@@ -9,10 +9,10 @@ module.exports = {
           dark: '#2a1f14',
           bg: '#f5f0ea',
           border: '#e8dfd4',
-          muted: '#9e8c75'
-        }
-      }
-    }
+          muted: '#9e8c75',
+        },
+      },
+    },
   },
-  plugins: []
+  plugins: [],
 }

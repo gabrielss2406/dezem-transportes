@@ -8,7 +8,7 @@ const navItems = [
   { path: '/drivers', label: 'Motoristas', icon: '👤' },
   { path: '/customers', label: 'Clientes', icon: '🏢' },
   { path: '/products', label: 'Produtos', icon: '📦' },
-  { path: '/suppliers', label: 'Fornecedores', icon: '🏪' }
+  { path: '/suppliers', label: 'Fornecedores', icon: '🏪' },
 ]
 
 export function Sidebar() {
@@ -39,9 +39,7 @@ export function Sidebar() {
         ))}
       </nav>
 
-      <div className="mt-auto px-3 text-[#4a3419] text-xs">
-        v1.0.0
-      </div>
+      <div className="mt-auto px-3 text-[#4a3419] text-xs">v1.0.0</div>
     </aside>
   )
 }

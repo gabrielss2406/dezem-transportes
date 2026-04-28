@@ -15,7 +15,7 @@ export function currentMonthRange(): { start: string; end: string } {
   const lastDay = new Date(y, now.getMonth() + 1, 0).getDate()
   return {
     start: `${y}-${m}-01`,
-    end: `${y}-${m}-${lastDay}`
+    end: `${y}-${m}-${lastDay}`,
   }
 }
 
@@ -32,12 +32,12 @@ export const COST_CATEGORIES = [
   { value: 'maintenance', label: 'Manutenção' },
   { value: 'salary', label: 'Salário' },
   { value: 'toll', label: 'Pedágio' },
-  { value: 'others', label: 'Outros' }
+  { value: 'others', label: 'Outros' },
 ]
 
 export const SUPPLIER_TYPES = [
   { value: 'gas_station', label: 'Posto' },
   { value: 'workshop', label: 'Oficina' },
   { value: 'quarry', label: 'Pedreira' },
-  { value: 'other', label: 'Outro' }
+  { value: 'other', label: 'Outro' },
 ]

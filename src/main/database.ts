@@ -1,7 +1,7 @@
+import bcrypt from 'bcryptjs'
 import Database from 'better-sqlite3'
 import { app } from 'electron'
 import { join } from 'path'
-import bcrypt from 'bcryptjs'
 
 let db: Database.Database
 

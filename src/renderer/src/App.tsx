@@ -1,15 +1,15 @@
 import { useState } from 'react'
-import { MemoryRouter, Routes, Route } from 'react-router-dom'
+import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { Sidebar } from './components/Sidebar'
-import { LoginPage } from './pages/Login'
-import { DashboardPage } from './pages/Dashboard'
-import { TripsPage } from './pages/Trips'
 import { CostsPage } from './pages/Costs'
-import { TrucksPage } from './pages/records/Trucks'
-import { DriversPage } from './pages/records/Drivers'
+import { DashboardPage } from './pages/Dashboard'
+import { LoginPage } from './pages/Login'
 import { CustomersPage } from './pages/records/Customers'
+import { DriversPage } from './pages/records/Drivers'
 import { ProductsPage } from './pages/records/Products'
 import { SuppliersPage } from './pages/records/Suppliers'
+import { TrucksPage } from './pages/records/Trucks'
+import { TripsPage } from './pages/Trips'
 
 export default function App() {
   const [user, setUser] = useState<string | null>(null)

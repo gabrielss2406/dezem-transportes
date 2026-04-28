@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Input, Button } from '../components/ui'
+import { Button, Input } from '../components/ui'
 
 interface LoginProps {
   onLogin: (name: string) => void
@@ -16,8 +16,8 @@ export function LoginPage({ onLogin }: LoginProps) {
     setError('')
     try {
       const result = await window.api.auth.login(password)
-      if (result.ok) {
-        onLogin(result.name!)
+      if (result.ok && result.name) {
+        onLogin(result.name)
       } else {
         setError(result.error || 'Senha incorreta')
       }

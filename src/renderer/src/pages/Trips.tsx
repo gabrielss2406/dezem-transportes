@@ -1,10 +1,22 @@
-import { useState, useEffect, useCallback } from 'react'
-import { Button, Table, Modal, Input, Select, Toast, useToast } from '../components/ui'
+import { useCallback, useEffect, useState } from 'react'
 import { PageHeader } from '../components/PageHeader'
+import { Button, Input, Modal, Select, Table, Toast, useToast } from '../components/ui'
+import type { Customer, Driver, Product, Route, Supplier, Trip, Truck } from '../lib/types'
 import { formatBRL, formatDate } from '../lib/utils'
-import type { Trip, Truck, Driver, Product, Customer, Route, Supplier } from '../lib/types'
 
-const EMPTY = { date: '', truck_id: '', driver_id: '', product_id: '', customer_id: '', route_id: '', supplier_id: '', weight_ton: '', price_charged: '', km_driven: '', observation: '' }
+const EMPTY = {
+  date: '',
+  truck_id: '',
+  driver_id: '',
+  product_id: '',
+  customer_id: '',
+  route_id: '',
+  supplier_id: '',
+  weight_ton: '',
+  price_charged: '',
+  km_driven: '',
+  observation: '',
+}
 
 export function TripsPage() {
   const [trips, setTrips] = useState<Trip[]>([])
@@ -26,13 +38,20 @@ export function TripsPage() {
       window.api.products.list(),
       window.api.customers.list(),
       window.api.routes.list(),
-      window.api.suppliers.list()
+      window.api.suppliers.list(),
     ])
-    setTrips(t); setTrucks(tr); setDrivers(d); setProducts(p)
-    setCustomers(c); setRoutes(r); setSuppliers(s)
+    setTrips(t)
+    setTrucks(tr)
+    setDrivers(d)
+    setProducts(p)
+    setCustomers(c)
+    setRoutes(r)
+    setSuppliers(s)
   }, [])
 
-  useEffect(() => { load() }, [load])
+  useEffect(() => {
+    load()
+  }, [load])
 
   const set = (k: string, v: any) => setForm((f: any) => ({ ...f, [k]: v }))
 
@@ -48,7 +67,7 @@ export function TripsPage() {
         supplier_id: form.supplier_id ? Number(form.supplier_id) : null,
         weight_ton: Number(form.weight_ton),
         price_charged: Number(form.price_charged),
-        km_driven: Number(form.km_driven)
+        km_driven: Number(form.km_driven),
       })
       show('Viagem registrada!')
       setModal(false)
@@ -74,10 +93,13 @@ export function TripsPage() {
     <div className="p-8 max-w-6xl">
       {toast && <Toast message={toast.message} type={toast.type} />}
 
-      <PageHeader 
-        title="Viagens" 
-        actionLabel="Nova Viagem" 
-        onAction={() => { setForm({ ...EMPTY }); setModal(true) }} 
+      <PageHeader
+        title="Viagens"
+        actionLabel="Nova Viagem"
+        onAction={() => {
+          setForm({ ...EMPTY })
+          setModal(true)
+        }}
       />
 
       {/* Totalizers */}
@@ -105,7 +127,7 @@ export function TripsPage() {
           { key: 'weight_ton', label: 'Peso (ton)', render: (r) => `${r.weight_ton} ton` },
           { key: 'km_driven', label: 'Km', render: (r) => `${r.km_driven} km` },
           { key: 'price_charged', label: 'Valor', render: (r) => formatBRL(r.price_charged) },
-          { key: 'customer_name', label: 'Cliente' }
+          { key: 'customer_name', label: 'Cliente' },
         ]}
         data={trips}
         onDelete={handleDelete}
@@ -114,28 +136,85 @@ export function TripsPage() {
       {modal && (
         <Modal title="Nova Viagem" onClose={() => setModal(false)}>
           <div className="grid grid-cols-2 gap-4">
-            <Input label="Data" type="date" value={form.date} onChange={(e) => set('date', e.target.value)} />
-            <Select label="Caminhão" value={form.truck_id} onChange={(e) => set('truck_id', e.target.value)}
-              options={trucks.map((t) => ({ value: t.id, label: `${t.license_plate} — ${t.model}` }))} />
-            <Select label="Motorista" value={form.driver_id} onChange={(e) => set('driver_id', e.target.value)}
-              options={drivers.map((d) => ({ value: d.id, label: d.name }))} />
-            <Select label="Produto" value={form.product_id} onChange={(e) => set('product_id', e.target.value)}
-              options={products.map((p) => ({ value: p.id, label: p.name }))} />
-            <Input label="Peso (ton)" type="number" value={form.weight_ton} onChange={(e) => set('weight_ton', e.target.value)} />
-            <Input label="Preço cobrado (R$)" type="number" value={form.price_charged} onChange={(e) => set('price_charged', e.target.value)} />
-            <Input label="Km percorrido" type="number" value={form.km_driven} onChange={(e) => set('km_driven', e.target.value)} />
-            <Select label="Cliente" optional value={form.customer_id} onChange={(e) => set('customer_id', e.target.value)}
-              options={customers.map((c) => ({ value: c.id, label: c.name }))} />
-            <Select label="Rota" optional value={form.route_id} onChange={(e) => set('route_id', e.target.value)}
-              options={routes.map((r) => ({ value: r.id, label: r.name }))} />
-            <Select label="Posto (fornecedor)" optional value={form.supplier_id} onChange={(e) => set('supplier_id', e.target.value)}
-              options={suppliers.map((s) => ({ value: s.id, label: s.name }))} />
+            <Input
+              label="Data"
+              type="date"
+              value={form.date}
+              onChange={(e) => set('date', e.target.value)}
+            />
+            <Select
+              label="Caminhão"
+              value={form.truck_id}
+              onChange={(e) => set('truck_id', e.target.value)}
+              options={trucks.map((t) => ({
+                value: t.id,
+                label: `${t.license_plate} — ${t.model}`,
+              }))}
+            />
+            <Select
+              label="Motorista"
+              value={form.driver_id}
+              onChange={(e) => set('driver_id', e.target.value)}
+              options={drivers.map((d) => ({ value: d.id, label: d.name }))}
+            />
+            <Select
+              label="Produto"
+              value={form.product_id}
+              onChange={(e) => set('product_id', e.target.value)}
+              options={products.map((p) => ({ value: p.id, label: p.name }))}
+            />
+            <Input
+              label="Peso (ton)"
+              type="number"
+              value={form.weight_ton}
+              onChange={(e) => set('weight_ton', e.target.value)}
+            />
+            <Input
+              label="Preço cobrado (R$)"
+              type="number"
+              value={form.price_charged}
+              onChange={(e) => set('price_charged', e.target.value)}
+            />
+            <Input
+              label="Km percorrido"
+              type="number"
+              value={form.km_driven}
+              onChange={(e) => set('km_driven', e.target.value)}
+            />
+            <Select
+              label="Cliente"
+              optional
+              value={form.customer_id}
+              onChange={(e) => set('customer_id', e.target.value)}
+              options={customers.map((c) => ({ value: c.id, label: c.name }))}
+            />
+            <Select
+              label="Rota"
+              optional
+              value={form.route_id}
+              onChange={(e) => set('route_id', e.target.value)}
+              options={routes.map((r) => ({ value: r.id, label: r.name }))}
+            />
+            <Select
+              label="Posto (fornecedor)"
+              optional
+              value={form.supplier_id}
+              onChange={(e) => set('supplier_id', e.target.value)}
+              options={suppliers.map((s) => ({ value: s.id, label: s.name }))}
+            />
             <div className="col-span-2">
-              <Input label="Observação" optional value={form.observation} onChange={(e) => set('observation', e.target.value)} />
+              <Input
+                label="Observação"
+                optional
+                value={form.observation}
+                onChange={(e) => set('observation', e.target.value)}
+              />
             </div>
           </div>
           <div className="flex justify-end gap-3 mt-6">
-            <Button variant="ghost" onClick={() => setModal(false)}>Cancelar</Button>
+            <Button variant="ghost" onClick={() => setModal(false)}>
+              Cancelar
+            </Button>
             <Button onClick={save}>Salvar Viagem</Button>
           </div>
         </Modal>

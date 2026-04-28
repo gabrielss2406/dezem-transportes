@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react'
-import { KpiCard, Card } from '../components/ui'
+import { useEffect, useState } from 'react'
 import { PageHeader } from '../components/PageHeader'
-import { formatBRL, currentMonthRange } from '../lib/utils'
+import { Card, KpiCard } from '../components/ui'
 import type { DashboardSummary } from '../lib/types'
+import { currentMonthRange, formatBRL } from '../lib/utils'
 
 export function DashboardPage() {
   const [summary, setSummary] = useState<DashboardSummary | null>(null)
@@ -46,10 +46,15 @@ export function DashboardPage() {
               {summary.perTruck.length === 0 && <p className="text-[#9e8c75] text-sm">Sem dados</p>}
               <div className="flex flex-col gap-2">
                 {summary.perTruck.map((c) => (
-                  <div key={c.license_plate} className="flex justify-between items-center py-2 border-b border-[#f0e9e0] last:border-0">
+                  <div
+                    key={c.license_plate}
+                    className="flex justify-between items-center py-2 border-b border-[#f0e9e0] last:border-0"
+                  >
                     <div>
                       <p className="font-medium text-sm text-[#2a1f14]">{c.license_plate}</p>
-                      <p className="text-xs text-[#9e8c75]">{c.model} · {c.km.toFixed(0)} km</p>
+                      <p className="text-xs text-[#9e8c75]">
+                        {c.model} · {c.km.toFixed(0)} km
+                      </p>
                     </div>
                     <span className="font-semibold text-[#7B5B2E]">{formatBRL(c.revenue)}</span>
                   </div>
@@ -60,10 +65,15 @@ export function DashboardPage() {
             {/* Per Product */}
             <Card>
               <h2 className="font-semibold text-[#2a1f14] mb-4">Saída por Produto</h2>
-              {summary.perProduct.length === 0 && <p className="text-[#9e8c75] text-sm">Sem dados</p>}
+              {summary.perProduct.length === 0 && (
+                <p className="text-[#9e8c75] text-sm">Sem dados</p>
+              )}
               <div className="flex flex-col gap-2">
                 {summary.perProduct.map((p) => (
-                  <div key={p.name} className="flex justify-between items-center py-2 border-b border-[#f0e9e0] last:border-0">
+                  <div
+                    key={p.name}
+                    className="flex justify-between items-center py-2 border-b border-[#f0e9e0] last:border-0"
+                  >
                     <div>
                       <p className="font-medium text-sm text-[#2a1f14]">{p.name}</p>
                       <p className="text-xs text-[#9e8c75]">{p.trips} viagens</p>

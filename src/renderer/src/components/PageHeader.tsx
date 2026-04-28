@@ -17,9 +17,7 @@ export function PageHeader({ title, subtitle, actionLabel, onAction, children }:
       </div>
       <div className="flex gap-3">
         {children}
-        {actionLabel && onAction && (
-          <Button onClick={onAction}>+ {actionLabel}</Button>
-        )}
+        {actionLabel && onAction && <Button onClick={onAction}>+ {actionLabel}</Button>}
       </div>
     </div>
   )

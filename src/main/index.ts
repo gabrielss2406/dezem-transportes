@@ -1,6 +1,6 @@
-import { app, shell, BrowserWindow } from 'electron'
-import { join } from 'path'
 import { is } from '@electron-toolkit/utils'
+import { app, BrowserWindow, shell } from 'electron'
+import { join } from 'path'
 import { setupDatabase } from './database'
 import { registerHandlers } from './handlers'
 
@@ -15,11 +15,12 @@ function createWindow(): void {
     title: 'Dezem — Gestão de Frota',
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
-      sandbox: false
-    }
+      sandbox: false,
+    },
   })
 
   mainWindow.on('ready-to-show', () => {
+    mainWindow.maximize()
     mainWindow.show()
   })
 
@@ -41,7 +42,7 @@ app.whenReady().then(() => {
 
   createWindow()
 
-  app.on('activate', function () {
+  app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
 })
