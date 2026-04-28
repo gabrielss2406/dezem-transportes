@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Button, Table, Modal, Input, Select, Toast, useToast } from '../components/ui'
+import { PageHeader } from '../components/PageHeader'
 import { formatBRL, formatDate } from '../lib/utils'
 import type { Trip, Truck, Driver, Product, Customer, Route, Supplier } from '../lib/types'
 
@@ -43,7 +44,7 @@ export function TripsPage() {
         driver_id: Number(form.driver_id),
         product_id: Number(form.product_id),
         customer_id: form.customer_id ? Number(form.customer_id) : null,
-        route_id: form.route_id ? Number(form.rota_id) : null,
+        route_id: form.route_id ? Number(form.route_id) : null,
         supplier_id: form.supplier_id ? Number(form.supplier_id) : null,
         weight_ton: Number(form.weight_ton),
         price_charged: Number(form.price_charged),
@@ -73,10 +74,11 @@ export function TripsPage() {
     <div className="p-8 max-w-6xl">
       {toast && <Toast message={toast.message} type={toast.type} />}
 
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-[#2a1f14]">Viagens</h1>
-        <Button onClick={() => { setForm({ ...EMPTY }); setModal(true) }}>+ Nova Viagem</Button>
-      </div>
+      <PageHeader 
+        title="Viagens" 
+        actionLabel="Nova Viagem" 
+        onAction={() => { setForm({ ...EMPTY }); setModal(true) }} 
+      />
 
       {/* Totalizers */}
       <div className="grid grid-cols-3 gap-4 mb-6">

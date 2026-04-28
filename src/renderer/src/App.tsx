@@ -5,7 +5,11 @@ import { LoginPage } from './pages/Login'
 import { DashboardPage } from './pages/Dashboard'
 import { TripsPage } from './pages/Trips'
 import { CostsPage } from './pages/Costs'
-import { TrucksPage, DriversPage, CustomersPage, ProductsPage, SuppliersPage } from './pages/Records'
+import { TrucksPage } from './pages/records/Trucks'
+import { DriversPage } from './pages/records/Drivers'
+import { CustomersPage } from './pages/records/Customers'
+import { ProductsPage } from './pages/records/Products'
+import { SuppliersPage } from './pages/records/Suppliers'
 
 export default function App() {
   const [user, setUser] = useState<string | null>(null)

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Button, Table, Modal, Input, Select, Toast, useToast, Badge } from '../components/ui'
+import { PageHeader } from '../components/PageHeader'
 import { formatBRL, formatDate, COST_CATEGORIES, currentMonthKey } from '../lib/utils'
 import type { Cost, Truck, Supplier, Driver } from '../lib/types'
 
@@ -66,13 +67,9 @@ export function CostsPage() {
     <div className="p-8 max-w-6xl">
       {toast && <Toast message={toast.message} type={toast.type} />}
 
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-[#2a1f14]">Custos</h1>
-        <div className="flex gap-3">
-          <Button variant="ghost" onClick={issueSalaries}>💰 Lançar Salários do Mês</Button>
-          <Button onClick={() => { setForm({ ...EMPTY }); setModal(true) }}>+ Novo Custo</Button>
-        </div>
-      </div>
+      <PageHeader title="Custos" actionLabel="Novo Custo" onAction={() => { setForm({ ...EMPTY }); setModal(true) }}>
+        <Button variant="ghost" onClick={issueSalaries}>💰 Lançar Salários do Mês</Button>
+      </PageHeader>
 
       <div className="bg-[#7B5B2E] text-white rounded-xl p-4 mb-6 flex items-center justify-between">
         <span className="text-sm font-medium opacity-80">TOTAL DE CUSTOS</span>

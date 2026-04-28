@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { KpiCard, Card } from '../components/ui'
+import { PageHeader } from '../components/PageHeader'
 import { formatBRL, currentMonthRange } from '../lib/utils'
 import type { DashboardSummary } from '../lib/types'
 
@@ -20,12 +21,7 @@ export function DashboardPage() {
 
   return (
     <div className="p-8 max-w-6xl">
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="text-2xl font-bold text-[#2a1f14]">Dashboard</h1>
-          <p className="text-[#9e8c75] text-sm capitalize">{monthLabel}</p>
-        </div>
-      </div>
+      <PageHeader title="Dashboard" subtitle={monthLabel} />
 
       {loading && <p className="text-[#9e8c75]">Carregando...</p>}
 
