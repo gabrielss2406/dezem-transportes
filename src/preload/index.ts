@@ -1,77 +1,77 @@
 import { contextBridge, ipcRenderer } from 'electron'
 
-// Expõe API segura para o renderer via contextBridge
+// Exposes secure API to the renderer via contextBridge
 contextBridge.exposeInMainWorld('api', {
   // Auth
   auth: {
-    login: (senha: string) => ipcRenderer.invoke('auth:login', senha),
-    trocarSenha: (atual: string, nova: string) => ipcRenderer.invoke('auth:trocarSenha', atual, nova)
+    login: (password: string) => ipcRenderer.invoke('auth:login', password),
+    changePassword: (current: string, next: string) => ipcRenderer.invoke('auth:changePassword', current, next)
   },
 
-  // Clientes
-  clientes: {
-    listar: (busca?: string) => ipcRenderer.invoke('clientes:listar', busca),
-    criar: (data: any) => ipcRenderer.invoke('clientes:criar', data),
-    editar: (id: number, data: any) => ipcRenderer.invoke('clientes:editar', id, data),
-    deletar: (id: number) => ipcRenderer.invoke('clientes:deletar', id)
+  // Customers
+  customers: {
+    list: (search?: string) => ipcRenderer.invoke('customers:list', search),
+    create: (data: any) => ipcRenderer.invoke('customers:create', data),
+    update: (id: number, data: any) => ipcRenderer.invoke('customers:update', id, data),
+    delete: (id: number) => ipcRenderer.invoke('customers:delete', id)
   },
 
-  // Produtos
-  produtos: {
-    listar: (busca?: string) => ipcRenderer.invoke('produtos:listar', busca),
-    criar: (data: any) => ipcRenderer.invoke('produtos:criar', data),
-    editar: (id: number, data: any) => ipcRenderer.invoke('produtos:editar', id, data),
-    deletar: (id: number) => ipcRenderer.invoke('produtos:deletar', id)
+  // Products
+  products: {
+    list: (search?: string) => ipcRenderer.invoke('products:list', search),
+    create: (data: any) => ipcRenderer.invoke('products:create', data),
+    update: (id: number, data: any) => ipcRenderer.invoke('products:update', id, data),
+    delete: (id: number) => ipcRenderer.invoke('products:delete', id)
   },
 
-  // Fornecedores
-  fornecedores: {
-    listar: (busca?: string) => ipcRenderer.invoke('fornecedores:listar', busca),
-    criar: (data: any) => ipcRenderer.invoke('fornecedores:criar', data),
-    editar: (id: number, data: any) => ipcRenderer.invoke('fornecedores:editar', id, data),
-    deletar: (id: number) => ipcRenderer.invoke('fornecedores:deletar', id)
+  // Suppliers
+  suppliers: {
+    list: (search?: string) => ipcRenderer.invoke('suppliers:list', search),
+    create: (data: any) => ipcRenderer.invoke('suppliers:create', data),
+    update: (id: number, data: any) => ipcRenderer.invoke('suppliers:update', id, data),
+    delete: (id: number) => ipcRenderer.invoke('suppliers:delete', id)
   },
 
-  // Caminhões
-  caminhoes: {
-    listar: () => ipcRenderer.invoke('caminhoes:listar'),
-    criar: (data: any) => ipcRenderer.invoke('caminhoes:criar', data),
-    editar: (id: number, data: any) => ipcRenderer.invoke('caminhoes:editar', id, data),
-    deletar: (id: number) => ipcRenderer.invoke('caminhoes:deletar', id)
+  // Trucks
+  trucks: {
+    list: () => ipcRenderer.invoke('trucks:list'),
+    create: (data: any) => ipcRenderer.invoke('trucks:create', data),
+    update: (id: number, data: any) => ipcRenderer.invoke('trucks:update', id, data),
+    delete: (id: number) => ipcRenderer.invoke('trucks:delete', id)
   },
 
-  // Motoristas
-  motoristas: {
-    listar: () => ipcRenderer.invoke('motoristas:listar'),
-    criar: (data: any) => ipcRenderer.invoke('motoristas:criar', data),
-    editar: (id: number, data: any) => ipcRenderer.invoke('motoristas:editar', id, data),
-    deletar: (id: number) => ipcRenderer.invoke('motoristas:deletar', id)
+  // Drivers
+  drivers: {
+    list: () => ipcRenderer.invoke('drivers:list'),
+    create: (data: any) => ipcRenderer.invoke('drivers:create', data),
+    update: (id: number, data: any) => ipcRenderer.invoke('drivers:update', id, data),
+    delete: (id: number) => ipcRenderer.invoke('drivers:delete', id)
   },
 
-  // Rotas
-  rotas: {
-    listar: () => ipcRenderer.invoke('rotas:listar'),
-    criar: (data: any) => ipcRenderer.invoke('rotas:criar', data)
+  // Routes
+  routes: {
+    list: () => ipcRenderer.invoke('routes:list'),
+    create: (data: any) => ipcRenderer.invoke('routes:create', data)
   },
 
-  // Viagens
-  viagens: {
-    listar: (filtros?: any) => ipcRenderer.invoke('viagens:listar', filtros),
-    criar: (data: any) => ipcRenderer.invoke('viagens:criar', data),
-    deletar: (id: number) => ipcRenderer.invoke('viagens:deletar', id)
+  // Trips
+  trips: {
+    list: (filters?: any) => ipcRenderer.invoke('trips:list', filters),
+    create: (data: any) => ipcRenderer.invoke('trips:create', data),
+    delete: (id: number) => ipcRenderer.invoke('trips:delete', id)
   },
 
-  // Custos
-  custos: {
-    listar: (filtros?: any) => ipcRenderer.invoke('custos:listar', filtros),
-    criar: (data: any) => ipcRenderer.invoke('custos:criar', data),
-    deletar: (id: number) => ipcRenderer.invoke('custos:deletar', id),
-    lancarSalariosMes: (mesAno: string) => ipcRenderer.invoke('custos:lancarSalariosMes', mesAno)
+  // Costs
+  costs: {
+    list: (filters?: any) => ipcRenderer.invoke('costs:list', filters),
+    create: (data: any) => ipcRenderer.invoke('costs:create', data),
+    delete: (id: number) => ipcRenderer.invoke('costs:delete', id),
+    issueMonthlySalaries: (monthYear: string) => ipcRenderer.invoke('costs:issueMonthlySalaries', monthYear)
   },
 
   // Dashboard
   dashboard: {
-    resumo: (dataInicio: string, dataFim: string) =>
-      ipcRenderer.invoke('dashboard:resumo', dataInicio, dataFim)
+    summary: (startDate: string, endDate: string) =>
+      ipcRenderer.invoke('dashboard:summary', startDate, endDate)
   }
 })

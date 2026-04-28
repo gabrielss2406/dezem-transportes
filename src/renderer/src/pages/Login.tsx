@@ -2,27 +2,27 @@ import { useState } from 'react'
 import { Input, Button } from '../components/ui'
 
 interface LoginProps {
-  onLogin: (nome: string) => void
+  onLogin: (name: string) => void
 }
 
 export function LoginPage({ onLogin }: LoginProps) {
-  const [senha, setSenha] = useState('')
-  const [erro, setErro] = useState('')
+  const [password, setPassword] = useState('')
+  const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true)
-    setErro('')
+    setError('')
     try {
-      const result = await window.api.auth.login(senha)
+      const result = await window.api.auth.login(password)
       if (result.ok) {
-        onLogin(result.nome!)
+        onLogin(result.name!)
       } else {
-        setErro(result.error || 'Senha incorreta')
+        setError(result.error || 'Senha incorreta')
       }
     } catch {
-      setErro('Erro ao conectar')
+      setError('Erro ao conectar')
     } finally {
       setLoading(false)
     }
@@ -40,13 +40,13 @@ export function LoginPage({ onLogin }: LoginProps) {
           <Input
             label="Senha de acesso"
             type="password"
-            value={senha}
-            onChange={(e) => setSenha(e.target.value)}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
             placeholder="••••••••"
             autoFocus
-            error={erro}
+            error={error}
           />
-          <Button type="submit" disabled={loading || !senha}>
+          <Button type="submit" disabled={loading || !password}>
             {loading ? 'Entrando...' : 'Entrar'}
           </Button>
         </form>

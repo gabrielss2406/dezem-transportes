@@ -2,13 +2,13 @@ import { NavLink } from 'react-router-dom'
 
 const navItems = [
   { path: '/', label: 'Dashboard', icon: '📊' },
-  { path: '/viagens', label: 'Viagens', icon: '🚛' },
-  { path: '/custos', label: 'Custos', icon: '💰' },
-  { path: '/caminhoes', label: 'Caminhões', icon: '🚚' },
-  { path: '/motoristas', label: 'Motoristas', icon: '👤' },
-  { path: '/clientes', label: 'Clientes', icon: '🏢' },
-  { path: '/produtos', label: 'Produtos', icon: '📦' },
-  { path: '/fornecedores', label: 'Fornecedores', icon: '🏪' }
+  { path: '/trips', label: 'Viagens', icon: '🚛' },
+  { path: '/costs', label: 'Custos', icon: '💰' },
+  { path: '/trucks', label: 'Caminhões', icon: '🚚' },
+  { path: '/drivers', label: 'Motoristas', icon: '👤' },
+  { path: '/customers', label: 'Clientes', icon: '🏢' },
+  { path: '/products', label: 'Produtos', icon: '📦' },
+  { path: '/suppliers', label: 'Fornecedores', icon: '🏪' }
 ]
 
 export function Sidebar() {

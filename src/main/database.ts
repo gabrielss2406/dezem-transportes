@@ -19,116 +19,116 @@ export function setupDatabase(): void {
 
   db.exec(`
     -- Auth
-    CREATE TABLE IF NOT EXISTS usuarios (
-      id        INTEGER PRIMARY KEY AUTOINCREMENT,
-      nome      TEXT    NOT NULL,
-      senha_hash TEXT   NOT NULL,
-      criado_em TEXT    DEFAULT (datetime('now'))
+    CREATE TABLE IF NOT EXISTS users (
+      id            INTEGER PRIMARY KEY AUTOINCREMENT,
+      name          TEXT    NOT NULL,
+      password_hash TEXT   NOT NULL,
+      created_at    TEXT    DEFAULT (datetime('now'))
     );
 
-    -- Clientes
-    CREATE TABLE IF NOT EXISTS clientes (
+    -- Customers
+    CREATE TABLE IF NOT EXISTS customers (
       id         INTEGER PRIMARY KEY AUTOINCREMENT,
-      nome       TEXT NOT NULL,
+      name       TEXT NOT NULL,
       cnpj       TEXT,
       ie         TEXT,
-      telefone   TEXT,
-      endereco   TEXT,
-      criado_em  TEXT DEFAULT (datetime('now'))
+      phone      TEXT,
+      address    TEXT,
+      created_at TEXT DEFAULT (datetime('now'))
     );
 
-    -- Produtos
-    CREATE TABLE IF NOT EXISTS produtos (
-      id        INTEGER PRIMARY KEY AUTOINCREMENT,
-      nome      TEXT NOT NULL,
-      unidade   TEXT NOT NULL DEFAULT 'ton',
-      criado_em TEXT DEFAULT (datetime('now'))
+    -- Products
+    CREATE TABLE IF NOT EXISTS products (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      name       TEXT NOT NULL,
+      unit       TEXT NOT NULL DEFAULT 'ton',
+      created_at TEXT DEFAULT (datetime('now'))
     );
 
-    -- Fornecedores
-    CREATE TABLE IF NOT EXISTS fornecedores (
-      id        INTEGER PRIMARY KEY AUTOINCREMENT,
-      nome      TEXT NOT NULL,
-      tipo      TEXT NOT NULL CHECK(tipo IN ('posto','oficina','pedreira','outro')),
-      telefone  TEXT,
-      criado_em TEXT DEFAULT (datetime('now'))
+    -- Suppliers
+    CREATE TABLE IF NOT EXISTS suppliers (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      name       TEXT NOT NULL,
+      type       TEXT NOT NULL CHECK(type IN ('gas_station','workshop','quarry','other')),
+      phone      TEXT,
+      created_at TEXT DEFAULT (datetime('now'))
     );
 
-    -- Caminhões
-    CREATE TABLE IF NOT EXISTS caminhoes (
+    -- Trucks
+    CREATE TABLE IF NOT EXISTS trucks (
       id               INTEGER PRIMARY KEY AUTOINCREMENT,
-      placa            TEXT NOT NULL UNIQUE,
-      modelo           TEXT NOT NULL,
-      ano              INTEGER,
-      capacidade_ton   REAL,
-      odometro_atual   REAL NOT NULL DEFAULT 0,
-      criado_em        TEXT DEFAULT (datetime('now'))
+      license_plate    TEXT NOT NULL UNIQUE,
+      model            TEXT NOT NULL,
+      year             INTEGER,
+      capacity_ton     REAL,
+      current_odometer REAL NOT NULL DEFAULT 0,
+      created_at       TEXT DEFAULT (datetime('now'))
     );
 
-    -- Motoristas
-    CREATE TABLE IF NOT EXISTS motoristas (
-      id            INTEGER PRIMARY KEY AUTOINCREMENT,
-      nome          TEXT NOT NULL,
-      cpf           TEXT,
-      telefone      TEXT,
-      salario_mensal REAL NOT NULL DEFAULT 0,
-      caminhao_id   INTEGER REFERENCES caminhoes(id),
-      ativo         INTEGER NOT NULL DEFAULT 1,
-      criado_em     TEXT DEFAULT (datetime('now'))
-    );
-
-    -- Rotas
-    CREATE TABLE IF NOT EXISTS rotas (
-      id        INTEGER PRIMARY KEY AUTOINCREMENT,
-      nome      TEXT NOT NULL,
-      distancia_km REAL,
-      criado_em TEXT DEFAULT (datetime('now'))
-    );
-
-    -- Viagens
-    CREATE TABLE IF NOT EXISTS viagens (
-      id              INTEGER PRIMARY KEY AUTOINCREMENT,
-      data            TEXT NOT NULL,
-      caminhao_id     INTEGER NOT NULL REFERENCES caminhoes(id),
-      motorista_id    INTEGER NOT NULL REFERENCES motoristas(id),
-      produto_id      INTEGER NOT NULL REFERENCES produtos(id),
-      cliente_id      INTEGER REFERENCES clientes(id),
-      rota_id         INTEGER REFERENCES rotas(id),
-      fornecedor_id   INTEGER REFERENCES fornecedores(id),
-      peso_ton        REAL NOT NULL DEFAULT 0,
-      preco_cobrado   REAL NOT NULL DEFAULT 0,
-      km_percorrido   REAL NOT NULL DEFAULT 0,
-      observacao      TEXT,
-      criado_em       TEXT DEFAULT (datetime('now'))
-    );
-
-    -- Custos
-    CREATE TABLE IF NOT EXISTS custos (
+    -- Drivers
+    CREATE TABLE IF NOT EXISTS drivers (
       id             INTEGER PRIMARY KEY AUTOINCREMENT,
-      data           TEXT NOT NULL,
-      categoria      TEXT NOT NULL CHECK(categoria IN ('combustivel','oleo','manutencao','salario','pedagio','outros')),
-      valor          REAL NOT NULL,
-      caminhao_id    INTEGER REFERENCES caminhoes(id),
-      fornecedor_id  INTEGER REFERENCES fornecedores(id),
-      motorista_id   INTEGER REFERENCES motoristas(id),
-      descricao      TEXT,
-      criado_em      TEXT DEFAULT (datetime('now'))
+      name           TEXT NOT NULL,
+      cpf            TEXT,
+      phone          TEXT,
+      monthly_salary REAL NOT NULL DEFAULT 0,
+      truck_id       INTEGER REFERENCES trucks(id),
+      active         INTEGER NOT NULL DEFAULT 1,
+      created_at     TEXT DEFAULT (datetime('now'))
     );
 
-    -- Índices para performance nas consultas frequentes
-    CREATE INDEX IF NOT EXISTS idx_viagens_data        ON viagens(data);
-    CREATE INDEX IF NOT EXISTS idx_viagens_caminhao    ON viagens(caminhao_id);
-    CREATE INDEX IF NOT EXISTS idx_viagens_motorista   ON viagens(motorista_id);
-    CREATE INDEX IF NOT EXISTS idx_custos_data         ON custos(data);
-    CREATE INDEX IF NOT EXISTS idx_custos_categoria    ON custos(categoria);
+    -- Routes
+    CREATE TABLE IF NOT EXISTS routes (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      name        TEXT NOT NULL,
+      distance_km REAL,
+      created_at  TEXT DEFAULT (datetime('now'))
+    );
+
+    -- Trips
+    CREATE TABLE IF NOT EXISTS trips (
+      id            INTEGER PRIMARY KEY AUTOINCREMENT,
+      date          TEXT NOT NULL,
+      truck_id      INTEGER NOT NULL REFERENCES trucks(id),
+      driver_id     INTEGER NOT NULL REFERENCES drivers(id),
+      product_id    INTEGER NOT NULL REFERENCES products(id),
+      customer_id   INTEGER REFERENCES customers(id),
+      route_id      INTEGER REFERENCES routes(id),
+      supplier_id   INTEGER REFERENCES suppliers(id),
+      weight_ton    REAL NOT NULL DEFAULT 0,
+      price_charged REAL NOT NULL DEFAULT 0,
+      km_driven     REAL NOT NULL DEFAULT 0,
+      observation   TEXT,
+      created_at    TEXT DEFAULT (datetime('now'))
+    );
+
+    -- Costs
+    CREATE TABLE IF NOT EXISTS costs (
+      id            INTEGER PRIMARY KEY AUTOINCREMENT,
+      date          TEXT NOT NULL,
+      category      TEXT NOT NULL CHECK(category IN ('fuel','oil','maintenance','salary','toll','others')),
+      value         REAL NOT NULL,
+      truck_id      INTEGER REFERENCES trucks(id),
+      supplier_id   INTEGER REFERENCES suppliers(id),
+      driver_id     INTEGER REFERENCES drivers(id),
+      description   TEXT,
+      created_at    TEXT DEFAULT (datetime('now'))
+    );
+
+    -- Indexes for performance on frequent queries
+    CREATE INDEX IF NOT EXISTS idx_trips_date      ON trips(date);
+    CREATE INDEX IF NOT EXISTS idx_trips_truck     ON trips(truck_id);
+    CREATE INDEX IF NOT EXISTS idx_trips_driver    ON trips(driver_id);
+    CREATE INDEX IF NOT EXISTS idx_costs_date      ON costs(date);
+    CREATE INDEX IF NOT EXISTS idx_costs_category  ON costs(category);
   `)
 
-  // Seed: usuário admin padrão se não existir
-  const userCount = (db.prepare('SELECT COUNT(*) as c FROM usuarios').get() as any).c
+  // Seed: default admin user if none exists
+  const userCount = (db.prepare('SELECT COUNT(*) as c FROM users').get() as any).c
   if (userCount === 0) {
     const hash = bcrypt.hashSync('dezem2024', 10)
-    db.prepare('INSERT INTO usuarios (nome, senha_hash) VALUES (?, ?)').run('Admin', hash)
+    db.prepare('INSERT INTO users (name, password_hash) VALUES (?, ?)').run('Admin', hash)
   }
 
-  console.log('[DB] SQLite pronto em:', dbPath)
+  console.log('[DB] SQLite ready at:', dbPath)
 }

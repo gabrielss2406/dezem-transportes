@@ -8,14 +8,14 @@ export function formatDate(dateStr: string): string {
   return `${d}/${m}/${y}`
 }
 
-export function currentMonthRange(): { inicio: string; fim: string } {
+export function currentMonthRange(): { start: string; end: string } {
   const now = new Date()
   const y = now.getFullYear()
   const m = String(now.getMonth() + 1).padStart(2, '0')
   const lastDay = new Date(y, now.getMonth() + 1, 0).getDate()
   return {
-    inicio: `${y}-${m}-01`,
-    fim: `${y}-${m}-${lastDay}`
+    start: `${y}-${m}-01`,
+    end: `${y}-${m}-${lastDay}`
   }
 }
 
@@ -26,18 +26,18 @@ export function currentMonthKey(): string {
   return `${y}-${m}`
 }
 
-export const CATEGORIAS_CUSTO = [
-  { value: 'combustivel', label: 'Combustível' },
-  { value: 'oleo', label: 'Óleo' },
-  { value: 'manutencao', label: 'Manutenção' },
-  { value: 'salario', label: 'Salário' },
-  { value: 'pedagio', label: 'Pedágio' },
-  { value: 'outros', label: 'Outros' }
+export const COST_CATEGORIES = [
+  { value: 'fuel', label: 'Combustível' },
+  { value: 'oil', label: 'Óleo' },
+  { value: 'maintenance', label: 'Manutenção' },
+  { value: 'salary', label: 'Salário' },
+  { value: 'toll', label: 'Pedágio' },
+  { value: 'others', label: 'Outros' }
 ]
 
-export const TIPOS_FORNECEDOR = [
-  { value: 'posto', label: 'Posto' },
-  { value: 'oficina', label: 'Oficina' },
-  { value: 'pedreira', label: 'Pedreira' },
-  { value: 'outro', label: 'Outro' }
+export const SUPPLIER_TYPES = [
+  { value: 'gas_station', label: 'Posto' },
+  { value: 'workshop', label: 'Oficina' },
+  { value: 'quarry', label: 'Pedreira' },
+  { value: 'other', label: 'Outro' }
 ]
