@@ -2,7 +2,7 @@
   "name": "dezem-gestao-frota",
   "version": "1.0.0",
   "description": "Sistema de Gestão de Frota — Dezem Transportes",
-  "main": "dist-electron/main.js",
+  "main": "./out/main/index.js",
   "author": "Dezem Dev Team",
   "license": "ISC",
   "scripts": {
@@ -59,8 +59,7 @@
       "createDesktopShortcut": true
     },
     "files": [
-      "dist/**/*",
-      "dist-electron/**/*"
+      "out/**/*"
     ]
   }
 }

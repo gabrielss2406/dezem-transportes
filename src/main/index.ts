@@ -14,7 +14,7 @@ function createWindow(): void {
     autoHideMenuBar: true,
     title: 'Dezem — Gestão de Frota',
     webPreferences: {
-      preload: join(__dirname, 'preload.js'),
+      preload: join(__dirname, '../preload/index.js'),
       sandbox: false
     }
   })
@@ -31,12 +31,11 @@ function createWindow(): void {
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
     mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
   } else {
-    mainWindow.loadFile(join(__dirname, '../dist/index.html'))
+    mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
   }
 }
 
 app.whenReady().then(() => {
-  // Init SQLite DB and IPC handlers
   setupDatabase()
   registerHandlers()
 

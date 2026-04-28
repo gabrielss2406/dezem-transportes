@@ -4,37 +4,16 @@ import react from '@vitejs/plugin-react'
 
 export default defineConfig({
   main: {
-    plugins: [externalizeDepsPlugin()],
-    build: {
-      outDir: 'dist-electron',
-      emptyOutDir: true,
-      rollupOptions: {
-        output: {
-          entryFileNames: 'main.js'
-        }
-      }
-    }
+    plugins: [externalizeDepsPlugin()]
   },
   preload: {
-    plugins: [externalizeDepsPlugin()],
-    build: {
-      outDir: 'dist-electron',
-      emptyOutDir: true,
-      rollupOptions: {
-        output: {
-          entryFileNames: 'preload.js'
-        }
-      }
-    }
+    plugins: [externalizeDepsPlugin()]
   },
   renderer: {
     resolve: {
       alias: {
         '@renderer': resolve('src/renderer/src')
       }
-    },
-    build: {
-      outDir: 'dist'
     },
     plugins: [react()]
   }
