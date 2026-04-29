@@ -1,6 +1,6 @@
-import { is } from '@electron-toolkit/utils'
-import { app, BrowserWindow, shell } from 'electron'
 import { join } from 'path'
+import { is } from '@electron-toolkit/utils'
+import { BrowserWindow, app, shell } from 'electron'
 import { setupDatabase } from './database'
 import { registerHandlers } from './handlers'
 

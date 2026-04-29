@@ -21,8 +21,7 @@
         "useNodejsImportProtocol": "off"
       },
       "suspicious": {
-        "noExplicitAny": "off",
-        "noUnknownAtRules": "off"
+        "noExplicitAny": "off"
       },
       "complexity": {
         "useLiteralKeys": "off"

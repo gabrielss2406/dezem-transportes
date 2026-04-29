@@ -25,20 +25,20 @@ export function registerHandlers(): void {
   // ── CUSTOMERS ───────────────────────────────────────────────────────────────
   ipcMain.handle('customers:list', (_e, search = '') => {
     return db()
-      .prepare(`SELECT * FROM customers WHERE name LIKE ? ORDER BY name`)
+      .prepare('SELECT * FROM customers WHERE name LIKE ? ORDER BY name')
       .all(`%${search}%`)
   })
 
   ipcMain.handle('customers:create', (_e, data: any) => {
     const r = db()
-      .prepare(`INSERT INTO customers (name, cnpj, ie, phone, address) VALUES (?,?,?,?,?)`)
+      .prepare('INSERT INTO customers (name, cnpj, ie, phone, address) VALUES (?,?,?,?,?)')
       .run(data.name, data.cnpj, data.ie, data.phone, data.address)
     return { id: r.lastInsertRowid }
   })
 
   ipcMain.handle('customers:update', (_e, id: number, data: any) => {
     db()
-      .prepare(`UPDATE customers SET name=?, cnpj=?, ie=?, phone=?, address=? WHERE id=?`)
+      .prepare('UPDATE customers SET name=?, cnpj=?, ie=?, phone=?, address=? WHERE id=?')
       .run(data.name, data.cnpj, data.ie, data.phone, data.address, id)
     return { ok: true }
   })
@@ -50,18 +50,18 @@ export function registerHandlers(): void {
 
   // ── PRODUCTS ────────────────────────────────────────────────────────────────
   ipcMain.handle('products:list', (_e, search = '') => {
-    return db().prepare(`SELECT * FROM products WHERE name LIKE ? ORDER BY name`).all(`%${search}%`)
+    return db().prepare('SELECT * FROM products WHERE name LIKE ? ORDER BY name').all(`%${search}%`)
   })
 
   ipcMain.handle('products:create', (_e, data: any) => {
     const r = db()
-      .prepare(`INSERT INTO products (name, unit) VALUES (?,?)`)
+      .prepare('INSERT INTO products (name, unit) VALUES (?,?)')
       .run(data.name, data.unit || 'ton')
     return { id: r.lastInsertRowid }
   })
 
   ipcMain.handle('products:update', (_e, id: number, data: any) => {
-    db().prepare(`UPDATE products SET name=?, unit=? WHERE id=?`).run(data.name, data.unit, id)
+    db().prepare('UPDATE products SET name=?, unit=? WHERE id=?').run(data.name, data.unit, id)
     return { ok: true }
   })
 
@@ -73,20 +73,20 @@ export function registerHandlers(): void {
   // ── SUPPLIERS ───────────────────────────────────────────────────────────────
   ipcMain.handle('suppliers:list', (_e, search = '') => {
     return db()
-      .prepare(`SELECT * FROM suppliers WHERE name LIKE ? ORDER BY name`)
+      .prepare('SELECT * FROM suppliers WHERE name LIKE ? ORDER BY name')
       .all(`%${search}%`)
   })
 
   ipcMain.handle('suppliers:create', (_e, data: any) => {
     const r = db()
-      .prepare(`INSERT INTO suppliers (name, type, phone) VALUES (?,?,?)`)
+      .prepare('INSERT INTO suppliers (name, type, phone) VALUES (?,?,?)')
       .run(data.name, data.type, data.phone)
     return { id: r.lastInsertRowid }
   })
 
   ipcMain.handle('suppliers:update', (_e, id: number, data: any) => {
     db()
-      .prepare(`UPDATE suppliers SET name=?, type=?, phone=? WHERE id=?`)
+      .prepare('UPDATE suppliers SET name=?, type=?, phone=? WHERE id=?')
       .run(data.name, data.type, data.phone, id)
     return { ok: true }
   })
@@ -104,7 +104,7 @@ export function registerHandlers(): void {
   ipcMain.handle('trucks:create', (_e, data: any) => {
     const r = db()
       .prepare(
-        `INSERT INTO trucks (license_plate, model, year, capacity_ton, current_odometer) VALUES (?,?,?,?,?)`,
+        'INSERT INTO trucks (license_plate, model, year, capacity_ton, current_odometer) VALUES (?,?,?,?,?)',
       )
       .run(data.license_plate, data.model, data.year, data.capacity_ton, data.current_odometer || 0)
     return { id: r.lastInsertRowid }
@@ -112,7 +112,7 @@ export function registerHandlers(): void {
 
   ipcMain.handle('trucks:update', (_e, id: number, data: any) => {
     db()
-      .prepare(`UPDATE trucks SET license_plate=?, model=?, year=?, capacity_ton=? WHERE id=?`)
+      .prepare('UPDATE trucks SET license_plate=?, model=?, year=?, capacity_ton=? WHERE id=?')
       .run(data.license_plate, data.model, data.year, data.capacity_ton, id)
     return { ok: true }
   })
@@ -137,7 +137,7 @@ export function registerHandlers(): void {
   ipcMain.handle('drivers:create', (_e, data: any) => {
     const r = db()
       .prepare(
-        `INSERT INTO drivers (name, cpf, phone, monthly_salary, truck_id) VALUES (?,?,?,?,?)`,
+        'INSERT INTO drivers (name, cpf, phone, monthly_salary, truck_id) VALUES (?,?,?,?,?)',
       )
       .run(data.name, data.cpf, data.phone, data.monthly_salary, data.truck_id || null)
     return { id: r.lastInsertRowid }
@@ -145,7 +145,7 @@ export function registerHandlers(): void {
 
   ipcMain.handle('drivers:update', (_e, id: number, data: any) => {
     db()
-      .prepare(`UPDATE drivers SET name=?, cpf=?, phone=?, monthly_salary=?, truck_id=? WHERE id=?`)
+      .prepare('UPDATE drivers SET name=?, cpf=?, phone=?, monthly_salary=?, truck_id=? WHERE id=?')
       .run(data.name, data.cpf, data.phone, data.monthly_salary, data.truck_id || null, id)
     return { ok: true }
   })
@@ -300,7 +300,7 @@ export function registerHandlers(): void {
 
   ipcMain.handle('costs:issueMonthlySalaries', (_e, monthYear: string) => {
     // monthYear format: 'YYYY-MM'
-    const drivers = db().prepare(`SELECT * FROM drivers WHERE active = 1`).all() as any[]
+    const drivers = db().prepare('SELECT * FROM drivers WHERE active = 1').all() as any[]
     const date = `${monthYear}-01`
     let issued = 0
     const insert = db().prepare(`

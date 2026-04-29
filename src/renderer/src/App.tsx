@@ -4,12 +4,12 @@ import { Sidebar } from './components/Sidebar'
 import { CostsPage } from './pages/Costs'
 import { DashboardPage } from './pages/Dashboard'
 import { LoginPage } from './pages/Login'
+import { TripsPage } from './pages/Trips'
 import { CustomersPage } from './pages/records/Customers'
 import { DriversPage } from './pages/records/Drivers'
 import { ProductsPage } from './pages/records/Products'
 import { SuppliersPage } from './pages/records/Suppliers'
 import { TrucksPage } from './pages/records/Trucks'
-import { TripsPage } from './pages/Trips'
 
 export default function App() {
   const [user, setUser] = useState<string | null>(null)

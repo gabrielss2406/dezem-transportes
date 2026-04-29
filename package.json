@@ -23,8 +23,7 @@
     "better-sqlite3": "^9.4.3",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "react-router-dom": "^6.22.0",
-    "recharts": "^2.12.0"
+    "react-router-dom": "^6.22.0"
   },
   "devDependencies": {
     "@biomejs/biome": "1.9.4",
@@ -56,19 +55,33 @@
       "target": [
         {
           "target": "nsis",
-          "arch": [
-            "x64"
-          ]
+          "arch": ["x64"]
         }
       ]
     },
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
-      "createDesktopShortcut": true
+      "createDesktopShortcut": true,
+      "useZip": false
     },
+    "compression": "maximum",
+    "asar": true,
+    "electronLanguages": ["pt-BR", "en-US"],
     "files": [
-      "out/**/*"
-    ]
+      "out/**/*",
+      "!**/*.map",
+      "!**/*.ts",
+      "!**/*.d.ts",
+      "!**/node_modules/.bin/**",
+      "!**/node_modules/*/{test,tests,__tests__,spec,specs}/**",
+      "!**/node_modules/*/{doc,docs,documentation}/**",
+      "!**/node_modules/*/{example,examples,demo,demos}/**",
+      "!**/node_modules/*/*.{md,markdown,txt,pdf,yml,yaml}",
+      "!**/node_modules/*/{README,CHANGELOG,CONTRIBUTING,LICENSE}*",
+      "!**/node_modules/*/{.eslintrc,.babelrc,.editorconfig}",
+      "!**/node_modules/**/*.map"
+    ],
+    "asarUnpack": ["**/node_modules/better-sqlite3/build/Release/*.node"]
   }
 }
