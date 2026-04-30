@@ -2,86 +2,35 @@
   "name": "dezem-gestao-frota",
   "version": "1.0.0",
   "description": "Sistema de Gestão de Frota — Dezem Transportes",
-  "main": "./out/main/index.js",
   "author": "Dezem Dev Team",
   "license": "ISC",
   "scripts": {
-    "dev": "electron-vite dev",
-    "build": "electron-vite build",
-    "preview": "electron-vite preview",
-    "dist": "npm run build && electron-builder",
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "tauri": "tauri",
     "lint": "biome check --write",
     "format": "biome format --write",
     "prepare": "husky"
   },
-  "lint-staged": {
-    "*.{ts,tsx,js,json}": "biome check --write --no-errors-on-unmatched"
-  },
   "dependencies": {
-    "@electron-toolkit/utils": "^4.0.0",
-    "bcryptjs": "^2.4.3",
-    "better-sqlite3": "^9.4.3",
+    "@tauri-apps/api": "^2.2.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-router-dom": "^6.22.0"
   },
   "devDependencies": {
     "@biomejs/biome": "1.9.4",
-    "@electron-toolkit/tsconfig": "^2.0.0",
-    "@types/bcryptjs": "^2.4.6",
-    "@types/better-sqlite3": "^7.6.8",
+    "@tauri-apps/cli": "^2.2.8",
     "@types/react": "^18.2.0",
     "@types/react-dom": "^18.2.0",
     "@vitejs/plugin-react": "^4.2.1",
     "autoprefixer": "^10.4.17",
-    "electron": "^29.1.0",
-    "electron-builder": "^24.13.3",
-    "electron-vite": "^2.1.0",
     "husky": "^9.1.7",
     "lint-staged": "^15.4.3",
     "postcss": "^8.4.35",
     "tailwindcss": "^3.4.1",
     "typescript": "^5.4.2",
     "vite": "^5.1.4"
-  },
-  "build": {
-    "appId": "com.dezem.gestaofrota",
-    "productName": "Dezem Gestão de Frota",
-    "directories": {
-      "output": "release"
-    },
-    "win": {
-      "icon": "resources/icon.ico",
-      "target": [
-        {
-          "target": "nsis",
-          "arch": ["x64"]
-        }
-      ]
-    },
-    "nsis": {
-      "oneClick": false,
-      "allowToChangeInstallationDirectory": true,
-      "createDesktopShortcut": true,
-      "useZip": false
-    },
-    "compression": "maximum",
-    "asar": true,
-    "electronLanguages": ["pt-BR", "en-US"],
-    "files": [
-      "out/**/*",
-      "!**/*.map",
-      "!**/*.ts",
-      "!**/*.d.ts",
-      "!**/node_modules/.bin/**",
-      "!**/node_modules/*/{test,tests,__tests__,spec,specs}/**",
-      "!**/node_modules/*/{doc,docs,documentation}/**",
-      "!**/node_modules/*/{example,examples,demo,demos}/**",
-      "!**/node_modules/*/*.{md,markdown,txt,pdf,yml,yaml}",
-      "!**/node_modules/*/{README,CHANGELOG,CONTRIBUTING,LICENSE}*",
-      "!**/node_modules/*/{.eslintrc,.babelrc,.editorconfig}",
-      "!**/node_modules/**/*.map"
-    ],
-    "asarUnpack": ["**/node_modules/better-sqlite3/build/Release/*.node"]
   }
 }
