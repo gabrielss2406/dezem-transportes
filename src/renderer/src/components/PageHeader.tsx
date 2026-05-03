@@ -1,3 +1,4 @@
+import type React from 'react'
 import { Button } from './ui'
 
 interface PageHeaderProps {
@@ -10,14 +11,29 @@ interface PageHeaderProps {
 
 export function PageHeader({ title, subtitle, actionLabel, onAction, children }: PageHeaderProps) {
   return (
-    <div className="flex items-center justify-between mb-6">
+    <div className="flex items-end justify-between mb-10">
       <div>
-        <h1 className="text-2xl font-bold text-[#2a1f14]">{title}</h1>
-        {subtitle && <p className="text-[#9e8c75] text-sm capitalize">{subtitle}</p>}
+        <span className="text-primary font-bold tracking-widest text-xs uppercase block mb-2">
+          Dezem Transportes
+        </span>
+        <h1 className="text-4xl font-black font-headline tracking-tighter text-on-surface">
+          {title}
+        </h1>
+        {subtitle && (
+          <p className="text-on-surface-variant text-base mt-1 capitalize">{subtitle}</p>
+        )}
       </div>
-      <div className="flex gap-3">
+      <div className="flex gap-3 items-center">
         {children}
-        {actionLabel && onAction && <Button onClick={onAction}>+ {actionLabel}</Button>}
+        {actionLabel && onAction && (
+          <button
+            onClick={onAction}
+            className="flex items-center gap-2 bg-primary text-on-primary px-6 py-3 rounded font-bold text-sm shadow-lg shadow-primary/20 hover:brightness-110 active:scale-95 transition-all"
+          >
+            <span className="material-symbols-outlined text-xl">add</span>
+            {actionLabel}
+          </button>
+        )}
       </div>
     </div>
   )

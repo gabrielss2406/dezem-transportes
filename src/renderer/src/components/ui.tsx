@@ -13,14 +13,14 @@ export function Button({
   ...props
 }: ButtonProps) {
   const base =
-    'inline-flex items-center justify-center font-semibold rounded transition-colors focus:outline-none disabled:opacity-50'
+    'inline-flex items-center justify-center font-bold rounded transition-all focus:outline-none disabled:opacity-50 active:scale-95'
   const variants = {
-    primary: 'bg-[#7B5B2E] text-white hover:bg-[#5e4320] active:bg-[#4a3419]',
+    primary: 'bg-primary text-on-primary hover:brightness-110 shadow-lg shadow-primary/20',
     ghost:
-      'border border-[#7B5B2E] text-[#7B5B2E] bg-transparent hover:bg-[#7B5B2E] hover:text-white',
-    danger: 'bg-red-600 text-white hover:bg-red-700',
+      'border border-outline-variant text-on-surface-variant hover:text-on-surface hover:border-primary/60 bg-transparent',
+    danger: 'bg-error-container text-on-error-container hover:brightness-110',
   }
-  const sizes = { sm: 'px-3 py-1.5 text-sm', md: 'px-5 py-2.5 text-sm' }
+  const sizes = { sm: 'px-3 py-1.5 text-xs', md: 'px-6 py-2.5 text-sm' }
   return (
     <button className={`${base} ${variants[variant]} ${sizes[size]} ${className}`} {...props}>
       {children}
@@ -36,18 +36,18 @@ interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
 }
 export function Input({ label, optional, error, className = '', ...props }: InputProps) {
   return (
-    <div className="flex flex-col gap-1">
+    <div className="flex flex-col gap-1.5">
       {label && (
-        <label className="text-xs font-semibold uppercase tracking-wide text-[#4a3419]">
+        <label className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
           {label}{' '}
-          {optional && <span className="text-[#9e8c75] font-normal normal-case">(opcional)</span>}
+          {optional && <span className="text-outline font-normal normal-case">(opcional)</span>}
         </label>
       )}
       <input
-        className={`border rounded px-3 py-2 text-sm bg-white focus:outline-none focus:border-[#7B5B2E] transition-colors ${error ? 'border-red-500' : 'border-[#d5c9bb]'} ${className}`}
+        className={`bg-surface-container-lowest border border-outline-variant/30 rounded-lg px-4 py-3 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all ${error ? 'border-error' : ''} ${className}`}
         {...props}
       />
-      {error && <span className="text-xs text-red-600">{error}</span>}
+      {error && <span className="text-xs text-error">{error}</span>}
     </div>
   )
 }
@@ -60,15 +60,15 @@ interface SelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
 }
 export function Select({ label, optional, options, className = '', ...props }: SelectProps) {
   return (
-    <div className="flex flex-col gap-1">
+    <div className="flex flex-col gap-1.5">
       {label && (
-        <label className="text-xs font-semibold uppercase tracking-wide text-[#4a3419]">
+        <label className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
           {label}{' '}
-          {optional && <span className="text-[#9e8c75] font-normal normal-case">(opcional)</span>}
+          {optional && <span className="text-outline font-normal normal-case">(opcional)</span>}
         </label>
       )}
       <select
-        className={`border border-[#d5c9bb] rounded px-3 py-2 text-sm bg-white focus:outline-none focus:border-[#7B5B2E] transition-colors ${className}`}
+        className={`bg-surface-container-lowest border border-outline-variant/30 rounded-lg px-4 py-3 text-sm text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all ${className}`}
         {...props}
       >
         <option value="">Selecione...</option>
@@ -89,14 +89,18 @@ interface BadgeProps {
 }
 export function Badge({ label, color = 'gray' }: BadgeProps) {
   const colors = {
-    green: 'bg-green-100 text-green-800',
-    amber: 'bg-amber-100 text-amber-800',
-    red: 'bg-red-100 text-red-800',
-    blue: 'bg-blue-100 text-blue-800',
-    gray: 'bg-gray-100 text-gray-600',
+    green: 'bg-tertiary-container/30 text-tertiary',
+    amber: 'bg-secondary-container text-on-secondary-container',
+    red: 'bg-error-container/30 text-error',
+    blue: 'bg-tertiary-container/20 text-tertiary',
+    gray: 'bg-surface-container-highest text-on-surface-variant',
   }
   return (
-    <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${colors[color]}`}>{label}</span>
+    <span
+      className={`text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded ${colors[color]}`}
+    >
+      {label}
+    </span>
   )
 }
 
@@ -109,7 +113,9 @@ export function Card({
   className?: string
 }) {
   return (
-    <div className={`bg-white rounded-xl border border-[#e8dfd4] shadow-sm p-5 ${className}`}>
+    <div
+      className={`bg-surface-container rounded-xl border border-outline-variant/10 p-6 ${className}`}
+    >
       {children}
     </div>
   )
@@ -125,16 +131,26 @@ interface KpiCardProps {
 export function KpiCard({ label, value, sub, accent }: KpiCardProps) {
   return (
     <div
-      className={`rounded-xl p-5 flex flex-col gap-1 ${accent ? 'bg-[#7B5B2E] text-white' : 'bg-white border border-[#e8dfd4]'}`}
+      className={`rounded-xl p-6 flex flex-col gap-2 ${
+        accent
+          ? 'bg-gradient-to-br from-primary to-primary-container text-on-primary'
+          : 'bg-surface-container border border-outline-variant/10'
+      }`}
     >
       <span
-        className={`text-xs font-semibold uppercase tracking-widest ${accent ? 'text-[#d4b896]' : 'text-[#9e8c75]'}`}
+        className={`text-[10px] font-bold uppercase tracking-widest ${accent ? 'text-on-primary/70' : 'text-on-surface-variant'}`}
       >
         {label}
       </span>
-      <span className="text-2xl font-bold">{value}</span>
+      <span
+        className={`text-2xl font-black font-headline ${accent ? 'text-on-primary' : 'text-on-surface'}`}
+      >
+        {value}
+      </span>
       {sub && (
-        <span className={`text-xs ${accent ? 'text-[#d4b896]' : 'text-[#9e8c75]'}`}>{sub}</span>
+        <span className={`text-xs ${accent ? 'text-on-primary/70' : 'text-on-surface-variant'}`}>
+          {sub}
+        </span>
       )}
     </div>
   )
@@ -148,13 +164,13 @@ interface ModalProps {
 }
 export function Modal({ title, onClose, children }: ModalProps) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="bg-[#f5f0ea] rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-[#e8dfd4]">
-          <h2 className="font-bold text-[#2a1f14] text-lg">{title}</h2>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+      <div className="bg-surface-container-low border border-outline-variant/20 rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-outline-variant/10">
+          <h2 className="font-headline font-bold text-on-surface text-lg">{title}</h2>
           <button
             onClick={onClose}
-            className="text-[#9e8c75] hover:text-[#4a3419] text-xl font-bold"
+            className="text-on-surface-variant hover:text-on-surface text-2xl font-light leading-none transition-colors"
           >
             ×
           </button>
@@ -174,29 +190,32 @@ interface TableProps {
 }
 export function Table({ columns, data, onEdit, onDelete }: TableProps) {
   return (
-    <div className="overflow-x-auto rounded-xl border border-[#e8dfd4] bg-white">
-      <table className="w-full text-sm">
+    <div className="overflow-x-auto rounded-xl bg-surface-container overflow-hidden border border-outline-variant/10">
+      <table className="w-full text-left border-collapse">
         <thead>
-          <tr className="border-b border-[#e8dfd4] bg-[#f5f0ea]">
+          <tr className="bg-surface-container-high">
             {columns.map((c) => (
               <th
                 key={c.key}
-                className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wider text-[#9e8c75]"
+                className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-on-surface-variant"
               >
                 {c.label}
               </th>
             ))}
             {(onEdit || onDelete) && (
-              <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-[#9e8c75]">
+              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-on-surface-variant text-right">
                 Ações
               </th>
             )}
           </tr>
         </thead>
-        <tbody>
+        <tbody className="divide-y divide-outline-variant/10">
           {data.length === 0 && (
             <tr>
-              <td colSpan={columns.length + 1} className="text-center py-8 text-[#9e8c75]">
+              <td
+                colSpan={columns.length + 1}
+                className="text-center py-12 text-on-surface-variant text-sm"
+              >
                 Nenhum registro encontrado
               </td>
             </tr>
@@ -204,32 +223,32 @@ export function Table({ columns, data, onEdit, onDelete }: TableProps) {
           {data.map((row, i) => (
             <tr
               key={row.id ?? i}
-              className="border-b border-[#f0e9e0] hover:bg-[#faf7f3] transition-colors"
+              className={`hover:bg-surface-bright/10 transition-colors group ${i % 2 === 1 ? 'bg-surface-container-lowest/30' : ''}`}
             >
               {columns.map((c) => (
-                <td key={c.key} className="px-4 py-3 text-[#2a1f14]">
+                <td key={c.key} className="px-6 py-4 text-sm text-on-surface">
                   {c.render ? c.render(row) : (row[c.key] ?? '—')}
                 </td>
               ))}
               {(onEdit || onDelete) && (
-                <td className="px-4 py-3">
-                  <div className="flex gap-2">
+                <td className="px-6 py-4">
+                  <div className="flex gap-1 justify-end opacity-0 group-hover:opacity-100 transition-opacity">
                     {onEdit && (
                       <button
                         onClick={() => onEdit(row)}
-                        className="text-[#7B5B2E] hover:text-[#4a3419]"
+                        className="p-2 text-on-surface-variant hover:text-primary hover:bg-primary/10 rounded-lg transition-all"
                         title="Editar"
                       >
-                        ✏️
+                        <span className="material-symbols-outlined text-xl">edit</span>
                       </button>
                     )}
                     {onDelete && (
                       <button
                         onClick={() => onDelete(row)}
-                        className="text-red-400 hover:text-red-600"
+                        className="p-2 text-on-surface-variant hover:text-error hover:bg-error/10 rounded-lg transition-all"
                         title="Excluir"
                       >
-                        🗑️
+                        <span className="material-symbols-outlined text-xl">delete</span>
                       </button>
                     )}
                   </div>
@@ -243,7 +262,7 @@ export function Table({ columns, data, onEdit, onDelete }: TableProps) {
   )
 }
 
-// ── Toast (simple) ───────────────────────────────────────────────────────────
+// ── Toast ────────────────────────────────────────────────────────────────────
 interface ToastProps {
   message: string
   type: 'success' | 'error'
@@ -251,8 +270,15 @@ interface ToastProps {
 export function Toast({ message, type }: ToastProps) {
   return (
     <div
-      className={`fixed bottom-6 right-6 z-50 px-5 py-3 rounded-xl shadow-lg text-white text-sm font-medium ${type === 'success' ? 'bg-green-600' : 'bg-red-600'}`}
+      className={`fixed bottom-6 right-6 z-50 px-5 py-3 rounded-xl shadow-2xl text-sm font-bold flex items-center gap-2 ${
+        type === 'success'
+          ? 'bg-surface-container-high text-tertiary border border-tertiary/20'
+          : 'bg-error-container/20 text-error border border-error/20'
+      }`}
     >
+      <span className="material-symbols-outlined text-sm">
+        {type === 'success' ? 'check_circle' : 'error'}
+      </span>
       {message}
     </div>
   )

@@ -1,21 +1,14 @@
 import { useCallback, useEffect, useState } from 'react'
-import { PageHeader } from '../../components/PageHeader'
-import { Input, Modal, Table, Toast, useToast } from '../../components/ui'
+import { Button, Input, Modal, Toast, useToast } from '../../components/ui'
 import type { Truck } from '../../lib/types'
 
-const EMPTY_TRUCK = {
-  license_plate: '',
-  model: '',
-  year: '',
-  capacity_ton: '',
-  current_odometer: '',
-}
+const EMPTY = { license_plate: '', model: '', year: '', capacity_ton: '', current_odometer: '' }
 
 export function TrucksPage() {
   const [rows, setRows] = useState<Truck[]>([])
   const [modal, setModal] = useState(false)
   const [editing, setEditing] = useState<Truck | null>(null)
-  const [form, setForm] = useState<any>({ ...EMPTY_TRUCK })
+  const [form, setForm] = useState<any>({ ...EMPTY })
   const { toast, show } = useToast()
 
   const load = useCallback(() => window.api.trucks.list().then(setRows), [])
@@ -37,7 +30,7 @@ export function TrucksPage() {
       show(editing ? 'Caminhão atualizado!' : 'Caminhão cadastrado!')
       setModal(false)
       setEditing(null)
-      setForm({ ...EMPTY_TRUCK })
+      setForm({ ...EMPTY })
       load()
     } catch (e: any) {
       show(e.message, 'error')
@@ -64,39 +57,139 @@ export function TrucksPage() {
   }
 
   return (
-    <div className="p-8 max-w-5xl">
+    <div className="p-12 max-w-7xl mx-auto">
       {toast && <Toast message={toast.message} type={toast.type} />}
 
-      <PageHeader
-        title="Caminhões"
-        actionLabel="Novo Caminhão"
-        onAction={() => {
-          setEditing(null)
-          setForm({ ...EMPTY_TRUCK })
-          setModal(true)
-        }}
-      />
+      {/* Header */}
+      <div className="flex items-end justify-between mb-10">
+        <div>
+          <span className="text-primary font-bold tracking-widest text-xs uppercase block mb-2">
+            Gestão de Frota
+          </span>
+          <h1 className="text-5xl font-black font-headline tracking-tighter text-on-surface">
+            Caminhões
+          </h1>
+          <p className="text-on-surface-variant mt-2 text-base">
+            Gerencie os veículos da sua frota.
+          </p>
+        </div>
+        <button
+          onClick={() => {
+            setEditing(null)
+            setForm({ ...EMPTY })
+            setModal(true)
+          }}
+          className="flex items-center gap-3 bg-primary text-on-primary px-8 py-4 rounded font-bold text-sm shadow-lg shadow-primary/20 hover:brightness-110 active:scale-95 transition-all"
+        >
+          <span className="material-symbols-outlined">add</span>
+          Novo Caminhão
+        </button>
+      </div>
 
-      <Table
-        columns={[
-          { key: 'license_plate', label: 'Placa' },
-          { key: 'model', label: 'Modelo' },
-          { key: 'year', label: 'Ano' },
+      {/* Stats */}
+      <div className="grid grid-cols-3 gap-6 mb-10">
+        {[
+          { label: 'Total de Caminhões', value: rows.length, icon: 'local_shipping' },
           {
-            key: 'capacity_ton',
-            label: 'Capacidade',
-            render: (r) => (r.capacity_ton ? `${r.capacity_ton} ton` : '—'),
+            label: 'Km Acumulado',
+            value: rows.reduce((s, r) => s + r.current_odometer, 0).toFixed(0),
+            icon: 'route',
           },
           {
-            key: 'current_odometer',
-            label: 'Odômetro',
-            render: (r) => `${r.current_odometer.toFixed(0)} km`,
+            label: 'Capacidade Total',
+            value: `${rows.reduce((s, r) => s + (r.capacity_ton ?? 0), 0).toFixed(0)} ton`,
+            icon: 'scale',
           },
-        ]}
-        data={rows}
-        onEdit={edit}
-        onDelete={handleDelete}
-      />
+        ].map(({ label, value, icon }) => (
+          <div
+            key={label}
+            className="bg-surface-container-low p-6 rounded-lg relative overflow-hidden group"
+          >
+            <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+              <span className="material-symbols-outlined text-6xl text-primary">{icon}</span>
+            </div>
+            <p className="text-on-surface-variant text-sm mb-1">{label}</p>
+            <p className="text-4xl font-black font-headline text-on-surface">{value}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Table */}
+      <div className="bg-surface-container rounded-xl overflow-hidden border border-outline-variant/10">
+        <table className="w-full text-left border-collapse">
+          <thead>
+            <tr className="bg-surface-container-high">
+              {['Placa', 'Modelo', 'Ano', 'Capacidade', 'Odômetro', ''].map((h) => (
+                <th
+                  key={h}
+                  className="px-6 py-5 text-[10px] font-black uppercase tracking-widest text-on-surface-variant"
+                >
+                  {h}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-outline-variant/10">
+            {rows.length === 0 && (
+              <tr>
+                <td colSpan={6} className="px-6 py-12 text-center text-on-surface-variant text-sm">
+                  Nenhum caminhão cadastrado
+                </td>
+              </tr>
+            )}
+            {rows.map((row, i) => (
+              <tr
+                key={row.id}
+                className={`hover:bg-surface-bright/5 transition-colors group ${i % 2 === 1 ? 'bg-surface-container-lowest/30' : ''}`}
+              >
+                <td className="px-6 py-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 bg-surface-container-lowest rounded flex items-center justify-center shrink-0">
+                      <span className="material-symbols-outlined text-primary text-sm">
+                        local_shipping
+                      </span>
+                    </div>
+                    <span className="font-mono font-bold text-primary text-sm">
+                      {row.license_plate}
+                    </span>
+                  </div>
+                </td>
+                <td className="px-6 py-4 text-sm text-on-surface">{row.model}</td>
+                <td className="px-6 py-4 text-sm text-on-surface-variant">{row.year || '—'}</td>
+                <td className="px-6 py-4 text-sm text-on-surface-variant">
+                  {row.capacity_ton ? `${row.capacity_ton} ton` : '—'}
+                </td>
+                <td className="px-6 py-4 text-sm font-mono text-on-surface-variant">
+                  {row.current_odometer.toFixed(0)} km
+                </td>
+                <td className="px-6 py-4">
+                  <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button
+                      onClick={() => edit(row)}
+                      className="p-2 text-outline hover:text-primary hover:bg-primary/10 rounded-lg transition-all"
+                    >
+                      <span className="material-symbols-outlined text-xl">edit</span>
+                    </button>
+                    <button
+                      onClick={() => handleDelete(row)}
+                      className="p-2 text-outline hover:text-error hover:bg-error/10 rounded-lg transition-all"
+                    >
+                      <span className="material-symbols-outlined text-xl">delete</span>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+
+        <div className="px-6 py-4 bg-surface-container-high/50 border-t border-outline-variant/10">
+          <p className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">
+            {rows.length} caminhão{rows.length !== 1 ? 'ões' : ''} cadastrado
+            {rows.length !== 1 ? 's' : ''}
+          </p>
+        </div>
+      </div>
 
       {modal && (
         <Modal
@@ -118,35 +211,31 @@ export function TrucksPage() {
             <Input
               label="Ano"
               type="number"
+              optional
               value={form.year}
               onChange={(e) => set('year', e.target.value)}
             />
             <Input
               label="Capacidade (ton)"
               type="number"
+              optional
               value={form.capacity_ton}
               onChange={(e) => set('capacity_ton', e.target.value)}
             />
-            <Input
-              label="Odômetro inicial (km)"
-              type="number"
-              value={form.current_odometer}
-              onChange={(e) => set('current_odometer', e.target.value)}
-            />
+            <div className="col-span-2">
+              <Input
+                label="Odômetro inicial (km)"
+                type="number"
+                value={form.current_odometer}
+                onChange={(e) => set('current_odometer', e.target.value)}
+              />
+            </div>
           </div>
           <div className="flex justify-end gap-3 mt-6">
-            <button
-              className="text-sm text-[#9e8c75] hover:text-[#4a3419]"
-              onClick={() => setModal(false)}
-            >
+            <Button variant="ghost" onClick={() => setModal(false)}>
               Cancelar
-            </button>
-            <button
-              className="bg-[#7B5B2E] text-white px-6 py-2 rounded-lg font-semibold hover:bg-[#5e4320]"
-              onClick={save}
-            >
-              Salvar
-            </button>
+            </Button>
+            <Button onClick={save}>Salvar</Button>
           </div>
         </Modal>
       )}

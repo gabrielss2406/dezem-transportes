@@ -4,6 +4,7 @@ import { Sidebar } from './components/Sidebar'
 import { CostsPage } from './pages/Costs'
 import { DashboardPage } from './pages/Dashboard'
 import { LoginPage } from './pages/Login'
+import { OverviewPage } from './pages/Overview'
 import { TripsPage } from './pages/Trips'
 import { CustomersPage } from './pages/records/Customers'
 import { DriversPage } from './pages/records/Drivers'
@@ -13,16 +14,45 @@ import { TrucksPage } from './pages/records/Trucks'
 
 export default function App() {
   const [user, setUser] = useState<string | null>(null)
+  const [showOverview, setShowOverview] = useState(false)
+  const [initialPath, setInitialPath] = useState('/')
 
   if (!user) {
-    return <LoginPage onLogin={setUser} />
+    return (
+      <LoginPage
+        onLogin={(name) => {
+          setUser(name)
+          setShowOverview(true)
+        }}
+      />
+    )
+  }
+
+  if (showOverview) {
+    return (
+      <OverviewPage
+        onNavigate={(path) => {
+          setInitialPath(path)
+          setShowOverview(false)
+        }}
+        onLogout={() => {
+          setUser(null)
+          setShowOverview(false)
+        }}
+      />
+    )
+  }
+
+  function handleLogout() {
+    setUser(null)
+    setShowOverview(false)
   }
 
   return (
-    <MemoryRouter>
-      <div className="flex min-h-screen bg-[#f5f0ea]">
-        <Sidebar />
-        <main className="flex-1 overflow-auto">
+    <MemoryRouter initialEntries={[initialPath]}>
+      <div className="flex h-screen bg-surface overflow-hidden">
+        <Sidebar onLogout={handleLogout} />
+        <main className="flex-1 overflow-y-auto">
           <Routes>
             <Route path="/" element={<DashboardPage />} />
             <Route path="/trips" element={<TripsPage />} />
