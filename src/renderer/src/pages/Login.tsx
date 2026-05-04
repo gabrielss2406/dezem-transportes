@@ -134,7 +134,7 @@ export function LoginPage({ onLogin }: LoginProps) {
 
       {/* Footer */}
       <footer className="flex flex-col items-center gap-4 w-full py-8">
-        <div className="flex gap-8">
+        {/* <div className="flex gap-8">
           {['Privacidade', 'Termos', 'Contato'].map((link) => (
             <a
               key={link}
@@ -144,8 +144,8 @@ export function LoginPage({ onLogin }: LoginProps) {
               {link}
             </a>
           ))}
-        </div>
-        <p className="text-sm text-primary">© 2024 Dezem Transportes - Excelência em Logística</p>
+        </div> */}
+        <p className="text-sm text-primary">© Dezem Transportes - Excelência em Logística</p>
       </footer>
     </div>
   )

@@ -1,6 +1,7 @@
 import { NavLink, useNavigate } from 'react-router-dom'
 
 const navItems = [
+  { path: '/', label: 'Dashboard', icon: 'analytics' },
   { path: '/customers', label: 'Clientes', icon: 'group' },
   { path: '/products', label: 'Produtos', icon: 'inventory_2' },
   { path: '/suppliers', label: 'Fornecedores', icon: 'handshake' },
@@ -8,7 +9,7 @@ const navItems = [
   { path: '/drivers', label: 'Motoristas', icon: 'badge' },
   { path: '/trips', label: 'Viagens', icon: 'route' },
   { path: '/costs', label: 'Custos', icon: 'payments' },
-  { path: '/', label: 'Dashboard', icon: 'analytics' },
+  { path: '/overview', label: 'Menu', icon: 'menu' },
 ]
 
 interface SidebarProps {
