@@ -1,8 +1,48 @@
 import { useEffect, useState } from 'react'
-import { PageHeader } from '../components/PageHeader'
-import { Card, KpiCard } from '../components/ui'
 import type { DashboardSummary } from '../lib/types'
 import { currentMonthRange, formatBRL } from '../lib/utils'
+
+function KpiBlock({
+  label,
+  value,
+  trend,
+  accent,
+}: {
+  label: string
+  value: string
+  trend?: string
+  accent?: boolean
+}) {
+  return (
+    <div
+      className={`rounded-xl p-8 flex flex-col transition-transform duration-200 hover:scale-[1.02] ${
+        accent ? 'bg-gradient-to-br from-primary to-primary-container' : 'bg-surface-container-low'
+      }`}
+    >
+      <span
+        className={`text-xs font-bold uppercase tracking-widest mb-6 ${
+          accent ? 'text-on-primary/70' : 'text-on-surface-variant'
+        }`}
+      >
+        {label}
+      </span>
+      <div className={`flex items-baseline gap-2 ${accent ? 'text-on-primary' : ''}`}>
+        <span className={`text-xl font-bold opacity-60 ${accent ? '' : 'text-primary'}`}>R$</span>
+        <span className="text-5xl font-black tracking-tighter font-headline">{value}</span>
+      </div>
+      {trend && (
+        <div
+          className={`mt-6 flex items-center gap-2 text-xs font-bold ${
+            accent ? 'text-on-primary/80' : 'text-tertiary'
+          }`}
+        >
+          <span className="material-symbols-outlined text-sm">trending_up</span>
+          {trend}
+        </div>
+      )}
+    </div>
+  )
+}
 
 export function DashboardPage() {
   const [summary, setSummary] = useState<DashboardSummary | null>(null)
@@ -20,82 +60,158 @@ export function DashboardPage() {
   const monthLabel = now.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })
 
   return (
-    <div className="p-8 max-w-6xl">
-      <PageHeader title="Dashboard" subtitle={monthLabel} />
+    <div className="p-12 max-w-7xl mx-auto">
+      {/* Header */}
+      <div className="mb-12">
+        <span className="text-primary font-bold tracking-widest text-xs uppercase block mb-2">
+          Dezem Transportes
+        </span>
+        <h1 className="text-4xl font-black font-headline tracking-tighter text-on-surface">
+          Dashboard
+        </h1>
+        <p className="text-on-surface-variant mt-1 capitalize">{monthLabel}</p>
+      </div>
 
-      {loading && <p className="text-[#9e8c75]">Carregando...</p>}
+      {loading && <p className="text-on-surface-variant text-sm">Carregando...</p>}
 
       {summary && (
         <>
-          {/* KPIs */}
-          <div className="grid grid-cols-4 gap-4 mb-8">
-            <KpiCard label="Receita do mês" value={formatBRL(summary.revenue)} />
-            <KpiCard label="Custos do mês" value={formatBRL(summary.cost)} />
-            <KpiCard label="Lucro líquido" value={formatBRL(summary.profit)} accent />
-            <KpiCard
-              label="Viagens realizadas"
-              value={String(summary.totalTrips)}
-              sub={`${summary.totalKm.toFixed(0)} km totais`}
+          {/* KPI Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-16">
+            <KpiBlock
+              label="Receita Total"
+              value={formatBRL(summary.revenue).replace('R$ ', '')}
+              trend="Período atual"
+            />
+            <KpiBlock label="Custo Total" value={formatBRL(summary.cost).replace('R$ ', '')} />
+            <KpiBlock
+              label="Lucro Líquido"
+              value={formatBRL(summary.profit).replace('R$ ', '')}
+              trend={`${summary.totalTrips} viagens · ${summary.totalKm.toFixed(0)} km`}
+              accent
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-6">
+          {/* Tables */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
             {/* Per Truck */}
-            <Card>
-              <h2 className="font-semibold text-[#2a1f14] mb-4">Resultado por Caminhão</h2>
-              {summary.perTruck.length === 0 && <p className="text-[#9e8c75] text-sm">Sem dados</p>}
-              <div className="flex flex-col gap-2">
-                {summary.perTruck.map((c) => (
-                  <div
-                    key={c.license_plate}
-                    className="flex justify-between items-center py-2 border-b border-[#f0e9e0] last:border-0"
-                  >
-                    <div>
-                      <p className="font-medium text-sm text-[#2a1f14]">{c.license_plate}</p>
-                      <p className="text-xs text-[#9e8c75]">
-                        {c.model} · {c.km.toFixed(0)} km
-                      </p>
-                    </div>
-                    <span className="font-semibold text-[#7B5B2E]">{formatBRL(c.revenue)}</span>
-                  </div>
-                ))}
+            <div className="bg-surface-container rounded-xl overflow-hidden border border-outline-variant/10">
+              <div className="px-6 py-5 border-b border-outline-variant/10 bg-surface-container-high">
+                <h2 className="font-headline font-bold text-on-surface">Resultado por Caminhão</h2>
               </div>
-            </Card>
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr>
+                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-on-surface-variant">
+                      Caminhão
+                    </th>
+                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-on-surface-variant text-right">
+                      Receita
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-outline-variant/10">
+                  {summary.perTruck.length === 0 && (
+                    <tr>
+                      <td
+                        colSpan={2}
+                        className="px-6 py-8 text-center text-on-surface-variant text-sm"
+                      >
+                        Sem dados
+                      </td>
+                    </tr>
+                  )}
+                  {summary.perTruck.map((c) => (
+                    <tr
+                      key={c.license_plate}
+                      className="hover:bg-surface-bright/5 transition-colors"
+                    >
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-9 h-9 bg-surface-container-lowest rounded flex items-center justify-center">
+                            <span className="material-symbols-outlined text-primary text-sm">
+                              local_shipping
+                            </span>
+                          </div>
+                          <div>
+                            <p className="font-bold text-on-surface text-sm">{c.license_plate}</p>
+                            <p className="text-xs text-on-surface-variant opacity-60">
+                              {c.model} · {c.km.toFixed(0)} km
+                            </p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 font-bold text-primary text-sm text-right">
+                        {formatBRL(c.revenue)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
 
             {/* Per Product */}
-            <Card>
-              <h2 className="font-semibold text-[#2a1f14] mb-4">Saída por Produto</h2>
-              {summary.perProduct.length === 0 && (
-                <p className="text-[#9e8c75] text-sm">Sem dados</p>
-              )}
-              <div className="flex flex-col gap-2">
-                {summary.perProduct.map((p) => (
-                  <div
-                    key={p.name}
-                    className="flex justify-between items-center py-2 border-b border-[#f0e9e0] last:border-0"
-                  >
-                    <div>
-                      <p className="font-medium text-sm text-[#2a1f14]">{p.name}</p>
-                      <p className="text-xs text-[#9e8c75]">{p.trips} viagens</p>
-                    </div>
-                    <span className="font-semibold text-[#7B5B2E]">{p.tonnage.toFixed(1)} ton</span>
-                  </div>
-                ))}
+            <div className="bg-surface-container rounded-xl overflow-hidden border border-outline-variant/10">
+              <div className="px-6 py-5 border-b border-outline-variant/10 bg-surface-container-high">
+                <h2 className="font-headline font-bold text-on-surface">Saída por Produto</h2>
               </div>
-            </Card>
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr>
+                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-on-surface-variant">
+                      Produto
+                    </th>
+                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-on-surface-variant text-right">
+                      Tonelagem
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-outline-variant/10">
+                  {summary.perProduct.length === 0 && (
+                    <tr>
+                      <td
+                        colSpan={2}
+                        className="px-6 py-8 text-center text-on-surface-variant text-sm"
+                      >
+                        Sem dados
+                      </td>
+                    </tr>
+                  )}
+                  {summary.perProduct.map((p) => (
+                    <tr key={p.name} className="hover:bg-surface-bright/5 transition-colors">
+                      <td className="px-6 py-4">
+                        <p className="font-bold text-on-surface text-sm">{p.name}</p>
+                        <p className="text-xs text-on-surface-variant opacity-60">
+                          {p.trips} viagens
+                        </p>
+                      </td>
+                      <td className="px-6 py-4 font-bold text-primary text-sm text-right">
+                        {p.tonnage.toFixed(1)} ton
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
 
-            {/* Costs by Category */}
-            <Card className="col-span-2">
-              <h2 className="font-semibold text-[#2a1f14] mb-4">Custos por Categoria</h2>
-              <div className="grid grid-cols-3 gap-3">
-                {summary.perCategory.map((c) => (
-                  <div key={c.category} className="bg-[#f5f0ea] rounded-lg p-3">
-                    <p className="text-xs text-[#9e8c75] capitalize mb-1">{c.category}</p>
-                    <p className="font-semibold text-[#2a1f14]">{formatBRL(c.total)}</p>
-                  </div>
-                ))}
-              </div>
-            </Card>
+          {/* Costs by Category */}
+          <div className="bg-surface-container rounded-xl overflow-hidden border border-outline-variant/10">
+            <div className="px-6 py-5 border-b border-outline-variant/10 bg-surface-container-high">
+              <h2 className="font-headline font-bold text-on-surface">Custos por Categoria</h2>
+            </div>
+            <div className="p-6 grid grid-cols-2 md:grid-cols-3 gap-4">
+              {summary.perCategory.map((c) => (
+                <div key={c.category} className="bg-surface-container-high p-5 rounded-lg">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant mb-2 capitalize">
+                    {c.category}
+                  </p>
+                  <p className="font-black text-on-surface text-xl font-headline">
+                    {formatBRL(c.total)}
+                  </p>
+                </div>
+              ))}
+            </div>
           </div>
         </>
       )}

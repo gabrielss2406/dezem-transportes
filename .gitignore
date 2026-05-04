@@ -6,3 +6,5 @@ out/
 *.db
 .env
 .env.local
+.claude/settings.local.json
+stitch_dezem_transportes_login/
