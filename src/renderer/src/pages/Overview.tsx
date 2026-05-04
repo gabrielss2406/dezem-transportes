@@ -74,7 +74,7 @@ export function OverviewPage({ onNavigate }: OverviewProps) {
           <button
             key={mod.num}
             type="button"
-            className="group text-left bg-surface-container rounded-xl overflow-hidden border border-outline-variant/10 transition-all hover:shadow-2xl hover:shadow-primary/10 hover:-translate-y-1"
+            className="group text-left bg-surface-container rounded-xl overflow-hidden transition-all hover:shadow-2xl hover:shadow-primary/10 hover:-translate-y-1"
             onClick={() => onNavigate(mod.path)}
           >
             <div className="relative aspect-video overflow-hidden">
@@ -105,7 +105,7 @@ export function OverviewPage({ onNavigate }: OverviewProps) {
       </div>
 
       {/* Footer Stats */}
-      <footer className="mt-24 pt-12 border-t border-outline-variant/10 flex flex-col md:flex-row justify-between items-start gap-12">
+      <footer className="mt-24 pt-12 flex flex-col md:flex-row justify-between items-start gap-12">
         <div className="max-w-md">
           <p className="text-[10px] font-bold uppercase tracking-widest text-primary mb-2">
             Resumo do Sistema

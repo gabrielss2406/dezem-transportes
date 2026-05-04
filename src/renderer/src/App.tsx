@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { MemoryRouter, Route, Routes, useNavigate } from 'react-router-dom'
 import { Sidebar } from './components/Sidebar'
 import { CostsPage } from './pages/Costs'
@@ -14,7 +14,20 @@ import { TrucksPage } from './pages/records/Trucks'
 
 function AppRoutes() {
   const [user, setUser] = useState<string | null>(null)
+  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
+    return (localStorage.getItem('theme') as 'light' | 'dark') || 'dark'
+  })
   const navigate = useNavigate()
+
+  useEffect(() => {
+    document.documentElement.classList.remove('light', 'dark')
+    document.documentElement.classList.add(theme)
+    localStorage.setItem('theme', theme)
+  }, [theme])
+
+  function toggleTheme() {
+    setTheme((t) => (t === 'light' ? 'dark' : 'light'))
+  }
 
   function handleLogout() {
     setUser(null)
@@ -38,7 +51,7 @@ function AppRoutes() {
         path="*"
         element={
           <div className="flex h-screen bg-surface overflow-hidden">
-            <Sidebar onLogout={handleLogout} />
+            <Sidebar onLogout={handleLogout} theme={theme} onToggleTheme={toggleTheme} />
             <main className="flex-1 overflow-y-auto">
               <Routes>
                 <Route path="/" element={<DashboardPage />} />

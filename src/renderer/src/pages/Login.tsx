@@ -47,7 +47,7 @@ export function LoginPage({ onLogin }: LoginProps) {
           </div>
 
           {/* Card */}
-          <div className="bg-surface-container-lowest rounded-xl p-10 shadow-[0_20px_40px_rgba(27,28,26,0.05)]">
+          <div className="bg-surface-container-lowest rounded-xl p-10 shadow-2xl shadow-primary/5 border border-outline-variant/10">
             <form onSubmit={handleSubmit} className="space-y-8">
               {/* Username (display only — auth uses password) */}
               <div className="space-y-2">
