@@ -1,0 +1,100 @@
+erDiagram
+    users {
+        INTEGER id PK
+        TEXT name
+        TEXT password_hash
+        TEXT created_at
+    }
+
+    customers {
+        INTEGER id PK
+        TEXT name
+        TEXT cnpj
+        TEXT ie
+        TEXT phone
+        TEXT address
+        TEXT created_at
+    }
+
+    products {
+        INTEGER id PK
+        TEXT name
+        TEXT unit
+        TEXT created_at
+    }
+
+    suppliers {
+        INTEGER id PK
+        TEXT name
+        TEXT type
+        TEXT phone
+        TEXT created_at
+    }
+
+    trucks {
+        INTEGER id PK
+        TEXT license_plate
+        TEXT model
+        INTEGER year
+        REAL capacity_ton
+        REAL current_odometer
+        TEXT created_at
+    }
+
+    drivers {
+        INTEGER id PK
+        TEXT name
+        TEXT cpf
+        TEXT phone
+        REAL monthly_salary
+        INTEGER truck_id FK
+        INTEGER active
+        TEXT created_at
+    }
+
+    routes {
+        INTEGER id PK
+        TEXT name
+        REAL distance_km
+        TEXT created_at
+    }
+
+    trips {
+        INTEGER id PK
+        TEXT date
+        INTEGER truck_id FK
+        INTEGER driver_id FK
+        INTEGER product_id FK
+        INTEGER customer_id FK
+        INTEGER route_id FK
+        INTEGER supplier_id FK
+        REAL weight_ton
+        REAL price_charged
+        REAL km_driven
+        TEXT observation
+        TEXT created_at
+    }
+
+    costs {
+        INTEGER id PK
+        TEXT date
+        TEXT category
+        REAL value
+        INTEGER truck_id FK
+        INTEGER supplier_id FK
+        INTEGER driver_id FK
+        TEXT description
+        TEXT created_at
+    }
+
+    trucks ||--o{ drivers : "alocado para"
+    trucks ||--o{ trips : "realiza"
+    drivers ||--o{ trips : "conduz"
+    products ||--o{ trips : "transportado em"
+    customers ||--o{ trips : "contrata"
+    routes ||--o{ trips : "define caminho"
+    suppliers ||--o{ trips : "origem (opcional)"
+
+    trucks ||--o{ costs : "gera custo"
+    suppliers ||--o{ costs : "recebe de"
+    drivers ||--o{ costs : "relacionado a (ex: salário)"
