@@ -1,7 +1,16 @@
 import { join } from 'path'
 import { BrowserWindow, app, shell } from 'electron'
 import { setupDatabase } from './database'
-import { registerHandlers } from './handlers'
+import { registerAuthHandlers } from './modules/auth/auth.handlers'
+import { registerCostHandlers } from './modules/costs/costs.handlers'
+import { registerCustomerHandlers } from './modules/customers/customers.handlers'
+import { registerDashboardHandlers } from './modules/dashboard/dashboard.handlers'
+import { registerDriverHandlers } from './modules/drivers/drivers.handlers'
+import { registerProductHandlers } from './modules/products/products.handlers'
+import { registerRouteHandlers } from './modules/routes/routes.handlers'
+import { registerSupplierHandlers } from './modules/suppliers/suppliers.handlers'
+import { registerTripHandlers } from './modules/trips/trips.handlers'
+import { registerTruckHandlers } from './modules/trucks/trucks.handlers'
 
 function createWindow(): void {
   const mainWindow = new BrowserWindow({
@@ -37,7 +46,16 @@ function createWindow(): void {
 
 app.whenReady().then(() => {
   setupDatabase()
-  registerHandlers()
+  registerAuthHandlers()
+  registerCostHandlers()
+  registerCustomerHandlers()
+  registerDashboardHandlers()
+  registerDriverHandlers()
+  registerProductHandlers()
+  registerRouteHandlers()
+  registerSupplierHandlers()
+  registerTripHandlers()
+  registerTruckHandlers()
 
   createWindow()
 
