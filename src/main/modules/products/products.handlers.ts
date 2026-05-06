@@ -1,5 +1,5 @@
 import { ipcMain } from 'electron'
-import { productSchema } from '../../../renderer/src/lib/schemas'
+import { productSchema } from '../../../shared/schemas'
 import { getDb } from '../../database'
 import {
   createIdValidatedHandler,

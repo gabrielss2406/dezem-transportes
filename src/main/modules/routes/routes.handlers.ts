@@ -1,5 +1,5 @@
 import { ipcMain } from 'electron'
-import { routeSchema } from '../../../renderer/src/lib/schemas'
+import { routeSchema } from '../../../shared/schemas'
 import { getDb } from '../../database'
 import { createValidatedHandler } from '../../lib/utils'
 

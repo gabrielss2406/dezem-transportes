@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { isValidCNPJ, isValidCPF, isValidPhone } from '../../../shared/validation'
+import { isValidCNPJ, isValidCPF, isValidPhone } from './validation'
 
 export const idSchema = z.number().int().positive()
 

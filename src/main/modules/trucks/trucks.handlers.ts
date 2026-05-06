@@ -1,5 +1,5 @@
 import { ipcMain } from 'electron'
-import { truckSchema } from '../../../renderer/src/lib/schemas'
+import { truckSchema } from '../../../shared/schemas'
 import { getDb } from '../../database'
 import {
   createIdValidatedHandler,

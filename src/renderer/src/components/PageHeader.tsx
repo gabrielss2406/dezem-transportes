@@ -1,5 +1,4 @@
 import type React from 'react'
-import { Button } from './ui'
 
 interface PageHeaderProps {
   title: string

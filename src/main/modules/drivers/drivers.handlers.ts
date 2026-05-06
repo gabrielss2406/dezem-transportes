@@ -1,5 +1,5 @@
 import { ipcMain } from 'electron'
-import { driverSchema } from '../../../renderer/src/lib/schemas'
+import { driverSchema } from '../../../shared/schemas'
 import { getDb } from '../../database'
 import {
   createIdValidatedHandler,

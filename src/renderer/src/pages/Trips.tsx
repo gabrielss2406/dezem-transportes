@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Button, Modal, Select, Toast, useToast } from '../components/ui'
+import { Button, Modal, Toast, useToast } from '../components/ui'
 import type { Customer, Driver, Product, Route, Supplier, Trip, Truck } from '../lib/types'
 import { formatBRL, formatDate } from '../lib/utils'
 

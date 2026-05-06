@@ -1,8 +1,19 @@
 import { ipcMain } from 'electron'
 import { ZodError, z } from 'zod'
-import { isValidCNPJ, isValidCPF, isValidPhone } from '../../shared/validation'
 
-type IpcHandler = (event: Electron.IpcMainInvokeEvent, ...args: any[]) => any
+// Helper to format Zod errors into a structured object
+function formatZodError(error: ZodError): Record<string, string> {
+  return error.issues.reduce(
+    (acc, e) => {
+      const path = e.path.join('.')
+      if (path) {
+        acc[path] = e.message
+      }
+      return acc
+    },
+    {} as Record<string, string>,
+  )
+}
 
 export function createValidatedHandler<T extends z.ZodRawShape>(
   channel: string,
@@ -15,11 +26,11 @@ export function createValidatedHandler<T extends z.ZodRawShape>(
       return handler(validatedData)
     } catch (error) {
       if (error instanceof ZodError) {
-        return { ok: false, error: error.errors.map((e) => e.message).join(', ') }
+        return { ok: false, errors: formatZodError(error) }
       }
       // Log the unexpected error for debugging
       console.error(`Unexpected error in ${channel}:`, error)
-      return { ok: false, error: 'Ocorreu um erro inesperado no servidor.' }
+      return { ok: false, errors: { form: 'Ocorreu um erro inesperado no servidor.' } }
     }
   })
 }
@@ -36,10 +47,10 @@ export function createValidatedHandlerWithId<T extends z.ZodRawShape>(
       return handler(validatedId, validatedData)
     } catch (error) {
       if (error instanceof ZodError) {
-        return { ok: false, error: error.errors.map((e) => e.message).join(', ') }
+        return { ok: false, errors: formatZodError(error) }
       }
       console.error(`Unexpected error in ${channel}:`, error)
-      return { ok: false, error: 'Ocorreu um erro inesperado no servidor.' }
+      return { ok: false, errors: { form: 'Ocorreu um erro inesperado no servidor.' } }
     }
   })
 }
@@ -51,10 +62,11 @@ export function createIdValidatedHandler(channel: string, handler: (id: number) 
       return handler(validatedId)
     } catch (error) {
       if (error instanceof ZodError) {
-        return { ok: false, error: error.errors.map((e) => e.message).join(', ') }
+        // Since this handler only validates an ID, we can return a simpler error
+        return { ok: false, errors: { id: 'ID inválido.' } }
       }
       console.error(`Unexpected error in ${channel}:`, error)
-      return { ok: false, error: 'Ocorreu um erro inesperado no servidor.' }
+      return { ok: false, errors: { form: 'Ocorreu um erro inesperado no servidor.' } }
     }
   })
 }

@@ -1,5 +1,5 @@
 import { ipcMain } from 'electron'
-import { tripSchema } from '../../../renderer/src/lib/schemas'
+import { tripSchema } from '../../../shared/schemas'
 import { getDb } from '../../database'
 import { createIdValidatedHandler, createValidatedHandler } from '../../lib/utils'
 
