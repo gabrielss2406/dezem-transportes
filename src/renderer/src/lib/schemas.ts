@@ -1,67 +1,90 @@
 import { z } from 'zod'
+import { isValidCNPJ, isValidCPF, isValidPhone } from '../../../shared/validation'
 
 export const idSchema = z.number().int().positive()
 
 export const customerSchema = z.object({
-  name: z.string().min(1),
-  cnpj: z.string().optional(),
-  ie: z.string().optional(),
-  phone: z.string().optional(),
-  address: z.string().optional(),
+  name: z.string().min(3, 'Nome deve ter no mínimo 3 caracteres').max(100),
+  cnpj: z.string().refine(isValidCNPJ, { message: 'CNPJ inválido' }).optional().or(z.literal('')),
+  ie: z.string().max(20).optional(),
+  phone: z
+    .string()
+    .refine(isValidPhone, { message: 'Telefone inválido' })
+    .optional()
+    .or(z.literal('')),
+  address: z.string().max(255).optional(),
 })
 
 export const productSchema = z.object({
-  name: z.string().min(1),
-  unit: z.string().optional(),
+  name: z.string().min(2, 'Nome deve ter no mínimo 2 caracteres').max(100),
+  unit: z.string().max(10).optional(),
 })
 
 export const supplierSchema = z.object({
-  name: z.string().min(1),
-  type: z.string().optional(),
-  phone: z.string().optional(),
+  name: z.string().min(3, 'Nome deve ter no mínimo 3 caracteres').max(100),
+  type: z.string().max(50).optional(),
+  phone: z
+    .string()
+    .refine(isValidPhone, { message: 'Telefone inválido' })
+    .optional()
+    .or(z.literal('')),
 })
 
 export const truckSchema = z.object({
-  license_plate: z.string().min(7),
-  model: z.string().min(1),
-  year: z.number().int().positive(),
-  capacity_ton: z.number().positive(),
-  current_odometer: z.number().int().positive().optional(),
+  license_plate: z
+    .string()
+    .length(7, 'Placa deve ter 7 caracteres')
+    .regex(/^[A-Z]{3}[0-9][A-Z0-9][0-9]{2}$/, 'Placa em formato inválido'),
+  model: z.string().min(2, 'Modelo deve ter no mínimo 2 caracteres').max(50),
+  year: z
+    .number()
+    .int()
+    .min(1950, 'Ano inválido')
+    .max(new Date().getFullYear() + 1),
+  capacity_ton: z
+    .number()
+    .positive('Capacidade deve ser positiva')
+    .max(100, 'Capacidade excessiva'),
+  current_odometer: z.number().int().min(0).optional(),
 })
 
 export const driverSchema = z.object({
-  name: z.string().min(1),
-  cpf: z.string().optional(),
-  phone: z.string().optional(),
-  monthly_salary: z.number().positive(),
-  truck_id: z.number().int().positive().optional(),
+  name: z.string().min(3, 'Nome deve ter no mínimo 3 caracteres').max(100),
+  cpf: z.string().refine(isValidCPF, { message: 'CPF inválido' }).optional().or(z.literal('')),
+  phone: z
+    .string()
+    .refine(isValidPhone, { message: 'Telefone inválido' })
+    .optional()
+    .or(z.literal('')),
+  monthly_salary: z.number().positive('Salário deve ser positivo').max(100000, 'Salário excessivo'),
+  truck_id: z.number().int().positive().optional().nullable(),
 })
 
 export const routeSchema = z.object({
-  name: z.string().min(1),
-  distance_km: z.number().positive(),
+  name: z.string().min(3, 'Nome deve ter no mínimo 3 caracteres').max(100),
+  distance_km: z.number().positive('Distância deve ser positiva').max(10000, 'Distância excessiva'),
 })
 
 export const tripSchema = z.object({
-  date: z.string(),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data em formato inválido'),
   truck_id: z.number().int().positive(),
   driver_id: z.number().int().positive(),
   product_id: z.number().int().positive(),
-  customer_id: z.number().int().positive().optional(),
-  route_id: z.number().int().positive().optional(),
-  supplier_id: z.number().int().positive().optional(),
-  weight_ton: z.number().positive(),
-  price_charged: z.number().positive(),
-  km_driven: z.number().positive(),
-  observation: z.string().optional(),
+  customer_id: z.number().int().positive().optional().nullable(),
+  route_id: z.number().int().positive().optional().nullable(),
+  supplier_id: z.number().int().positive().optional().nullable(),
+  weight_ton: z.number().positive('Peso deve ser positivo').max(100, 'Peso excessivo'),
+  price_charged: z.number().positive('Valor deve ser positivo').max(1000000, 'Valor excessivo'),
+  km_driven: z.number().positive('KM deve ser positivo').max(10000, 'KM excessivo'),
+  observation: z.string().max(500).optional(),
 })
 
 export const costSchema = z.object({
-  date: z.string(),
-  category: z.string().min(1),
-  value: z.number().positive(),
-  truck_id: z.number().int().positive().optional(),
-  supplier_id: z.number().int().positive().optional(),
-  driver_id: z.number().int().positive().optional(),
-  description: z.string().optional(),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data em formato inválido'),
+  category: z.string().min(1, 'Categoria é obrigatória'),
+  value: z.number().positive('Valor deve ser positivo').max(1000000, 'Valor excessivo'),
+  truck_id: z.number().int().positive().optional().nullable(),
+  supplier_id: z.number().int().positive().optional().nullable(),
+  driver_id: z.number().int().positive().optional().nullable(),
+  description: z.string().max(255).optional(),
 })

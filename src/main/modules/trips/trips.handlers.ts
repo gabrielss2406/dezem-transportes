@@ -1,7 +1,7 @@
 import { ipcMain } from 'electron'
-import { ZodError } from 'zod'
-import { idSchema, tripSchema } from '../../../renderer/src/lib/schemas'
+import { tripSchema } from '../../../renderer/src/lib/schemas'
 import { getDb } from '../../database'
+import { createIdValidatedHandler, createValidatedHandler } from '../../lib/utils'
 
 export function registerTripHandlers(): void {
   const db = () => getDb()
@@ -45,55 +45,39 @@ export function registerTripHandlers(): void {
       .all(...params)
   })
 
-  ipcMain.handle('trips:create', (_e, data: any) => {
-    try {
-      const validatedData = tripSchema.parse(data)
-      const r = db().transaction(() => {
-        const res = db()
-          .prepare(
-            `
+  createValidatedHandler('trips:create', tripSchema, (data) => {
+    const r = db().transaction(() => {
+      const res = db()
+        .prepare(
+          `
         INSERT INTO trips (date, truck_id, driver_id, product_id, customer_id, route_id, supplier_id, weight_ton, price_charged, km_driven, observation)
         VALUES (?,?,?,?,?,?,?,?,?,?,?)
       `,
-          )
-          .run(
-            validatedData.date,
-            validatedData.truck_id,
-            validatedData.driver_id,
-            validatedData.product_id,
-            validatedData.customer_id || null,
-            validatedData.route_id || null,
-            validatedData.supplier_id || null,
-            validatedData.weight_ton,
-            validatedData.price_charged,
-            validatedData.km_driven,
-            validatedData.observation || null,
-          )
-        // Update truck odometer automatically
-        db()
-          .prepare('UPDATE trucks SET current_odometer = current_odometer + ? WHERE id = ?')
-          .run(validatedData.km_driven, validatedData.truck_id)
-        return res
-      })()
-      return { id: (r as any).lastInsertRowid }
-    } catch (error) {
-      if (error instanceof ZodError) {
-        return { ok: false, error: error.errors.map((e) => e.message).join(', ') }
-      }
-      return { ok: false, error: 'Ocorreu um erro inesperado.' }
-    }
+        )
+        .run(
+          data.date,
+          data.truck_id,
+          data.driver_id,
+          data.product_id,
+          data.customer_id || null,
+          data.route_id || null,
+          data.supplier_id || null,
+          data.weight_ton,
+          data.price_charged,
+          data.km_driven,
+          data.observation || null,
+        )
+      // Update truck odometer automatically
+      db()
+        .prepare('UPDATE trucks SET current_odometer = current_odometer + ? WHERE id = ?')
+        .run(data.km_driven, data.truck_id)
+      return res
+    })()
+    return { id: (r as any).lastInsertRowid }
   })
 
-  ipcMain.handle('trips:delete', (_e, id: number) => {
-    try {
-      const validatedId = idSchema.parse(id)
-      db().prepare('DELETE FROM trips WHERE id = ?').run(validatedId)
-      return { ok: true }
-    } catch (error) {
-      if (error instanceof ZodError) {
-        return { ok: false, error: error.errors.map((e) => e.message).join(', ') }
-      }
-      return { ok: false, error: 'Ocorreu um erro inesperado.' }
-    }
+  createIdValidatedHandler('trips:delete', (id) => {
+    db().prepare('DELETE FROM trips WHERE id = ?').run(id)
+    return { ok: true }
   })
 }

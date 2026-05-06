@@ -1,7 +1,11 @@
 import { ipcMain } from 'electron'
-import { ZodError } from 'zod'
-import { idSchema, supplierSchema } from '../../../renderer/src/lib/schemas'
+import { supplierSchema } from '../../../renderer/src/lib/schemas'
 import { getDb } from '../../database'
+import {
+  createIdValidatedHandler,
+  createValidatedHandler,
+  createValidatedHandlerWithId,
+} from '../../lib/utils'
 
 export function registerSupplierHandlers(): void {
   const db = () => getDb()
@@ -12,47 +16,22 @@ export function registerSupplierHandlers(): void {
       .all(`%${search}%`)
   })
 
-  ipcMain.handle('suppliers:create', (_e, data: any) => {
-    try {
-      const validatedData = supplierSchema.parse(data)
-      const r = db()
-        .prepare('INSERT INTO suppliers (name, type, phone) VALUES (?,?,?)')
-        .run(validatedData.name, validatedData.type, validatedData.phone)
-      return { id: r.lastInsertRowid }
-    } catch (error) {
-      if (error instanceof ZodError) {
-        return { ok: false, error: error.errors.map((e) => e.message).join(', ') }
-      }
-      return { ok: false, error: 'Ocorreu um erro inesperado.' }
-    }
+  createValidatedHandler('suppliers:create', supplierSchema, (data) => {
+    const r = db()
+      .prepare('INSERT INTO suppliers (name, type, phone) VALUES (?,?,?)')
+      .run(data.name, data.type, data.phone)
+    return { id: r.lastInsertRowid }
   })
 
-  ipcMain.handle('suppliers:update', (_e, id: number, data: any) => {
-    try {
-      const validatedId = idSchema.parse(id)
-      const validatedData = supplierSchema.parse(data)
-      db()
-        .prepare('UPDATE suppliers SET name=?, type=?, phone=? WHERE id=?')
-        .run(validatedData.name, validatedData.type, validatedData.phone, validatedId)
-      return { ok: true }
-    } catch (error) {
-      if (error instanceof ZodError) {
-        return { ok: false, error: error.errors.map((e) => e.message).join(', ') }
-      }
-      return { ok: false, error: 'Ocorreu um erro inesperado.' }
-    }
+  createValidatedHandlerWithId('suppliers:update', supplierSchema, (id, data) => {
+    db()
+      .prepare('UPDATE suppliers SET name=?, type=?, phone=? WHERE id=?')
+      .run(data.name, data.type, data.phone, id)
+    return { ok: true }
   })
 
-  ipcMain.handle('suppliers:delete', (_e, id: number) => {
-    try {
-      const validatedId = idSchema.parse(id)
-      db().prepare('DELETE FROM suppliers WHERE id = ?').run(validatedId)
-      return { ok: true }
-    } catch (error) {
-      if (error instanceof ZodError) {
-        return { ok: false, error: error.errors.map((e) => e.message).join(', ') }
-      }
-      return { ok: false, error: 'Ocorreu um erro inesperado.' }
-    }
+  createIdValidatedHandler('suppliers:delete', (id) => {
+    db().prepare('DELETE FROM suppliers WHERE id = ?').run(id)
+    return { ok: true }
   })
 }

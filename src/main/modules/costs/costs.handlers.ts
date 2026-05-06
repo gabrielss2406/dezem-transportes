@@ -1,7 +1,7 @@
 import { ipcMain } from 'electron'
-import { ZodError } from 'zod'
-import { costSchema, idSchema } from '../../../renderer/src/lib/schemas'
+import { costSchema } from '../../../renderer/src/lib/schemas'
 import { getDb } from '../../database'
+import { createIdValidatedHandler, createValidatedHandler } from '../../lib/utils'
 
 export function registerCostHandlers(): void {
   const db = () => getDb()
@@ -41,45 +41,29 @@ export function registerCostHandlers(): void {
       .all(...params)
   })
 
-  ipcMain.handle('costs:create', (_e, data: any) => {
-    try {
-      const validatedData = costSchema.parse(data)
-      const r = db()
-        .prepare(
-          `
+  createValidatedHandler('costs:create', costSchema, (data) => {
+    const r = db()
+      .prepare(
+        `
       INSERT INTO costs (date, category, value, truck_id, supplier_id, driver_id, description)
       VALUES (?,?,?,?,?,?,?)
     `,
-        )
-        .run(
-          validatedData.date,
-          validatedData.category,
-          validatedData.value,
-          validatedData.truck_id || null,
-          validatedData.supplier_id || null,
-          validatedData.driver_id || null,
-          validatedData.description || null,
-        )
-      return { id: r.lastInsertRowid }
-    } catch (error) {
-      if (error instanceof ZodError) {
-        return { ok: false, error: error.errors.map((e) => e.message).join(', ') }
-      }
-      return { ok: false, error: 'Ocorreu um erro inesperado.' }
-    }
+      )
+      .run(
+        data.date,
+        data.category,
+        data.value,
+        data.truck_id || null,
+        data.supplier_id || null,
+        data.driver_id || null,
+        data.description || null,
+      )
+    return { id: r.lastInsertRowid }
   })
 
-  ipcMain.handle('costs:delete', (_e, id: number) => {
-    try {
-      const validatedId = idSchema.parse(id)
-      db().prepare('DELETE FROM costs WHERE id = ?').run(validatedId)
-      return { ok: true }
-    } catch (error) {
-      if (error instanceof ZodError) {
-        return { ok: false, error: error.errors.map((e) => e.message).join(', ') }
-      }
-      return { ok: false, error: 'Ocorreu um erro inesperado.' }
-    }
+  createIdValidatedHandler('costs:delete', (id) => {
+    db().prepare('DELETE FROM costs WHERE id = ?').run(id)
+    return { ok: true }
   })
 
   ipcMain.handle('costs:issueMonthlySalaries', (_e, monthYear: string) => {

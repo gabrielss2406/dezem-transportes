@@ -1,7 +1,11 @@
 import { ipcMain } from 'electron'
-import { ZodError } from 'zod'
-import { driverSchema, idSchema } from '../../../renderer/src/lib/schemas'
+import { driverSchema } from '../../../renderer/src/lib/schemas'
 import { getDb } from '../../database'
+import {
+  createIdValidatedHandler,
+  createValidatedHandler,
+  createValidatedHandlerWithId,
+} from '../../lib/utils'
 
 export function registerDriverHandlers(): void {
   const db = () => getDb()
@@ -19,64 +23,24 @@ export function registerDriverHandlers(): void {
       .all()
   })
 
-  ipcMain.handle('drivers:create', (_e, data: any) => {
-    try {
-      const validatedData = driverSchema.parse(data)
-      const r = db()
-        .prepare(
-          'INSERT INTO drivers (name, cpf, phone, monthly_salary, truck_id) VALUES (?,?,?,?,?)',
-        )
-        .run(
-          validatedData.name,
-          validatedData.cpf,
-          validatedData.phone,
-          validatedData.monthly_salary,
-          validatedData.truck_id || null,
-        )
-      return { id: r.lastInsertRowid }
-    } catch (error) {
-      if (error instanceof ZodError) {
-        return { ok: false, error: error.errors.map((e) => e.message).join(', ') }
-      }
-      return { ok: false, error: 'Ocorreu um erro inesperado.' }
-    }
+  createValidatedHandler('drivers:create', driverSchema, (data) => {
+    const r = db()
+      .prepare(
+        'INSERT INTO drivers (name, cpf, phone, monthly_salary, truck_id) VALUES (?,?,?,?,?)',
+      )
+      .run(data.name, data.cpf, data.phone, data.monthly_salary, data.truck_id || null)
+    return { id: r.lastInsertRowid }
   })
 
-  ipcMain.handle('drivers:update', (_e, id: number, data: any) => {
-    try {
-      const validatedId = idSchema.parse(id)
-      const validatedData = driverSchema.parse(data)
-      db()
-        .prepare(
-          'UPDATE drivers SET name=?, cpf=?, phone=?, monthly_salary=?, truck_id=? WHERE id=?',
-        )
-        .run(
-          validatedData.name,
-          validatedData.cpf,
-          validatedData.phone,
-          validatedData.monthly_salary,
-          validatedData.truck_id || null,
-          validatedId,
-        )
-      return { ok: true }
-    } catch (error) {
-      if (error instanceof ZodError) {
-        return { ok: false, error: error.errors.map((e) => e.message).join(', ') }
-      }
-      return { ok: false, error: 'Ocorreu um erro inesperado.' }
-    }
+  createValidatedHandlerWithId('drivers:update', driverSchema, (id, data) => {
+    db()
+      .prepare('UPDATE drivers SET name=?, cpf=?, phone=?, monthly_salary=?, truck_id=? WHERE id=?')
+      .run(data.name, data.cpf, data.phone, data.monthly_salary, data.truck_id || null, id)
+    return { ok: true }
   })
 
-  ipcMain.handle('drivers:delete', (_e, id: number) => {
-    try {
-      const validatedId = idSchema.parse(id)
-      db().prepare('DELETE FROM drivers WHERE id = ?').run(validatedId)
-      return { ok: true }
-    } catch (error) {
-      if (error instanceof ZodError) {
-        return { ok: false, error: error.errors.map((e) => e.message).join(', ') }
-      }
-      return { ok: false, error: 'Ocorreu um erro inesperado.' }
-    }
+  createIdValidatedHandler('drivers:delete', (id) => {
+    db().prepare('DELETE FROM drivers WHERE id = ?').run(id)
+    return { ok: true }
   })
 }
