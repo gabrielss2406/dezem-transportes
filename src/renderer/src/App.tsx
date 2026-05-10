@@ -3,6 +3,7 @@ import { MemoryRouter, Route, Routes, useNavigate } from 'react-router-dom'
 import { Sidebar } from './components/Sidebar'
 import { CostsPage } from './pages/Costs'
 import { DashboardPage } from './pages/Dashboard'
+import { DesignSystemPage } from './pages/DesignSystem'
 import { LoginPage } from './pages/Login'
 import { OverviewPage } from './pages/Overview'
 import { TripsPage } from './pages/Trips'
@@ -66,6 +67,7 @@ function AppRoutes() {
                 <Route path="/customers" element={<CustomersPage />} />
                 <Route path="/products" element={<ProductsPage />} />
                 <Route path="/suppliers" element={<SuppliersPage />} />
+                <Route path="/design-system" element={<DesignSystemPage />} />
               </Routes>
             </main>
           </div>
