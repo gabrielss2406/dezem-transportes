@@ -1,6 +1,9 @@
+import { zodResolver } from '@hookform/resolvers/zod'
 import { useCallback, useEffect, useState } from 'react'
+import { useForm } from 'react-hook-form'
+import { tripSchema } from '../../../shared/schemas'
+import type { Customer, Driver, Product, Route, Supplier, Trip, Truck } from '../../lib/types'
 import { Button, Modal, Toast, useToast } from '../components/ui'
-import type { Customer, Driver, Product, Route, Supplier, Trip, Truck } from '../lib/types'
 import { formatBRL, formatDate } from '../lib/utils'
 
 const EMPTY = {
@@ -17,38 +20,6 @@ const EMPTY = {
   observation: '',
 }
 
-function FormField({
-  label,
-  icon,
-  children,
-}: {
-  label: string
-  icon?: string
-  children: React.ReactNode
-}) {
-  return (
-    <div>
-      <label className="block text-[10px] font-bold uppercase tracking-[0.2em] text-on-surface-variant mb-3 opacity-70">
-        {label}
-      </label>
-      <div className="relative">
-        {icon && (
-          <span className="absolute inset-y-0 left-4 flex items-center text-primary/60 pointer-events-none">
-            <span className="material-symbols-outlined">{icon}</span>
-          </span>
-        )}
-        {children}
-      </div>
-    </div>
-  )
-}
-
-const inputCls = (hasIcon = false) =>
-  `w-full bg-surface-container-lowest border border-outline-variant/30 rounded-xl ${hasIcon ? 'pl-12' : 'px-4'} pr-4 py-4 text-on-surface placeholder:text-on-surface-variant/40 focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all outline-none text-sm`
-
-const selectCls = (hasIcon = false) =>
-  `w-full bg-surface-container-lowest border border-outline-variant/30 rounded-xl ${hasIcon ? 'pl-12' : 'px-4'} pr-4 py-4 text-on-surface focus:ring-2 focus:ring-primary/20 focus:border-primary appearance-none transition-all outline-none text-sm`
-
 export function TripsPage() {
   const [trips, setTrips] = useState<Trip[]>([])
   const [trucks, setTrucks] = useState<Truck[]>([])
@@ -58,8 +29,18 @@ export function TripsPage() {
   const [routes, setRoutes] = useState<Route[]>([])
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [modal, setModal] = useState(false)
-  const [form, setForm] = useState<any>({ ...EMPTY })
   const { toast, show } = useToast()
+
+  const {
+    register,
+    handleSubmit,
+    setValue,
+    formState: { errors },
+    reset,
+  } = useForm<Omit<Trip, 'id'>>({
+    resolver: zodResolver(tripSchema),
+    defaultValues: { ...EMPTY },
+  })
 
   const load = useCallback(async () => {
     const [t, tr, d, p, c, r, s] = await Promise.all([
@@ -84,25 +65,12 @@ export function TripsPage() {
     load()
   }, [load])
 
-  const set = (k: string, v: any) => setForm((f: any) => ({ ...f, [k]: v }))
-
-  async function save() {
+  const onSubmit = async (data: Omit<Trip, 'id'>) => {
     try {
-      await window.api.trips.create({
-        ...form,
-        truck_id: Number(form.truck_id),
-        driver_id: Number(form.driver_id),
-        product_id: Number(form.product_id),
-        customer_id: form.customer_id ? Number(form.customer_id) : null,
-        route_id: form.route_id ? Number(form.route_id) : null,
-        supplier_id: form.supplier_id ? Number(form.supplier_id) : null,
-        weight_ton: Number(form.weight_ton),
-        price_charged: Number(form.price_charged),
-        km_driven: Number(form.km_driven),
-      })
+      await window.api.trips.create(data)
       show('Viagem registrada!')
       setModal(false)
-      setForm({ ...EMPTY })
+      reset()
       load()
     } catch (e: any) {
       show(e.message || 'Erro ao salvar', 'error')
@@ -139,7 +107,7 @@ export function TripsPage() {
         </div>
         <button
           onClick={() => {
-            setForm({ ...EMPTY })
+            reset()
             setModal(true)
           }}
           className="flex items-center gap-3 bg-primary text-on-primary px-8 py-4 rounded font-extrabold shadow-lg shadow-primary/20 hover:brightness-110 active:scale-95 transition-all"
@@ -248,146 +216,94 @@ export function TripsPage() {
         <Modal title="Nova Viagem" onClose={() => setModal(false)}>
           <div className="space-y-5">
             <div className="grid grid-cols-2 gap-5">
-              <FormField label="Data">
-                <input
-                  type="date"
-                  value={form.date}
-                  onChange={(e) => set('date', e.target.value)}
-                  className={inputCls()}
-                />
-              </FormField>
+              <Input label="Data" type="date" {...register('date')} error={errors.date?.message} />
 
-              <FormField label="Caminhão" icon="local_shipping">
-                <select
-                  value={form.truck_id}
-                  onChange={(e) => set('truck_id', e.target.value)}
-                  className={selectCls(true)}
-                >
-                  <option value="">Selecione...</option>
-                  {trucks.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.license_plate} — {t.model}
-                    </option>
-                  ))}
-                </select>
-              </FormField>
+              <Select
+                label="Caminhão"
+                icon="local_shipping"
+                {...register('truck_id')}
+                error={errors.truck_id?.message}
+                options={trucks.map((t) => ({
+                  value: t.id,
+                  label: `${t.license_plate} — ${t.model}`,
+                }))}
+              />
 
-              <FormField label="Motorista" icon="person">
-                <select
-                  value={form.driver_id}
-                  onChange={(e) => set('driver_id', e.target.value)}
-                  className={selectCls(true)}
-                >
-                  <option value="">Selecione...</option>
-                  {drivers.map((d) => (
-                    <option key={d.id} value={d.id}>
-                      {d.name}
-                    </option>
-                  ))}
-                </select>
-              </FormField>
+              <Select
+                label="Motorista"
+                icon="person"
+                {...register('driver_id')}
+                error={errors.driver_id?.message}
+                options={drivers.map((d) => ({ value: d.id, label: d.name }))}
+              />
 
-              <FormField label="Produto" icon="inventory_2">
-                <select
-                  value={form.product_id}
-                  onChange={(e) => set('product_id', e.target.value)}
-                  className={selectCls(true)}
-                >
-                  <option value="">Selecione...</option>
-                  {products.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name}
-                    </option>
-                  ))}
-                </select>
-              </FormField>
+              <Select
+                label="Produto"
+                icon="inventory_2"
+                {...register('product_id')}
+                error={errors.product_id?.message}
+                options={products.map((p) => ({ value: p.id, label: p.name }))}
+              />
 
-              <FormField label="Cliente (opcional)" icon="business">
-                <select
-                  value={form.customer_id}
-                  onChange={(e) => set('customer_id', e.target.value)}
-                  className={selectCls(true)}
-                >
-                  <option value="">Selecione...</option>
-                  {customers.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
-              </FormField>
+              <Select
+                label="Cliente"
+                optional
+                icon="business"
+                {...register('customer_id')}
+                error={errors.customer_id?.message}
+                options={customers.map((c) => ({ value: c.id, label: c.name }))}
+              />
 
-              <FormField label="Rota (opcional)">
-                <select
-                  value={form.route_id}
-                  onChange={(e) => set('route_id', e.target.value)}
-                  className={selectCls()}
-                >
-                  <option value="">Selecione...</option>
-                  {routes.map((r) => (
-                    <option key={r.id} value={r.id}>
-                      {r.name}
-                    </option>
-                  ))}
-                </select>
-              </FormField>
+              <Select
+                label="Rota"
+                optional
+                {...register('route_id')}
+                error={errors.route_id?.message}
+                options={routes.map((r) => ({ value: r.id, label: r.name }))}
+              />
 
-              <FormField label="Peso (ton)">
-                <input
-                  type="number"
-                  step="0.01"
-                  placeholder="0,00"
-                  value={form.weight_ton}
-                  onChange={(e) => set('weight_ton', e.target.value)}
-                  className={inputCls()}
-                />
-              </FormField>
+              <Input
+                label="Peso (ton)"
+                type="number"
+                step="0.01"
+                placeholder="0,00"
+                {...register('weight_ton')}
+                error={errors.weight_ton?.message}
+              />
 
-              <FormField label="Valor cobrado (R$)" icon="payments">
-                <input
-                  type="number"
-                  step="0.01"
-                  placeholder="0,00"
-                  value={form.price_charged}
-                  onChange={(e) => set('price_charged', e.target.value)}
-                  className={inputCls(true)}
-                />
-              </FormField>
+              <Input
+                label="Valor cobrado (R$)"
+                type="number"
+                step="0.01"
+                placeholder="0,00"
+                icon="payments"
+                {...register('price_charged')}
+                error={errors.price_charged?.message}
+              />
 
-              <FormField label="Km percorrido">
-                <input
-                  type="number"
-                  placeholder="0"
-                  value={form.km_driven}
-                  onChange={(e) => set('km_driven', e.target.value)}
-                  className={inputCls()}
-                />
-              </FormField>
+              <Input
+                label="Km percorrido"
+                type="number"
+                placeholder="0"
+                {...register('km_driven')}
+                error={errors.km_driven?.message}
+              />
 
-              <FormField label="Posto (opcional)">
-                <select
-                  value={form.supplier_id}
-                  onChange={(e) => set('supplier_id', e.target.value)}
-                  className={selectCls()}
-                >
-                  <option value="">Selecione...</option>
-                  {suppliers.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name}
-                    </option>
-                  ))}
-                </select>
-              </FormField>
+              <Select
+                label="Posto"
+                optional
+                {...register('supplier_id')}
+                error={errors.supplier_id?.message}
+                options={suppliers.map((s) => ({ value: s.id, label: s.name }))}
+              />
 
               <div className="col-span-2">
-                <FormField label="Observação (opcional)">
-                  <input
-                    type="text"
-                    value={form.observation}
-                    onChange={(e) => set('observation', e.target.value)}
-                    className={inputCls()}
-                  />
-                </FormField>
+                <Input
+                  label="Observação"
+                  optional
+                  {...register('observation')}
+                  error={errors.observation?.message}
+                />
               </div>
             </div>
 
@@ -396,7 +312,7 @@ export function TripsPage() {
                 Cancelar
               </Button>
               <button
-                onClick={save}
+                onClick={handleSubmit(onSubmit)}
                 className="flex items-center gap-3 px-8 py-3 bg-primary text-on-primary font-extrabold rounded transition-all hover:brightness-110 active:scale-95 shadow-lg shadow-primary/20"
               >
                 Salvar Viagem

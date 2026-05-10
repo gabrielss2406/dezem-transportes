@@ -1,4 +1,7 @@
+import { zodResolver } from '@hookform/resolvers/zod'
 import { useCallback, useEffect, useState } from 'react'
+import { useForm } from 'react-hook-form'
+import { costSchema } from '../../../shared/schemas'
 import { Button, Modal, Toast, useToast } from '../components/ui'
 import type { Cost, Driver, Supplier, Truck } from '../lib/types'
 import { COST_CATEGORIES, currentMonthKey, formatBRL, formatDate } from '../lib/utils'
@@ -29,8 +32,18 @@ export function CostsPage() {
   const [drivers, setDrivers] = useState<Driver[]>([])
   const [modal, setModal] = useState(false)
   const [filterCategory, setFilterCategory] = useState('')
-  const [form, setForm] = useState<any>({ ...EMPTY })
   const { toast, show } = useToast()
+
+  const {
+    register,
+    handleSubmit,
+    setValue,
+    formState: { errors },
+    reset,
+  } = useForm<Omit<Cost, 'id'>>({
+    resolver: zodResolver(costSchema),
+    defaultValues: { ...EMPTY },
+  })
 
   const load = useCallback(async () => {
     const [c, tr, s, d] = await Promise.all([
@@ -49,20 +62,12 @@ export function CostsPage() {
     load()
   }, [load])
 
-  const set = (k: string, v: any) => setForm((f: any) => ({ ...f, [k]: v }))
-
-  async function save() {
+  const onSubmit = async (data: Omit<Cost, 'id'>) => {
     try {
-      await window.api.costs.create({
-        ...form,
-        value: Number(form.value),
-        truck_id: form.truck_id ? Number(form.truck_id) : null,
-        supplier_id: form.supplier_id ? Number(form.supplier_id) : null,
-        driver_id: form.driver_id ? Number(form.driver_id) : null,
-      })
+      await window.api.costs.create(data)
       show('Custo lançado!')
       setModal(false)
-      setForm({ ...EMPTY })
+      reset()
       load()
     } catch (e: any) {
       show(e.message || 'Erro', 'error')
@@ -118,7 +123,7 @@ export function CostsPage() {
             </button>
             <button
               onClick={() => {
-                setForm({ ...EMPTY })
+                reset()
                 setModal(true)
               }}
               className="flex items-center gap-2 bg-primary text-on-primary px-5 py-2.5 rounded font-bold text-sm shadow-lg shadow-primary/20 hover:brightness-110 active:scale-95 transition-all"
@@ -139,78 +144,52 @@ export function CostsPage() {
             Lançar Custo
           </h4>
           <div className="space-y-4">
-            <div>
-              <label className="text-[10px] uppercase font-bold text-on-surface-variant tracking-widest block mb-1.5">
-                Categoria
-              </label>
-              <select
-                value={form.category}
-                onChange={(e) => set('category', e.target.value)}
-                className="w-full bg-surface-container-lowest border-none rounded-lg p-3 text-on-surface text-sm focus:ring-2 focus:ring-primary/20 outline-none"
-              >
-                <option value="">Selecione...</option>
-                {COST_CATEGORIES.map((c) => (
-                  <option key={c.value} value={c.value}>
-                    {c.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="text-[10px] uppercase font-bold text-on-surface-variant tracking-widest block mb-1.5">
-                Data
-              </label>
-              <input
-                type="date"
-                value={form.date}
-                onChange={(e) => set('date', e.target.value)}
-                className="w-full bg-surface-container-lowest border-none rounded-lg p-3 text-on-surface text-sm focus:ring-2 focus:ring-primary/20 outline-none"
-              />
-            </div>
-            <div>
-              <label className="text-[10px] uppercase font-bold text-on-surface-variant tracking-widest block mb-1.5">
-                Valor (R$)
-              </label>
-              <input
-                type="number"
-                step="0.01"
-                placeholder="0,00"
-                value={form.value}
-                onChange={(e) => set('value', e.target.value)}
-                className="w-full bg-surface-container-lowest border-none rounded-lg p-3 text-on-surface text-sm focus:ring-2 focus:ring-primary/20 outline-none"
-              />
-            </div>
-            <div>
-              <label className="text-[10px] uppercase font-bold text-on-surface-variant tracking-widest block mb-1.5">
-                Veículo (opcional)
-              </label>
-              <select
-                value={form.truck_id}
-                onChange={(e) => set('truck_id', e.target.value)}
-                className="w-full bg-surface-container-lowest border-none rounded-lg p-3 text-on-surface text-sm focus:ring-2 focus:ring-primary/20 outline-none"
-              >
-                <option value="">Selecione...</option>
-                {trucks.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.license_plate}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="text-[10px] uppercase font-bold text-on-surface-variant tracking-widest block mb-1.5">
-                Descrição (opcional)
-              </label>
-              <textarea
-                rows={2}
-                placeholder="Detalhes da despesa..."
-                value={form.description}
-                onChange={(e) => set('description', e.target.value)}
-                className="w-full bg-surface-container-lowest border-none rounded-lg p-3 text-on-surface text-sm focus:ring-2 focus:ring-primary/20 outline-none resize-none"
-              />
-            </div>
+            <Select
+              label="Categoria"
+              {...register('category')}
+              error={errors.category?.message}
+              options={COST_CATEGORIES}
+            />
+            <Input label="Data" type="date" {...register('date')} error={errors.date?.message} />
+            <Input
+              label="Valor (R$)"
+              type="number"
+              step="0.01"
+              placeholder="0,00"
+              {...register('value')}
+              error={errors.value?.message}
+            />
+            <Select
+              label="Veículo"
+              optional
+              {...register('truck_id')}
+              error={errors.truck_id?.message}
+              options={trucks.map((t) => ({ value: t.id, label: t.license_plate }))}
+            />
+            <Select
+              label="Fornecedor"
+              optional
+              {...register('supplier_id')}
+              error={errors.supplier_id?.message}
+              options={suppliers.map((s) => ({ value: s.id, label: s.name }))}
+            />
+            <Select
+              label="Motorista"
+              optional
+              {...register('driver_id')}
+              error={errors.driver_id?.message}
+              options={drivers.map((d) => ({ value: d.id, label: d.name }))}
+            />
+            <Input
+              label="Descrição"
+              optional
+              {...register('description')}
+              error={errors.description?.message}
+              rows={2}
+              placeholder="Detalhes da despesa..."
+            />
             <button
-              onClick={save}
+              onClick={handleSubmit(onSubmit)}
               className="w-full py-4 bg-primary text-on-primary font-bold rounded-lg shadow-xl shadow-primary/10 hover:brightness-110 active:scale-95 transition-all text-sm"
             >
               Confirmar Lançamento
@@ -327,82 +306,47 @@ export function CostsPage() {
         <Modal title="Novo Custo" onClose={() => setModal(false)}>
           <div className="grid grid-cols-2 gap-4">
             <div className="col-span-2">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant block mb-1.5">
-                Categoria
-              </label>
-              <select
-                value={form.category}
-                onChange={(e) => set('category', e.target.value)}
-                className="w-full bg-surface-container-lowest border border-outline-variant/30 rounded-lg px-4 py-3 text-sm text-on-surface focus:ring-2 focus:ring-primary/30 outline-none"
-              >
-                <option value="">Selecione...</option>
-                {COST_CATEGORIES.map((c) => (
-                  <option key={c.value} value={c.value}>
-                    {c.label}
-                  </option>
-                ))}
-              </select>
+              <Select
+                label="Categoria"
+                {...register('category')}
+                error={errors.category?.message}
+                options={COST_CATEGORIES}
+              />
             </div>
-            {[
-              { label: 'Data', key: 'date', type: 'date' },
-              { label: 'Valor (R$)', key: 'value', type: 'number' },
-            ].map(({ label, key, type }) => (
-              <div key={key}>
-                <label className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant block mb-1.5">
-                  {label}
-                </label>
-                <input
-                  type={type}
-                  value={form[key]}
-                  onChange={(e) => set(key, e.target.value)}
-                  className="w-full bg-surface-container-lowest border border-outline-variant/30 rounded-lg px-4 py-3 text-sm text-on-surface focus:ring-2 focus:ring-primary/30 outline-none"
-                />
-              </div>
-            ))}
-            {[
-              {
-                label: 'Veículo',
-                key: 'truck_id',
-                options: trucks.map((t) => ({ value: t.id, label: t.license_plate })),
-              },
-              {
-                label: 'Fornecedor',
-                key: 'supplier_id',
-                options: suppliers.map((s) => ({ value: s.id, label: s.name })),
-              },
-              {
-                label: 'Motorista',
-                key: 'driver_id',
-                options: drivers.map((d) => ({ value: d.id, label: d.name })),
-              },
-            ].map(({ label, key, options }) => (
-              <div key={key}>
-                <label className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant block mb-1.5">
-                  {label} <span className="text-outline font-normal normal-case">(opcional)</span>
-                </label>
-                <select
-                  value={form[key]}
-                  onChange={(e) => set(key, e.target.value)}
-                  className="w-full bg-surface-container-lowest border border-outline-variant/30 rounded-lg px-4 py-3 text-sm text-on-surface focus:ring-2 focus:ring-primary/30 outline-none"
-                >
-                  <option value="">Selecione...</option>
-                  {options.map((o) => (
-                    <option key={o.value} value={o.value}>
-                      {o.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            ))}
+            <Input label="Data" type="date" {...register('date')} error={errors.date?.message} />
+            <Input
+              label="Valor (R$)"
+              type="number"
+              {...register('value')}
+              error={errors.value?.message}
+            />
+            <Select
+              label="Veículo"
+              optional
+              {...register('truck_id')}
+              error={errors.truck_id?.message}
+              options={trucks.map((t) => ({ value: t.id, label: t.license_plate }))}
+            />
+            <Select
+              label="Fornecedor"
+              optional
+              {...register('supplier_id')}
+              error={errors.supplier_id?.message}
+              options={suppliers.map((s) => ({ value: s.id, label: s.name }))}
+            />
+            <Select
+              label="Motorista"
+              optional
+              {...register('driver_id')}
+              error={errors.driver_id?.message}
+              options={drivers.map((d) => ({ value: d.id, label: d.name }))}
+            />
             <div className="col-span-2">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant block mb-1.5">
-                Descrição <span className="text-outline font-normal normal-case">(opcional)</span>
-              </label>
-              <input
-                type="text"
-                value={form.description}
-                onChange={(e) => set('description', e.target.value)}
-                className="w-full bg-surface-container-lowest border border-outline-variant/30 rounded-lg px-4 py-3 text-sm text-on-surface focus:ring-2 focus:ring-primary/30 outline-none"
+              <Input
+                label="Descrição"
+                optional
+                {...register('description')}
+                error={errors.description?.message}
               />
             </div>
           </div>
@@ -410,7 +354,7 @@ export function CostsPage() {
             <Button variant="ghost" onClick={() => setModal(false)}>
               Cancelar
             </Button>
-            <Button onClick={save}>Salvar Custo</Button>
+            <Button onClick={handleSubmit(onSubmit)}>Salvar Custo</Button>
           </div>
         </Modal>
       )}

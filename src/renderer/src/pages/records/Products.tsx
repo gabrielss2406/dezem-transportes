@@ -1,4 +1,7 @@
+import { zodResolver } from '@hookform/resolvers/zod'
 import { useCallback, useEffect, useState } from 'react'
+import { useForm } from 'react-hook-form'
+import { productSchema } from '../../../../shared/schemas'
 import { Button, Input, Modal, Select, Toast, useToast } from '../../components/ui'
 import type { Product } from '../../lib/types'
 
@@ -14,23 +17,32 @@ export function ProductsPage() {
   const [rows, setRows] = useState<Product[]>([])
   const [modal, setModal] = useState(false)
   const [editing, setEditing] = useState<Product | null>(null)
-  const [form, setForm] = useState<any>({ ...EMPTY })
   const { toast, show } = useToast()
+
+  const {
+    register,
+    handleSubmit,
+    setValue,
+    formState: { errors },
+    reset,
+  } = useForm<Omit<Product, 'id'>>({
+    resolver: zodResolver(productSchema),
+    defaultValues: { ...EMPTY },
+  })
 
   const load = useCallback(() => window.api.products.list().then(setRows), [])
   useEffect(() => {
     load()
   }, [load])
-  const set = (k: string, v: any) => setForm((f: any) => ({ ...f, [k]: v }))
 
-  async function save() {
+  const onSubmit = async (data: Omit<Product, 'id'>) => {
     try {
-      if (editing) await window.api.products.update(editing.id, form)
-      else await window.api.products.create(form)
+      if (editing) await window.api.products.update(editing.id, data)
+      else await window.api.products.create(data)
       show(editing ? 'Produto atualizado!' : 'Produto cadastrado!')
       setModal(false)
       setEditing(null)
-      setForm({ ...EMPTY })
+      reset()
       load()
     } catch (e: any) {
       show(e.message, 'error')
@@ -46,7 +58,8 @@ export function ProductsPage() {
 
   function edit(row: Product) {
     setEditing(row)
-    setForm({ name: row.name, unit: row.unit })
+    setValue('name', row.name)
+    setValue('unit', row.unit)
     setModal(true)
   }
 
@@ -67,7 +80,7 @@ export function ProductsPage() {
         <button
           onClick={() => {
             setEditing(null)
-            setForm({ ...EMPTY })
+            reset()
             setModal(true)
           }}
           className="flex items-center gap-2 bg-surface-container-low border border-primary/20 text-primary px-8 py-4 rounded font-bold text-sm hover:bg-primary hover:text-on-primary active:scale-95 transition-all"
@@ -183,15 +196,11 @@ export function ProductsPage() {
       {modal && (
         <Modal title={editing ? 'Editar Produto' : 'Novo Produto'} onClose={() => setModal(false)}>
           <div className="flex flex-col gap-4">
-            <Input
-              label="Nome do produto"
-              value={form.name}
-              onChange={(e) => set('name', e.target.value)}
-            />
+            <Input label="Nome do produto" {...register('name')} error={errors.name?.message} />
             <Select
               label="Unidade"
-              value={form.unit}
-              onChange={(e) => set('unit', e.target.value)}
+              {...register('unit')}
+              error={errors.unit?.message}
               options={UNITS}
             />
           </div>
@@ -199,7 +208,7 @@ export function ProductsPage() {
             <Button variant="ghost" onClick={() => setModal(false)}>
               Cancelar
             </Button>
-            <Button onClick={save}>Salvar</Button>
+            <Button onClick={handleSubmit(onSubmit)}>Salvar</Button>
           </div>
         </Modal>
       )}

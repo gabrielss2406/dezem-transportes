@@ -1,4 +1,7 @@
+import { zodResolver } from '@hookform/resolvers/zod'
 import { useCallback, useEffect, useState } from 'react'
+import { useForm } from 'react-hook-form'
+import { supplierSchema } from '../../../../shared/schemas'
 import { Button, Input, Modal, Select, Toast, useToast } from '../../components/ui'
 import type { Supplier } from '../../lib/types'
 import { SUPPLIER_TYPES } from '../../lib/utils'
@@ -16,23 +19,32 @@ export function SuppliersPage() {
   const [rows, setRows] = useState<Supplier[]>([])
   const [modal, setModal] = useState(false)
   const [editing, setEditing] = useState<Supplier | null>(null)
-  const [form, setForm] = useState<any>({ ...EMPTY })
   const { toast, show } = useToast()
+
+  const {
+    register,
+    handleSubmit,
+    setValue,
+    formState: { errors },
+    reset,
+  } = useForm<Omit<Supplier, 'id'>>({
+    resolver: zodResolver(supplierSchema),
+    defaultValues: { ...EMPTY },
+  })
 
   const load = useCallback(() => window.api.suppliers.list().then(setRows), [])
   useEffect(() => {
     load()
   }, [load])
-  const set = (k: string, v: any) => setForm((f: any) => ({ ...f, [k]: v }))
 
-  async function save() {
+  const onSubmit = async (data: Omit<Supplier, 'id'>) => {
     try {
-      if (editing) await window.api.suppliers.update(editing.id, form)
-      else await window.api.suppliers.create(form)
+      if (editing) await window.api.suppliers.update(editing.id, data)
+      else await window.api.suppliers.create(data)
       show(editing ? 'Fornecedor atualizado!' : 'Fornecedor cadastrado!')
       setModal(false)
       setEditing(null)
-      setForm({ ...EMPTY })
+      reset()
       load()
     } catch (e: any) {
       show(e.message, 'error')
@@ -48,7 +60,9 @@ export function SuppliersPage() {
 
   function edit(row: Supplier) {
     setEditing(row)
-    setForm({ name: row.name, type: row.type, phone: row.phone ?? '' })
+    setValue('name', row.name)
+    setValue('type', row.type)
+    setValue('phone', row.phone ?? '')
     setModal(true)
   }
 
@@ -69,7 +83,7 @@ export function SuppliersPage() {
         <button
           onClick={() => {
             setEditing(null)
-            setForm({ ...EMPTY })
+            reset()
             setModal(true)
           }}
           className="flex items-center gap-3 bg-primary text-on-primary px-8 py-4 rounded font-bold text-sm shadow-lg shadow-primary/20 hover:brightness-110 active:scale-95 transition-all"
@@ -186,25 +200,20 @@ export function SuppliersPage() {
           onClose={() => setModal(false)}
         >
           <div className="flex flex-col gap-4">
-            <Input label="Nome" value={form.name} onChange={(e) => set('name', e.target.value)} />
+            <Input label="Nome" {...register('name')} error={errors.name?.message} />
             <Select
               label="Tipo"
-              value={form.type}
-              onChange={(e) => set('type', e.target.value)}
+              {...register('type')}
+              error={errors.type?.message}
               options={SUPPLIER_TYPES}
             />
-            <Input
-              label="Telefone"
-              optional
-              value={form.phone}
-              onChange={(e) => set('phone', e.target.value)}
-            />
+            <Input label="Telefone" optional {...register('phone')} error={errors.phone?.message} />
           </div>
           <div className="flex justify-end gap-3 mt-6">
             <Button variant="ghost" onClick={() => setModal(false)}>
               Cancelar
             </Button>
-            <Button onClick={save}>Salvar</Button>
+            <Button onClick={handleSubmit(onSubmit)}>Salvar</Button>
           </div>
         </Modal>
       )}

@@ -37,15 +37,24 @@ export const truckSchema = z.object({
     .regex(/^[A-Z]{3}[0-9][A-Z0-9][0-9]{2}$/, 'Placa em formato inválido'),
   model: z.string().min(2, 'Modelo deve ter no mínimo 2 caracteres').max(50),
   year: z
-    .number()
-    .int()
-    .min(1950, 'Ano inválido')
-    .max(new Date().getFullYear() + 1),
+    .union([z.literal(''), z.coerce.number()])
+    .transform((val) => (val === '' ? null : val))
+    .pipe(
+      z
+        .number()
+        .int()
+        .min(1950, 'Ano inválido')
+        .max(new Date().getFullYear() + 1),
+    )
+    .optional()
+    .nullable(),
   capacity_ton: z
-    .number()
-    .positive('Capacidade deve ser positiva')
-    .max(100, 'Capacidade excessiva'),
-  current_odometer: z.number().int().min(0).optional(),
+    .union([z.literal(''), z.coerce.number()])
+    .transform((val) => (val === '' ? null : val))
+    .pipe(z.number().positive('Capacidade deve ser positiva').max(100, 'Capacidade excessiva'))
+    .optional()
+    .nullable(),
+  current_odometer: z.coerce.number().int().min(0).optional().nullable(),
 })
 
 export const driverSchema = z.object({
@@ -56,8 +65,15 @@ export const driverSchema = z.object({
     .refine(isValidPhone, { message: 'Telefone inválido' })
     .optional()
     .or(z.literal('')),
-  monthly_salary: z.number().positive('Salário deve ser positivo').max(100000, 'Salário excessivo'),
-  truck_id: z.number().int().positive().optional().nullable(),
+  monthly_salary: z.coerce
+    .number()
+    .positive('Salário deve ser positivo')
+    .max(100000, 'Salário excessivo'),
+  truck_id: z
+    .union([z.literal(''), z.string()])
+    .transform((val) => (val === '' ? null : z.coerce.number().parse(val)))
+    .optional()
+    .nullable(),
 })
 
 export const routeSchema = z.object({
@@ -67,24 +83,61 @@ export const routeSchema = z.object({
 
 export const tripSchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data em formato inválido'),
-  truck_id: z.number().int().positive(),
-  driver_id: z.number().int().positive(),
-  product_id: z.number().int().positive(),
-  customer_id: z.number().int().positive().optional().nullable(),
-  route_id: z.number().int().positive().optional().nullable(),
-  supplier_id: z.number().int().positive().optional().nullable(),
-  weight_ton: z.number().positive('Peso deve ser positivo').max(100, 'Peso excessivo'),
-  price_charged: z.number().positive('Valor deve ser positivo').max(1000000, 'Valor excessivo'),
-  km_driven: z.number().positive('KM deve ser positivo').max(10000, 'KM excessivo'),
+  truck_id: z.coerce.number().int().positive(),
+  driver_id: z.coerce.number().int().positive(),
+  product_id: z.coerce.number().int().positive(),
+  customer_id: z
+    .union([z.literal(''), z.coerce.number()])
+    .transform((val) => (val === '' ? null : val))
+    .pipe(z.number().int().positive())
+    .optional()
+    .nullable(),
+  route_id: z
+    .union([z.literal(''), z.coerce.number()])
+    .transform((val) => (val === '' ? null : val))
+    .pipe(z.number().int().positive())
+    .optional()
+    .nullable(),
+  supplier_id: z
+    .union([z.literal(''), z.coerce.number()])
+    .transform((val) => (val === '' ? null : val))
+    .pipe(z.number().int().positive())
+    .optional()
+    .nullable(),
+  weight_ton: z.coerce.number().positive('Peso deve ser positivo').max(100, 'Peso excessivo'),
+  price_charged: z.coerce
+    .number()
+    .positive('Valor deve ser positivo')
+    .max(1000000, 'Valor excessivo'),
+  km_driven: z.coerce.number().positive('KM deve ser positivo').max(10000, 'KM excessivo'),
   observation: z.string().max(500).optional(),
 })
 
 export const costSchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data em formato inválido'),
   category: z.string().min(1, 'Categoria é obrigatória'),
-  value: z.number().positive('Valor deve ser positivo').max(1000000, 'Valor excessivo'),
-  truck_id: z.number().int().positive().optional().nullable(),
-  supplier_id: z.number().int().positive().optional().nullable(),
-  driver_id: z.number().int().positive().optional().nullable(),
+  value: z.coerce.number().positive('Valor deve ser positivo').max(1000000, 'Valor excessivo'),
+  truck_id: z
+    .union([z.literal(''), z.coerce.number()])
+    .transform((val) => (val === '' ? null : val))
+    .pipe(z.number().int().positive())
+    .optional()
+    .nullable(),
+  supplier_id: z
+    .union([z.literal(''), z.coerce.number()])
+    .transform((val) => (val === '' ? null : val))
+    .pipe(z.number().int().positive())
+    .optional()
+    .nullable(),
+  driver_id: z
+    .union([z.literal(''), z.coerce.number()])
+    .transform((val) => (val === '' ? null : val))
+    .pipe(z.number().int().positive())
+    .optional()
+    .nullable(),
   description: z.string().max(255).optional(),
+})
+
+export const loginSchema = z.object({
+  password: z.string().min(1, 'Senha é obrigatória.'),
 })

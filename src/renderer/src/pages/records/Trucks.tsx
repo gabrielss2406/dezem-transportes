@@ -1,4 +1,7 @@
+import { zodResolver } from '@hookform/resolvers/zod'
 import { useCallback, useEffect, useState } from 'react'
+import { useForm } from 'react-hook-form'
+import { truckSchema } from '../../../../shared/schemas'
 import { Button, Input, Modal, Toast, useToast } from '../../components/ui'
 import type { Truck } from '../../lib/types'
 
@@ -8,29 +11,31 @@ export function TrucksPage() {
   const [rows, setRows] = useState<Truck[]>([])
   const [modal, setModal] = useState(false)
   const [editing, setEditing] = useState<Truck | null>(null)
-  const [form, setForm] = useState<any>({ ...EMPTY })
   const { toast, show } = useToast()
+
+  const {
+    register,
+    handleSubmit,
+    setValue,
+    formState: { errors },
+    reset,
+  } = useForm<Omit<Truck, 'id'>>({
+    resolver: zodResolver(truckSchema),
+    defaultValues: { ...EMPTY },
+  })
 
   const load = useCallback(() => window.api.trucks.list().then(setRows), [])
   useEffect(() => {
     load()
   }, [load])
-  const set = (k: string, v: any) => setForm((f: any) => ({ ...f, [k]: v }))
-
-  async function save() {
-    const data = {
-      ...form,
-      year: Number(form.year),
-      capacity_ton: Number(form.capacity_ton),
-      current_odometer: Number(form.current_odometer),
-    }
+  const onSubmit = async (data: Omit<Truck, 'id'>) => {
     try {
       if (editing) await window.api.trucks.update(editing.id, data)
       else await window.api.trucks.create(data)
       show(editing ? 'Caminhão atualizado!' : 'Caminhão cadastrado!')
       setModal(false)
       setEditing(null)
-      setForm({ ...EMPTY })
+      reset()
       load()
     } catch (e: any) {
       show(e.message, 'error')
@@ -46,13 +51,11 @@ export function TrucksPage() {
 
   function edit(row: Truck) {
     setEditing(row)
-    setForm({
-      license_plate: row.license_plate,
-      model: row.model,
-      year: row.year ?? '',
-      capacity_ton: row.capacity_ton ?? '',
-      current_odometer: row.current_odometer,
-    })
+    setValue('license_plate', row.license_plate)
+    setValue('model', row.model)
+    setValue('year', row.year ? String(row.year) : '')
+    setValue('capacity_ton', row.capacity_ton ? String(row.capacity_ton) : '')
+    setValue('current_odometer', row.current_odometer ? String(row.current_odometer) : '')
     setModal(true)
   }
 
@@ -76,7 +79,7 @@ export function TrucksPage() {
         <button
           onClick={() => {
             setEditing(null)
-            setForm({ ...EMPTY })
+            reset()
             setModal(true)
           }}
           className="flex items-center gap-3 bg-primary text-on-primary px-8 py-4 rounded font-bold text-sm shadow-lg shadow-primary/20 hover:brightness-110 active:scale-95 transition-all"
@@ -199,35 +202,31 @@ export function TrucksPage() {
           <div className="grid grid-cols-2 gap-4">
             <Input
               label="Placa"
-              value={form.license_plate}
-              onChange={(e) => set('license_plate', e.target.value)}
+              {...register('license_plate')}
+              error={errors.license_plate?.message}
               placeholder="ABC-1234"
             />
-            <Input
-              label="Modelo"
-              value={form.model}
-              onChange={(e) => set('model', e.target.value)}
-            />
+            <Input label="Modelo" {...register('model')} error={errors.model?.message} />
             <Input
               label="Ano"
               type="number"
               optional
-              value={form.year}
-              onChange={(e) => set('year', e.target.value)}
+              {...register('year')}
+              error={errors.year?.message}
             />
             <Input
               label="Capacidade (ton)"
               type="number"
               optional
-              value={form.capacity_ton}
-              onChange={(e) => set('capacity_ton', e.target.value)}
+              {...register('capacity_ton')}
+              error={errors.capacity_ton?.message}
             />
             <div className="col-span-2">
               <Input
                 label="Odômetro inicial (km)"
                 type="number"
-                value={form.current_odometer}
-                onChange={(e) => set('current_odometer', e.target.value)}
+                {...register('current_odometer')}
+                error={errors.current_odometer?.message}
               />
             </div>
           </div>
@@ -235,7 +234,7 @@ export function TrucksPage() {
             <Button variant="ghost" onClick={() => setModal(false)}>
               Cancelar
             </Button>
-            <Button onClick={save}>Salvar</Button>
+            <Button onClick={handleSubmit(onSubmit)}>Salvar</Button>
           </div>
         </Modal>
       )}

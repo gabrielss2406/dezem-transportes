@@ -1,4 +1,7 @@
+import { zodResolver } from '@hookform/resolvers/zod'
 import { useCallback, useEffect, useState } from 'react'
+import { useForm } from 'react-hook-form'
+import { customerSchema } from '../../../../shared/schemas'
 import { Button, Input, Modal, Toast, useToast } from '../../components/ui'
 import type { Customer } from '../../lib/types'
 
@@ -8,24 +11,33 @@ export function CustomersPage() {
   const [rows, setRows] = useState<Customer[]>([])
   const [modal, setModal] = useState(false)
   const [editing, setEditing] = useState<Customer | null>(null)
-  const [form, setForm] = useState<any>({ ...EMPTY })
   const [search, setSearch] = useState('')
   const { toast, show } = useToast()
+
+  const {
+    register,
+    handleSubmit,
+    setValue,
+    formState: { errors },
+    reset,
+  } = useForm<Omit<Customer, 'id'>>({
+    resolver: zodResolver(customerSchema),
+    defaultValues: { ...EMPTY },
+  })
 
   const load = useCallback(() => window.api.customers.list(search).then(setRows), [search])
   useEffect(() => {
     load()
   }, [load])
-  const set = (k: string, v: any) => setForm((f: any) => ({ ...f, [k]: v }))
 
-  async function save() {
+  const onSubmit = async (data: Omit<Customer, 'id'>) => {
     try {
-      if (editing) await window.api.customers.update(editing.id, form)
-      else await window.api.customers.create(form)
+      if (editing) await window.api.customers.update(editing.id, data)
+      else await window.api.customers.create(data)
       show(editing ? 'Cliente atualizado!' : 'Cliente cadastrado!')
       setModal(false)
       setEditing(null)
-      setForm({ ...EMPTY })
+      reset()
       load()
     } catch (e: any) {
       show(e.message, 'error')
@@ -41,13 +53,11 @@ export function CustomersPage() {
 
   function edit(row: Customer) {
     setEditing(row)
-    setForm({
-      name: row.name,
-      cnpj: row.cnpj ?? '',
-      ie: row.ie ?? '',
-      phone: row.phone ?? '',
-      address: row.address ?? '',
-    })
+    setValue('name', row.name)
+    setValue('cnpj', row.cnpj ?? '')
+    setValue('ie', row.ie ?? '')
+    setValue('phone', row.phone ?? '')
+    setValue('address', row.address ?? '')
     setModal(true)
   }
 
@@ -82,7 +92,7 @@ export function CustomersPage() {
           <button
             onClick={() => {
               setEditing(null)
-              setForm({ ...EMPTY })
+              reset()
               setModal(true)
             }}
             className="flex items-center gap-2 bg-primary text-on-primary px-6 py-3 rounded font-bold text-sm shadow-lg shadow-primary/20 hover:brightness-110 active:scale-95 transition-all"
@@ -174,38 +184,28 @@ export function CustomersPage() {
         <Modal title={editing ? 'Editar Cliente' : 'Novo Cliente'} onClose={() => setModal(false)}>
           <div className="grid grid-cols-2 gap-4">
             <div className="col-span-2">
-              <Input label="Nome" value={form.name} onChange={(e) => set('name', e.target.value)} />
+              <Input label="Nome" {...register('name')} error={errors.name?.message} />
             </div>
-            <Input
-              label="CNPJ"
-              optional
-              value={form.cnpj}
-              onChange={(e) => set('cnpj', e.target.value)}
-            />
+            <Input label="CNPJ" optional {...register('cnpj')} error={errors.cnpj?.message} />
             <Input
               label="Inscrição Estadual"
               optional
-              value={form.ie}
-              onChange={(e) => set('ie', e.target.value)}
+              {...register('ie')}
+              error={errors.ie?.message}
             />
-            <Input
-              label="Telefone"
-              optional
-              value={form.phone}
-              onChange={(e) => set('phone', e.target.value)}
-            />
+            <Input label="Telefone" optional {...register('phone')} error={errors.phone?.message} />
             <Input
               label="Endereço"
               optional
-              value={form.address}
-              onChange={(e) => set('address', e.target.value)}
+              {...register('address')}
+              error={errors.address?.message}
             />
           </div>
           <div className="flex justify-end gap-3 mt-6">
             <Button variant="ghost" onClick={() => setModal(false)}>
               Cancelar
             </Button>
-            <Button onClick={save}>Salvar</Button>
+            <Button onClick={handleSubmit(onSubmit)}>Salvar</Button>
           </div>
         </Modal>
       )}

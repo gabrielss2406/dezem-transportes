@@ -1,4 +1,7 @@
+import { zodResolver } from '@hookform/resolvers/zod'
 import { useCallback, useEffect, useState } from 'react'
+import { useForm } from 'react-hook-form'
+import { driverSchema } from '../../../../shared/schemas'
 import { Button, Input, Modal, Select, Toast, useToast } from '../../components/ui'
 import type { Driver, Truck } from '../../lib/types'
 import { formatBRL } from '../../lib/utils'
@@ -19,8 +22,18 @@ export function DriversPage() {
   const [trucks, setTrucks] = useState<Truck[]>([])
   const [modal, setModal] = useState(false)
   const [editing, setEditing] = useState<Driver | null>(null)
-  const [form, setForm] = useState<any>({ ...EMPTY })
   const { toast, show } = useToast()
+
+  const {
+    register,
+    handleSubmit,
+    setValue,
+    formState: { errors },
+    reset,
+  } = useForm<Omit<Driver, 'id'>>({
+    resolver: zodResolver(driverSchema),
+    defaultValues: { ...EMPTY, monthly_salary: 0, truck_id: null },
+  })
 
   const load = useCallback(async () => {
     const [d, t] = await Promise.all([window.api.drivers.list(), window.api.trucks.list()])
@@ -30,21 +43,15 @@ export function DriversPage() {
   useEffect(() => {
     load()
   }, [load])
-  const set = (k: string, v: any) => setForm((f: any) => ({ ...f, [k]: v }))
 
-  async function save() {
-    const data = {
-      ...form,
-      monthly_salary: Number(form.monthly_salary),
-      truck_id: form.truck_id ? Number(form.truck_id) : null,
-    }
+  const onSubmit = async (data: Omit<Driver, 'id'>) => {
     try {
       if (editing) await window.api.drivers.update(editing.id, data)
       else await window.api.drivers.create(data)
       show(editing ? 'Motorista atualizado!' : 'Motorista cadastrado!')
       setModal(false)
       setEditing(null)
-      setForm({ ...EMPTY })
+      reset()
       load()
     } catch (e: any) {
       show(e.message, 'error')
@@ -60,13 +67,11 @@ export function DriversPage() {
 
   function edit(row: Driver) {
     setEditing(row)
-    setForm({
-      name: row.name,
-      cpf: row.cpf ?? '',
-      phone: row.phone ?? '',
-      monthly_salary: row.monthly_salary,
-      truck_id: row.truck_id ?? '',
-    })
+    setValue('name', row.name)
+    setValue('cpf', row.cpf ?? '')
+    setValue('phone', row.phone ?? '')
+    setValue('monthly_salary', row.monthly_salary)
+    setValue('truck_id', row.truck_id ? String(row.truck_id) : '')
     setModal(true)
   }
 
@@ -90,7 +95,7 @@ export function DriversPage() {
         <button
           onClick={() => {
             setEditing(null)
-            setForm({ ...EMPTY })
+            reset()
             setModal(true)
           }}
           className="flex items-center gap-3 bg-primary text-on-primary px-8 py-4 rounded font-bold text-sm shadow-lg shadow-primary/20 hover:brightness-110 active:scale-95 transition-all"
@@ -216,31 +221,21 @@ export function DriversPage() {
         >
           <div className="grid grid-cols-2 gap-4">
             <div className="col-span-2">
-              <Input label="Nome" value={form.name} onChange={(e) => set('name', e.target.value)} />
+              <Input label="Nome" {...register('name')} error={errors.name?.message} />
             </div>
-            <Input
-              label="CPF"
-              optional
-              value={form.cpf}
-              onChange={(e) => set('cpf', e.target.value)}
-            />
-            <Input
-              label="Telefone"
-              optional
-              value={form.phone}
-              onChange={(e) => set('phone', e.target.value)}
-            />
+            <Input label="CPF" optional {...register('cpf')} error={errors.cpf?.message} />
+            <Input label="Telefone" optional {...register('phone')} error={errors.phone?.message} />
             <Input
               label="Salário mensal (R$)"
               type="number"
-              value={form.monthly_salary}
-              onChange={(e) => set('monthly_salary', e.target.value)}
+              {...register('monthly_salary')}
+              error={errors.monthly_salary?.message}
             />
             <Select
               label="Caminhão vinculado"
               optional
-              value={form.truck_id}
-              onChange={(e) => set('truck_id', e.target.value)}
+              {...register('truck_id')}
+              error={errors.truck_id?.message}
               options={trucks.map((t) => ({ value: t.id, label: t.license_plate }))}
             />
           </div>
@@ -248,7 +243,7 @@ export function DriversPage() {
             <Button variant="ghost" onClick={() => setModal(false)}>
               Cancelar
             </Button>
-            <Button onClick={save}>Salvar</Button>
+            <Button onClick={handleSubmit(onSubmit)}>Salvar</Button>
           </div>
         </Modal>
       )}
