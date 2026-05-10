@@ -267,6 +267,8 @@ export function TripsPage() {
                 type="number"
                 step="0.01"
                 placeholder="0,00"
+                mask="99.99"
+                maskChar=""
                 {...register('weight_ton')}
                 error={errors.weight_ton?.message}
               />
@@ -277,6 +279,8 @@ export function TripsPage() {
                 step="0.01"
                 placeholder="0,00"
                 icon="payments"
+                mask="999.999.999,99"
+                maskChar=""
                 {...register('price_charged')}
                 error={errors.price_charged?.message}
               />
@@ -285,6 +289,8 @@ export function TripsPage() {
                 label="Km percorrido"
                 type="number"
                 placeholder="0"
+                mask="99999"
+                maskChar=""
                 {...register('km_driven')}
                 error={errors.km_driven?.message}
               />

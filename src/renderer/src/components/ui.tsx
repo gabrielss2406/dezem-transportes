@@ -1,4 +1,5 @@
-import React from 'react'
+import React, { forwardRef } from 'react'
+import InputMask from 'react-input-mask'
 
 // ── Button ───────────────────────────────────────────────────────────────────
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
@@ -33,54 +34,67 @@ interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   label?: string
   optional?: boolean
   error?: string
+  mask?: string
+  maskChar?: string | null
 }
-export function Input({ label, optional, error, className = '', ...props }: InputProps) {
-  return (
-    <div className="flex flex-col gap-1.5">
-      {label && (
-        <label className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
-          {label}{' '}
-          {optional && <span className="text-outline font-normal normal-case">(opcional)</span>}
-        </label>
-      )}
-      <input
-        className={`bg-surface-container-lowest border border-outline-variant/30 rounded-lg px-4 py-3 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all ${error ? 'border-error' : ''} ${className}`}
-        {...props}
-      />
-      {error && <span className="text-xs text-error">{error}</span>}
-    </div>
-  )
-}
+export const Input = forwardRef<HTMLInputElement, InputProps>(
+  ({ label, optional, error, mask, maskChar, className = '', ...props }, ref) => {
+    const InputComponent = mask ? (InputMask as any) : 'input'
+    const maskProps = mask ? { mask, maskChar, inputRef: ref } : { ref }
+
+    return (
+      <div className="flex flex-col gap-1.5">
+        {label && (
+          <label className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
+            {label}{' '}
+            {optional && <span className="text-outline font-normal normal-case">(opcional)</span>}
+          </label>
+        )}
+        <InputComponent
+          {...maskProps}
+          className={`bg-surface-container-lowest border border-outline-variant/30 rounded-lg px-4 py-3 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all ${error ? 'border-error' : ''} ${className}`}
+          {...props}
+        />
+        {error && <span className="text-xs text-error">{error}</span>}
+      </div>
+    )
+  },
+)
 
 // ── Select ───────────────────────────────────────────────────────────────────
 interface SelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
   label?: string
   optional?: boolean
+  error?: string
   options: { value: string | number; label: string }[]
 }
-export function Select({ label, optional, options, className = '', ...props }: SelectProps) {
-  return (
-    <div className="flex flex-col gap-1.5">
-      {label && (
-        <label className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
-          {label}{' '}
-          {optional && <span className="text-outline font-normal normal-case">(opcional)</span>}
-        </label>
-      )}
-      <select
-        className={`bg-surface-container-lowest border border-outline-variant/30 rounded-lg px-4 py-3 text-sm text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all ${className}`}
-        {...props}
-      >
-        <option value="">Selecione...</option>
-        {options.map((o) => (
-          <option key={o.value} value={o.value}>
-            {o.label}
-          </option>
-        ))}
-      </select>
-    </div>
-  )
-}
+export const Select = forwardRef<HTMLSelectElement, SelectProps>(
+  ({ label, optional, error, options, className = '', ...props }, ref) => {
+    return (
+      <div className="flex flex-col gap-1.5">
+        {label && (
+          <label className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
+            {label}{' '}
+            {optional && <span className="text-outline font-normal normal-case">(opcional)</span>}
+          </label>
+        )}
+        <select
+          ref={ref}
+          className={`bg-surface-container-lowest border border-outline-variant/30 rounded-lg px-4 py-3 text-sm text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all ${error ? 'border-error' : ''} ${className}`}
+          {...props}
+        >
+          <option value="">Selecione...</option>
+          {options.map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          ))}
+        </select>
+        {error && <span className="text-xs text-error">{error}</span>}
+      </div>
+    )
+  },
+)
 
 // ── Badge ────────────────────────────────────────────────────────────────────
 interface BadgeProps {

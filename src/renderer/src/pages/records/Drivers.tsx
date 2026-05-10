@@ -30,10 +30,19 @@ export function DriversPage() {
     setValue,
     formState: { errors },
     reset,
+    watch,
   } = useForm<Omit<Driver, 'id'>>({
     resolver: zodResolver(driverSchema),
     defaultValues: { ...EMPTY, monthly_salary: 0, truck_id: null },
+    mode: 'all',
   })
+
+  const phoneValue = watch('phone') || ''
+  const digits = phoneValue.replace(/\D/g, '')
+  const phoneMask =
+    digits.length > 10 || (digits.length >= 3 && digits[2] === '9')
+      ? '(99) 99999-9999'
+      : '(99) 9999-9999'
 
   const load = useCallback(async () => {
     const [d, t] = await Promise.all([window.api.drivers.list(), window.api.trucks.list()])
@@ -223,8 +232,22 @@ export function DriversPage() {
             <div className="col-span-2">
               <Input label="Nome" {...register('name')} error={errors.name?.message} />
             </div>
-            <Input label="CPF" optional {...register('cpf')} error={errors.cpf?.message} />
-            <Input label="Telefone" optional {...register('phone')} error={errors.phone?.message} />
+            <Input
+              label="CPF"
+              optional
+              mask="999.999.999-99"
+              maskChar=""
+              {...register('cpf')}
+              error={errors.cpf?.message}
+            />
+            <Input
+              label="Telefone"
+              optional
+              mask={phoneMask}
+              maskChar={null}
+              {...register('phone')}
+              error={errors.phone?.message}
+            />
             <Input
               label="Salário mensal (R$)"
               type="number"

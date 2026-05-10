@@ -1,17 +1,61 @@
 import { z } from 'zod'
 import { isValidCNPJ, isValidCPF, isValidPhone } from './validation'
 
+z.setErrorMap((issue, ctx) => {
+  if (issue.code === z.ZodIssueCode.invalid_type) {
+    if (issue.received === 'undefined') {
+      return { message: 'Obrigatório' }
+    }
+    return { message: `Esperado ${ctx.expected}, recebido ${ctx.received}` }
+  }
+  if (issue.code === z.ZodIssueCode.too_small) {
+    if (issue.type === 'string') {
+      return { message: `Deve ter no mínimo ${issue.minimum} caracteres` }
+    }
+    return { message: `Deve ser no mínimo ${issue.minimum}` }
+  }
+  if (issue.code === z.ZodIssueCode.too_big) {
+    if (issue.type === 'string') {
+      return { message: `Deve ter no máximo ${issue.maximum} caracteres` }
+    }
+    return { message: `Deve ser no máximo ${issue.maximum}` }
+  }
+  if (issue.code === z.ZodIssueCode.invalid_string) {
+    if (issue.validation === 'email') {
+      return { message: 'Email inválido' }
+    }
+    if (issue.validation === 'uuid') {
+      return { message: 'UUID inválido' }
+    }
+    return { message: 'String inválida' }
+  }
+  if (issue.code === z.ZodIssueCode.invalid_enum_value) {
+    return {
+      message: `Valor inválido. Esperado um de ${issue.options.map((o) => `'${o}'`).join(' ou ')}`,
+    }
+  }
+  if (issue.code === z.ZodIssueCode.invalid_literal) {
+    return { message: `Literal inválido. Esperado '${issue.expected}'` }
+  }
+  if (issue.code === z.ZodIssueCode.custom) {
+    return { message: issue.message || 'Inválido' }
+  }
+  return { message: ctx.defaultError }
+})
+
 export const idSchema = z.number().int().positive()
 
 export const customerSchema = z.object({
   name: z.string().min(3, 'Nome deve ter no mínimo 3 caracteres').max(100),
-  cnpj: z.string().refine(isValidCNPJ, { message: 'CNPJ inválido' }).optional().or(z.literal('')),
+  cnpj: z
+    .string()
+    .optional()
+    .refine((val) => !val || isValidCNPJ(val), { message: 'CNPJ inválido' }),
   ie: z.string().max(20).optional(),
   phone: z
     .string()
-    .refine(isValidPhone, { message: 'Telefone inválido' })
     .optional()
-    .or(z.literal('')),
+    .refine((val) => !val || isValidPhone(val), { message: 'Telefone inválido' }),
   address: z.string().max(255).optional(),
 })
 
@@ -25,9 +69,8 @@ export const supplierSchema = z.object({
   type: z.string().max(50).optional(),
   phone: z
     .string()
-    .refine(isValidPhone, { message: 'Telefone inválido' })
     .optional()
-    .or(z.literal('')),
+    .refine((val) => !val || isValidPhone(val), { message: 'Telefone inválido' }),
 })
 
 export const truckSchema = z.object({
@@ -59,12 +102,14 @@ export const truckSchema = z.object({
 
 export const driverSchema = z.object({
   name: z.string().min(3, 'Nome deve ter no mínimo 3 caracteres').max(100),
-  cpf: z.string().refine(isValidCPF, { message: 'CPF inválido' }).optional().or(z.literal('')),
+  cpf: z
+    .string()
+    .optional()
+    .refine((val) => !val || isValidCPF(val), { message: 'CPF inválido' }),
   phone: z
     .string()
-    .refine(isValidPhone, { message: 'Telefone inválido' })
     .optional()
-    .or(z.literal('')),
+    .refine((val) => !val || isValidPhone(val), { message: 'Telefone inválido' }),
   monthly_salary: z.coerce
     .number()
     .positive('Salário deve ser positivo')

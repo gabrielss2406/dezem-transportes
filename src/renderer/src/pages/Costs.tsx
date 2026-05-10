@@ -156,6 +156,8 @@ export function CostsPage() {
               type="number"
               step="0.01"
               placeholder="0,00"
+              mask="999.999.999,99"
+              maskChar=""
               {...register('value')}
               error={errors.value?.message}
             />

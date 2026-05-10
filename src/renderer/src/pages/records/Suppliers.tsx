@@ -27,10 +27,19 @@ export function SuppliersPage() {
     setValue,
     formState: { errors },
     reset,
+    watch,
   } = useForm<Omit<Supplier, 'id'>>({
     resolver: zodResolver(supplierSchema),
     defaultValues: { ...EMPTY },
+    mode: 'all',
   })
+
+  const phoneValue = watch('phone') || ''
+  const digits = phoneValue.replace(/\D/g, '')
+  const phoneMask =
+    digits.length > 10 || (digits.length >= 3 && digits[2] === '9')
+      ? '(99) 99999-9999'
+      : '(99) 9999-9999'
 
   const load = useCallback(() => window.api.suppliers.list().then(setRows), [])
   useEffect(() => {
@@ -207,7 +216,14 @@ export function SuppliersPage() {
               error={errors.type?.message}
               options={SUPPLIER_TYPES}
             />
-            <Input label="Telefone" optional {...register('phone')} error={errors.phone?.message} />
+            <Input
+              label="Telefone"
+              optional
+              mask={phoneMask}
+              maskChar={null}
+              {...register('phone')}
+              error={errors.phone?.message}
+            />
           </div>
           <div className="flex justify-end gap-3 mt-6">
             <Button variant="ghost" onClick={() => setModal(false)}>

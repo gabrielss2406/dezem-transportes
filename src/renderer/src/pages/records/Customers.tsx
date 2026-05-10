@@ -20,10 +20,19 @@ export function CustomersPage() {
     setValue,
     formState: { errors },
     reset,
+    watch,
   } = useForm<Omit<Customer, 'id'>>({
     resolver: zodResolver(customerSchema),
     defaultValues: { ...EMPTY },
+    mode: 'all',
   })
+
+  const phoneValue = watch('phone') || ''
+  const digits = phoneValue.replace(/\D/g, '')
+  const phoneMask =
+    digits.length > 10 || (digits.length >= 3 && digits[2] === '9')
+      ? '(99) 99999-9999'
+      : '(99) 9999-9999'
 
   const load = useCallback(() => window.api.customers.list(search).then(setRows), [search])
   useEffect(() => {
@@ -186,14 +195,28 @@ export function CustomersPage() {
             <div className="col-span-2">
               <Input label="Nome" {...register('name')} error={errors.name?.message} />
             </div>
-            <Input label="CNPJ" optional {...register('cnpj')} error={errors.cnpj?.message} />
+            <Input
+              label="CNPJ"
+              optional
+              mask="99.999.999/9999-99"
+              maskChar=""
+              {...register('cnpj')}
+              error={errors.cnpj?.message}
+            />
             <Input
               label="Inscrição Estadual"
               optional
               {...register('ie')}
               error={errors.ie?.message}
             />
-            <Input label="Telefone" optional {...register('phone')} error={errors.phone?.message} />
+            <Input
+              label="Telefone"
+              optional
+              mask={phoneMask}
+              maskChar={null}
+              {...register('phone')}
+              error={errors.phone?.message}
+            />
             <Input
               label="Endereço"
               optional
