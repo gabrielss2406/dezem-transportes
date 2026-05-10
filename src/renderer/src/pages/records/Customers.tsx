@@ -39,17 +39,34 @@ export function CustomersPage() {
     load()
   }, [load])
 
+  // Limpeza automática ao fechar o modal
+  useEffect(() => {
+    if (!modal) {
+      setEditing(null)
+      reset(EMPTY)
+    }
+  }, [modal])
+
   const onSubmit = async (data: Omit<Customer, 'id'>) => {
     try {
-      if (editing) await window.api.customers.update(editing.id, data)
-      else await window.api.customers.create(data)
+      let res: any
+      if (editing) {
+        res = await window.api.customers.update(editing.id, data)
+      } else {
+        res = await window.api.customers.create(data)
+      }
+
+      if (res && res.ok === false) {
+        const msg = res.errors ? Object.values(res.errors)[0] : 'Erro ao salvar dados'
+        show(String(msg), 'error')
+        return
+      }
+
       show(editing ? 'Cliente atualizado!' : 'Cliente cadastrado!')
       setModal(false)
-      setEditing(null)
-      reset()
       load()
     } catch (e: any) {
-      show(e.message, 'error')
+      show(e.message || 'Erro de conexão', 'error')
     }
   }
 
@@ -62,11 +79,13 @@ export function CustomersPage() {
 
   function edit(row: Customer) {
     setEditing(row)
-    setValue('name', row.name)
-    setValue('cnpj', row.cnpj ?? '')
-    setValue('ie', row.ie ?? '')
-    setValue('phone', row.phone ?? '')
-    setValue('address', row.address ?? '')
+    reset({
+      name: row.name,
+      cnpj: row.cnpj ?? '',
+      ie: row.ie ?? '',
+      phone: row.phone ?? '',
+      address: row.address ?? '',
+    })
     setModal(true)
   }
 
@@ -99,11 +118,7 @@ export function CustomersPage() {
             />
           </div>
           <button
-            onClick={() => {
-              setEditing(null)
-              reset()
-              setModal(true)
-            }}
+            onClick={() => setModal(true)}
             className="flex items-center gap-2 bg-primary text-on-primary px-6 py-3 rounded font-bold text-sm shadow-lg shadow-primary/20 hover:brightness-110 active:scale-95 transition-all"
           >
             <span className="material-symbols-outlined text-xl">add</span>

@@ -24,6 +24,8 @@ export function DriversPage() {
   const [editing, setEditing] = useState<Driver | null>(null)
   const { toast, show } = useToast()
 
+  const FORM_EMPTY = { ...EMPTY, monthly_salary: 0, truck_id: null }
+
   const {
     register,
     handleSubmit,
@@ -34,7 +36,7 @@ export function DriversPage() {
     control,
   } = useForm<Omit<Driver, 'id'>>({
     resolver: zodResolver(driverSchema),
-    defaultValues: { ...EMPTY, monthly_salary: 0, truck_id: null },
+    defaultValues: FORM_EMPTY,
     mode: 'all',
   })
 
@@ -54,17 +56,34 @@ export function DriversPage() {
     load()
   }, [load])
 
+  // Limpeza automática ao fechar o modal
+  useEffect(() => {
+    if (!modal) {
+      setEditing(null)
+      reset(FORM_EMPTY)
+    }
+  }, [modal])
+
   const onSubmit = async (data: Omit<Driver, 'id'>) => {
     try {
-      if (editing) await window.api.drivers.update(editing.id, data)
-      else await window.api.drivers.create(data)
+      let res: any
+      if (editing) {
+        res = await window.api.drivers.update(editing.id, data)
+      } else {
+        res = await window.api.drivers.create(data)
+      }
+
+      if (res && res.ok === false) {
+        const msg = res.errors ? Object.values(res.errors)[0] : 'Erro ao salvar dados'
+        show(String(msg), 'error')
+        return
+      }
+
       show(editing ? 'Motorista atualizado!' : 'Motorista cadastrado!')
       setModal(false)
-      setEditing(null)
-      reset()
       load()
     } catch (e: any) {
-      show(e.message, 'error')
+      show(e.message || 'Erro de conexão', 'error')
     }
   }
 
@@ -77,11 +96,13 @@ export function DriversPage() {
 
   function edit(row: Driver) {
     setEditing(row)
-    setValue('name', row.name)
-    setValue('cpf', row.cpf ?? '')
-    setValue('phone', row.phone ?? '')
-    setValue('monthly_salary', row.monthly_salary)
-    setValue('truck_id', row.truck_id ? String(row.truck_id) : '')
+    reset({
+      name: row.name,
+      cpf: row.cpf ?? '',
+      phone: row.phone ?? '',
+      monthly_salary: row.monthly_salary,
+      truck_id: row.truck_id,
+    })
     setModal(true)
   }
 
@@ -103,11 +124,7 @@ export function DriversPage() {
           </p>
         </div>
         <button
-          onClick={() => {
-            setEditing(null)
-            reset()
-            setModal(true)
-          }}
+          onClick={() => setModal(true)}
           className="flex items-center gap-3 bg-primary text-on-primary px-8 py-4 rounded font-bold text-sm shadow-lg shadow-primary/20 hover:brightness-110 active:scale-95 transition-all"
         >
           <span className="material-symbols-outlined">person_add</span>
@@ -261,12 +278,19 @@ export function DriversPage() {
                 />
               )}
             />
-            <Select
-              label="Caminhão vinculado"
-              optional
-              {...register('truck_id')}
-              error={errors.truck_id?.message}
-              options={trucks.map((t) => ({ value: t.id, label: t.license_plate }))}
+            <Controller
+              name="truck_id"
+              control={control}
+              render={({ field }) => (
+                <Select
+                  label="Caminhão vinculado"
+                  optional
+                  value={field.value}
+                  onChange={field.onChange}
+                  error={errors.truck_id?.message}
+                  options={trucks.map((t) => ({ value: t.id, label: t.license_plate }))}
+                />
+              )}
             />
           </div>
           <div className="flex justify-end gap-3 mt-6">

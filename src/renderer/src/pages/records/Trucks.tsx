@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useCallback, useEffect, useState } from 'react'
-import { useForm } from 'react-hook-form'
+import { Controller, useForm } from 'react-hook-form'
 import { truckSchema } from '../../../../shared/schemas'
 import { Button, Input, Modal, Toast, useToast } from '../../components/ui'
 import type { Truck } from '../../lib/types'
@@ -19,6 +19,7 @@ export function TrucksPage() {
     setValue,
     formState: { errors },
     reset,
+    control,
   } = useForm<Omit<Truck, 'id'>>({
     resolver: zodResolver(truckSchema),
     defaultValues: { ...EMPTY },
@@ -29,17 +30,35 @@ export function TrucksPage() {
   useEffect(() => {
     load()
   }, [load])
+
+  // Limpeza automática ao fechar o modal
+  useEffect(() => {
+    if (!modal) {
+      setEditing(null)
+      reset(EMPTY)
+    }
+  }, [modal])
+
   const onSubmit = async (data: Omit<Truck, 'id'>) => {
     try {
-      if (editing) await window.api.trucks.update(editing.id, data)
-      else await window.api.trucks.create(data)
+      let res: any
+      if (editing) {
+        res = await window.api.trucks.update(editing.id, data)
+      } else {
+        res = await window.api.trucks.create(data)
+      }
+
+      if (res && res.ok === false) {
+        const msg = res.errors ? Object.values(res.errors)[0] : 'Erro ao salvar'
+        show(String(msg), 'error')
+        return
+      }
+
       show(editing ? 'Caminhão atualizado!' : 'Caminhão cadastrado!')
       setModal(false)
-      setEditing(null)
-      reset()
       load()
     } catch (e: any) {
-      show(e.message, 'error')
+      show(e.message || 'Erro de conexão', 'error')
     }
   }
 
@@ -52,11 +71,13 @@ export function TrucksPage() {
 
   function edit(row: Truck) {
     setEditing(row)
-    setValue('license_plate', row.license_plate)
-    setValue('model', row.model)
-    setValue('year', row.year ? String(row.year) : '')
-    setValue('capacity_ton', row.capacity_ton ? String(row.capacity_ton) : '')
-    setValue('current_odometer', row.current_odometer ? String(row.current_odometer) : '')
+    reset({
+      license_plate: row.license_plate,
+      model: row.model,
+      year: row.year,
+      capacity_ton: row.capacity_ton,
+      current_odometer: row.current_odometer,
+    })
     setModal(true)
   }
 
@@ -78,11 +99,7 @@ export function TrucksPage() {
           </p>
         </div>
         <button
-          onClick={() => {
-            setEditing(null)
-            reset()
-            setModal(true)
-          }}
+          onClick={() => setModal(true)}
           className="flex items-center gap-3 bg-primary text-on-primary px-8 py-4 rounded font-bold text-sm shadow-lg shadow-primary/20 hover:brightness-110 active:scale-95 transition-all"
         >
           <span className="material-symbols-outlined">add</span>
@@ -96,7 +113,7 @@ export function TrucksPage() {
           { label: 'Total de Caminhões', value: rows.length, icon: 'local_shipping' },
           {
             label: 'Km Acumulado',
-            value: rows.reduce((s, r) => s + r.current_odometer, 0).toFixed(0),
+            value: rows.reduce((s, r) => s + (r.current_odometer || 0), 0).toFixed(0),
             icon: 'route',
           },
           {
@@ -164,7 +181,7 @@ export function TrucksPage() {
                   {row.capacity_ton ? `${row.capacity_ton} ton` : '—'}
                 </td>
                 <td className="px-6 py-4 text-sm font-mono text-on-surface-variant">
-                  {row.current_odometer.toFixed(0)} km
+                  {Number(row.current_odometer || 0).toFixed(0)} km
                 </td>
                 <td className="px-6 py-4">
                   <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -189,8 +206,7 @@ export function TrucksPage() {
 
         <div className="px-6 py-4 bg-surface-container-high/50 border-t border-outline-variant/10">
           <p className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">
-            {rows.length} caminhão{rows.length !== 1 ? 'ões' : ''} cadastrado
-            {rows.length !== 1 ? 's' : ''}
+            {rows.length} caminh{rows.length !== 1 ? 'ões' : 'ão'} cadastrado
           </p>
         </div>
       </div>
@@ -208,26 +224,47 @@ export function TrucksPage() {
               placeholder="ABC-1234"
             />
             <Input label="Modelo" {...register('model')} error={errors.model?.message} />
-            <Input
-              label="Ano"
-              type="number"
-              optional
-              {...register('year')}
-              error={errors.year?.message}
+            <Controller
+              name="year"
+              control={control}
+              render={({ field }) => (
+                <Input
+                  label="Ano"
+                  type="number"
+                  optional
+                  value={field.value ?? ''}
+                  onChange={field.onChange}
+                  error={errors.year?.message}
+                />
+              )}
             />
-            <Input
-              label="Capacidade (ton)"
-              type="number"
-              optional
-              {...register('capacity_ton')}
-              error={errors.capacity_ton?.message}
+            <Controller
+              name="capacity_ton"
+              control={control}
+              render={({ field }) => (
+                <Input
+                  label="Capacidade (ton)"
+                  type="number"
+                  optional
+                  value={field.value ?? ''}
+                  onChange={field.onChange}
+                  error={errors.capacity_ton?.message}
+                />
+              )}
             />
             <div className="col-span-2">
-              <Input
-                label="Odômetro inicial (km)"
-                type="number"
-                {...register('current_odometer')}
-                error={errors.current_odometer?.message}
+              <Controller
+                name="current_odometer"
+                control={control}
+                render={({ field }) => (
+                  <Input
+                    label="Odômetro (km)"
+                    type="number"
+                    value={field.value ?? ''}
+                    onChange={field.onChange}
+                    error={errors.current_odometer?.message}
+                  />
+                )}
               />
             </div>
           </div>

@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useCallback, useEffect, useState } from 'react'
-import { useForm } from 'react-hook-form'
+import { Controller, useForm } from 'react-hook-form'
 import { productSchema } from '../../../../shared/schemas'
 import { Button, Input, Modal, Select, Toast, useToast } from '../../components/ui'
 import type { Product } from '../../lib/types'
@@ -25,9 +25,11 @@ export function ProductsPage() {
     setValue,
     formState: { errors },
     reset,
+    control,
   } = useForm<Omit<Product, 'id'>>({
     resolver: zodResolver(productSchema),
     defaultValues: { ...EMPTY },
+    mode: 'all',
   })
 
   const load = useCallback(() => window.api.products.list().then(setRows), [])
@@ -42,7 +44,7 @@ export function ProductsPage() {
       show(editing ? 'Produto atualizado!' : 'Produto cadastrado!')
       setModal(false)
       setEditing(null)
-      reset()
+      reset(EMPTY)
       load()
     } catch (e: any) {
       show(e.message, 'error')
@@ -58,8 +60,10 @@ export function ProductsPage() {
 
   function edit(row: Product) {
     setEditing(row)
-    setValue('name', row.name)
-    setValue('unit', row.unit)
+    reset({
+      name: row.name,
+      unit: row.unit,
+    })
     setModal(true)
   }
 
@@ -80,7 +84,7 @@ export function ProductsPage() {
         <button
           onClick={() => {
             setEditing(null)
-            reset()
+            reset(EMPTY)
             setModal(true)
           }}
           className="flex items-center gap-2 bg-surface-container-low border border-primary/20 text-primary px-8 py-4 rounded font-bold text-sm hover:bg-primary hover:text-on-primary active:scale-95 transition-all"
@@ -197,11 +201,18 @@ export function ProductsPage() {
         <Modal title={editing ? 'Editar Produto' : 'Novo Produto'} onClose={() => setModal(false)}>
           <div className="flex flex-col gap-4">
             <Input label="Nome do produto" {...register('name')} error={errors.name?.message} />
-            <Select
-              label="Unidade"
-              {...register('unit')}
-              error={errors.unit?.message}
-              options={UNITS}
+            <Controller
+              name="unit"
+              control={control}
+              render={({ field }) => (
+                <Select
+                  label="Unidade"
+                  value={field.value}
+                  onChange={field.onChange}
+                  error={errors.unit?.message}
+                  options={UNITS}
+                />
+              )}
             />
           </div>
           <div className="flex justify-end gap-3 mt-6">

@@ -1,4 +1,5 @@
-import React, { forwardRef } from 'react'
+import React, { forwardRef, useState, useRef, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import InputMask from 'react-input-mask'
 
 // ── Button ───────────────────────────────────────────────────────────────────
@@ -81,7 +82,6 @@ export function CurrencyInput({
   placeholder = '0,00',
   className = '',
 }: CurrencyInputProps) {
-  // Converte o número para string formatada (ex: 1250.5 -> 1.250,50)
   const format = (val: number | string) => {
     const n = typeof val === 'number' ? val : Number(val) || 0
     return new Intl.NumberFormat('pt-BR', {
@@ -91,9 +91,7 @@ export function CurrencyInput({
   }
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    // Remove tudo que não for dígito
     const digits = e.target.value.replace(/\D/g, '')
-    // Converte para centavos (ex: "1250" -> 12.50)
     const cents = Number(digits) / 100
     onChange(cents)
   }
@@ -124,39 +122,167 @@ export function CurrencyInput({
 }
 
 // ── Select ───────────────────────────────────────────────────────────────────
-interface SelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
+interface SelectProps {
   label?: string
   optional?: boolean
   error?: string
   options: { value: string | number; label: string }[]
+  value?: string | number
+  onChange?: (value: any) => void
+  placeholder?: string
+  className?: string
+  icon?: string
 }
-export const Select = forwardRef<HTMLSelectElement, SelectProps>(
-  ({ label, optional, error, options, className = '', ...props }, ref) => {
-    return (
-      <div className="flex flex-col gap-1.5">
-        {label && (
-          <label className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
-            {label}{' '}
-            {optional && <span className="text-outline font-normal normal-case">(opcional)</span>}
-          </label>
-        )}
-        <select
-          ref={ref}
-          className={`bg-surface-container-lowest border border-outline-variant/30 rounded-lg px-4 py-3 text-sm text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all ${error ? 'border-error' : ''} ${className}`}
-          {...props}
+
+export function Select({
+  label,
+  optional,
+  error,
+  options,
+  value,
+  onChange,
+  placeholder = 'Selecione...',
+  className = '',
+  icon,
+}: SelectProps) {
+  const [isOpen, setIsOpen] = useState(false)
+  const containerRef = useRef<HTMLDivElement>(null)
+  const buttonRef = useRef<HTMLButtonElement>(null)
+  const [coords, setCoords] = useState({ top: 0, left: 0, width: 0 })
+
+  const selectedOption = options.find((o) => String(o.value) === String(value))
+
+  const updateCoords = () => {
+    if (buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect()
+      setCoords({
+        top: rect.bottom + window.scrollY,
+        left: rect.left + window.scrollX,
+        width: rect.width,
+      })
+    }
+  }
+
+  useEffect(() => {
+    if (isOpen) {
+      updateCoords()
+      window.addEventListener('resize', updateCoords)
+      window.addEventListener('scroll', updateCoords, true)
+    }
+    return () => {
+      window.removeEventListener('resize', updateCoords)
+      window.removeEventListener('scroll', updateCoords, true)
+    }
+  }, [isOpen])
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setIsOpen(false)
+      }
+    }
+    if (isOpen) {
+      document.addEventListener('click', handleClickOutside)
+    }
+    return () => document.removeEventListener('click', handleClickOutside)
+  }, [isOpen])
+
+  return (
+    <div className={`flex flex-col gap-1.5 relative ${className}`} ref={containerRef}>
+      {label && (
+        <label className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
+          {label}{' '}
+          {optional && <span className="text-outline font-normal normal-case">(opcional)</span>}
+        </label>
+      )}
+
+      <button
+        ref={buttonRef}
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation()
+          setIsOpen(!isOpen)
+        }}
+        className={`flex items-center justify-between bg-surface-container-lowest border border-outline-variant/30 rounded-lg px-4 py-3 text-sm text-on-surface text-left focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all ${error ? 'border-error' : ''}`}
+      >
+        <div className="flex items-center gap-2 overflow-hidden">
+          {icon && (
+            <span className="material-symbols-outlined text-on-surface-variant/60 text-lg">
+              {icon}
+            </span>
+          )}
+          <span className={`truncate ${!selectedOption ? 'text-on-surface-variant/40' : ''}`}>
+            {selectedOption ? selectedOption.label : placeholder}
+          </span>
+        </div>
+        <span
+          className={`material-symbols-outlined text-on-surface-variant transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
         >
-          <option value="">Selecione...</option>
-          {options.map((o) => (
-            <option key={o.value} value={o.value}>
-              {o.label}
-            </option>
-          ))}
-        </select>
-        {error && <span className="text-xs text-error">{error}</span>}
-      </div>
-    )
-  },
-)
+          expand_more
+        </span>
+      </button>
+
+      {isOpen &&
+        createPortal(
+          <button
+            className="fixed z-[9999] bg-surface-container-low border border-outline-variant/20 rounded-xl shadow-2xl overflow-hidden"
+            onMouseDown={(e) => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              top: coords.top + 4,
+              left: coords.left,
+              width: coords.width,
+            }}
+          >
+            <div className="max-h-60 overflow-y-auto py-2">
+              {optional && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    onChange?.('')
+                    setIsOpen(false)
+                  }}
+                  className="w-full text-left px-4 py-2.5 text-sm transition-colors hover:bg-primary/10 text-on-surface-variant italic"
+                >
+                  Nenhum
+                </button>
+              )}
+              {options.length === 0 ? (
+                <div className="px-4 py-3 text-xs text-on-surface-variant italic">
+                  Nenhuma opção disponível
+                </div>
+              ) : (
+                options.map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      onChange?.(option.value)
+                      setIsOpen(false)
+                    }}
+                    className={`w-full text-left px-4 py-2.5 text-sm transition-colors hover:bg-primary/10 ${
+                      String(value) === String(option.value)
+                        ? 'bg-primary/20 text-primary font-bold'
+                        : 'text-on-surface'
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                ))
+              )}
+            </div>
+          </button>,
+          document.body,
+        )}
+
+      {error && <span className="text-xs text-error">{error}</span>}
+    </div>
+  )
+}
 
 // ── Badge ────────────────────────────────────────────────────────────────────
 interface BadgeProps {

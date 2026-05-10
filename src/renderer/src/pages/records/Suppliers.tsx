@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useCallback, useEffect, useState } from 'react'
-import { useForm } from 'react-hook-form'
+import { Controller, useForm } from 'react-hook-form'
 import { supplierSchema } from '../../../../shared/schemas'
 import { Button, Input, Modal, Select, Toast, useToast } from '../../components/ui'
 import type { Supplier } from '../../lib/types'
@@ -27,6 +27,7 @@ export function SuppliersPage() {
     setValue,
     formState: { errors },
     reset,
+    control,
     watch,
   } = useForm<Omit<Supplier, 'id'>>({
     resolver: zodResolver(supplierSchema),
@@ -46,17 +47,34 @@ export function SuppliersPage() {
     load()
   }, [load])
 
+  // Limpeza automática ao fechar o modal
+  useEffect(() => {
+    if (!modal) {
+      setEditing(null)
+      reset(EMPTY)
+    }
+  }, [modal])
+
   const onSubmit = async (data: Omit<Supplier, 'id'>) => {
     try {
-      if (editing) await window.api.suppliers.update(editing.id, data)
-      else await window.api.suppliers.create(data)
+      let res: any
+      if (editing) {
+        res = await window.api.suppliers.update(editing.id, data)
+      } else {
+        res = await window.api.suppliers.create(data)
+      }
+
+      if (res && res.ok === false) {
+        const msg = res.errors ? Object.values(res.errors)[0] : 'Erro ao salvar dados'
+        show(String(msg), 'error')
+        return
+      }
+
       show(editing ? 'Fornecedor atualizado!' : 'Fornecedor cadastrado!')
       setModal(false)
-      setEditing(null)
-      reset()
       load()
     } catch (e: any) {
-      show(e.message, 'error')
+      show(e.message || 'Erro de conexão', 'error')
     }
   }
 
@@ -69,9 +87,11 @@ export function SuppliersPage() {
 
   function edit(row: Supplier) {
     setEditing(row)
-    setValue('name', row.name)
-    setValue('type', row.type)
-    setValue('phone', row.phone ?? '')
+    reset({
+      name: row.name,
+      type: row.type,
+      phone: row.phone ?? '',
+    })
     setModal(true)
   }
 
@@ -90,11 +110,7 @@ export function SuppliersPage() {
           </h1>
         </div>
         <button
-          onClick={() => {
-            setEditing(null)
-            reset()
-            setModal(true)
-          }}
+          onClick={() => setModal(true)}
           className="flex items-center gap-3 bg-primary text-on-primary px-8 py-4 rounded font-bold text-sm shadow-lg shadow-primary/20 hover:brightness-110 active:scale-95 transition-all"
         >
           <span className="material-symbols-outlined">person_add</span>
@@ -210,11 +226,18 @@ export function SuppliersPage() {
         >
           <div className="flex flex-col gap-4">
             <Input label="Nome" {...register('name')} error={errors.name?.message} />
-            <Select
-              label="Tipo"
-              {...register('type')}
-              error={errors.type?.message}
-              options={SUPPLIER_TYPES}
+            <Controller
+              name="type"
+              control={control}
+              render={({ field }) => (
+                <Select
+                  label="Tipo"
+                  value={field.value}
+                  onChange={field.onChange}
+                  error={errors.type?.message}
+                  options={SUPPLIER_TYPES}
+                />
+              )}
             />
             <Input
               label="Telefone"

@@ -24,10 +24,17 @@ export function registerTruckHandlers(): void {
   })
 
   createValidatedHandlerWithId('trucks:update', truckSchema, (id, data) => {
-    db()
-      .prepare('UPDATE trucks SET license_plate=?, model=?, year=?, capacity_ton=? WHERE id=?')
-      .run(data.license_plate, data.model, data.year, data.capacity_ton, id)
-    return { ok: true }
+    const result = db()
+      .prepare(
+        'UPDATE trucks SET license_plate=?, model=?, year=?, capacity_ton=?, current_odometer=? WHERE id=?',
+      )
+      .run(data.license_plate, data.model, data.year, data.capacity_ton, data.current_odometer, id)
+
+    if (result.changes === 0) {
+      throw new Error(`Caminhão com ID ${id} não encontrado.`)
+    }
+
+    return { ok: true, changes: result.changes }
   })
 
   createIdValidatedHandler('trucks:delete', (id) => {

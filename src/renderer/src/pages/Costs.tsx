@@ -64,12 +64,19 @@ export function CostsPage() {
     load()
   }, [load])
 
+  // Limpeza automática ao fechar o modal
+  useEffect(() => {
+    if (!modal) {
+      reset(EMPTY)
+    }
+  }, [modal])
+
   const onSubmit = async (data: Omit<Cost, 'id'>) => {
     try {
       await window.api.costs.create(data)
       show('Custo lançado!')
       setModal(false)
-      reset()
+      reset(EMPTY)
       load()
     } catch (e: any) {
       show(e.message || 'Erro', 'error')
@@ -125,7 +132,7 @@ export function CostsPage() {
             </button>
             <button
               onClick={() => {
-                reset()
+                reset(EMPTY)
                 setModal(true)
               }}
               className="flex items-center gap-2 bg-primary text-on-primary px-5 py-2.5 rounded font-bold text-sm shadow-lg shadow-primary/20 hover:brightness-110 active:scale-95 transition-all"
@@ -146,11 +153,18 @@ export function CostsPage() {
             Lançar Custo
           </h4>
           <div className="space-y-4">
-            <Select
-              label="Categoria"
-              {...register('category')}
-              error={errors.category?.message}
-              options={COST_CATEGORIES}
+            <Controller
+              name="category"
+              control={control}
+              render={({ field }) => (
+                <Select
+                  label="Categoria"
+                  value={field.value}
+                  onChange={field.onChange}
+                  error={errors.category?.message}
+                  options={COST_CATEGORIES}
+                />
+              )}
             />
             <Input label="Data" type="date" {...register('date')} error={errors.date?.message} />
             <Controller
@@ -165,26 +179,47 @@ export function CostsPage() {
                 />
               )}
             />
-            <Select
-              label="Veículo"
-              optional
-              {...register('truck_id')}
-              error={errors.truck_id?.message}
-              options={trucks.map((t) => ({ value: t.id, label: t.license_plate }))}
+            <Controller
+              name="truck_id"
+              control={control}
+              render={({ field }) => (
+                <Select
+                  label="Veículo"
+                  optional
+                  value={field.value}
+                  onChange={field.onChange}
+                  error={errors.truck_id?.message}
+                  options={trucks.map((t) => ({ value: t.id, label: t.license_plate }))}
+                />
+              )}
             />
-            <Select
-              label="Fornecedor"
-              optional
-              {...register('supplier_id')}
-              error={errors.supplier_id?.message}
-              options={suppliers.map((s) => ({ value: s.id, label: s.name }))}
+            <Controller
+              name="supplier_id"
+              control={control}
+              render={({ field }) => (
+                <Select
+                  label="Fornecedor"
+                  optional
+                  value={field.value}
+                  onChange={field.onChange}
+                  error={errors.supplier_id?.message}
+                  options={suppliers.map((s) => ({ value: s.id, label: s.name }))}
+                />
+              )}
             />
-            <Select
-              label="Motorista"
-              optional
-              {...register('driver_id')}
-              error={errors.driver_id?.message}
-              options={drivers.map((d) => ({ value: d.id, label: d.name }))}
+            <Controller
+              name="driver_id"
+              control={control}
+              render={({ field }) => (
+                <Select
+                  label="Motorista"
+                  optional
+                  value={field.value}
+                  onChange={field.onChange}
+                  error={errors.driver_id?.message}
+                  options={drivers.map((d) => ({ value: d.id, label: d.name }))}
+                />
+              )}
             />
             <Input
               label="Descrição"
@@ -312,11 +347,18 @@ export function CostsPage() {
         <Modal title="Novo Custo" onClose={() => setModal(false)}>
           <div className="grid grid-cols-2 gap-4">
             <div className="col-span-2">
-              <Select
-                label="Categoria"
-                {...register('category')}
-                error={errors.category?.message}
-                options={COST_CATEGORIES}
+              <Controller
+                name="category"
+                control={control}
+                render={({ field }) => (
+                  <Select
+                    label="Categoria"
+                    value={field.value}
+                    onChange={field.onChange}
+                    error={errors.category?.message}
+                    options={COST_CATEGORIES}
+                  />
+                )}
               />
             </div>
             <Input label="Data" type="date" {...register('date')} error={errors.date?.message} />
@@ -332,26 +374,47 @@ export function CostsPage() {
                 />
               )}
             />
-            <Select
-              label="Veículo"
-              optional
-              {...register('truck_id')}
-              error={errors.truck_id?.message}
-              options={trucks.map((t) => ({ value: t.id, label: t.license_plate }))}
+            <Controller
+              name="truck_id"
+              control={control}
+              render={({ field }) => (
+                <Select
+                  label="Veículo"
+                  optional
+                  value={field.value}
+                  onChange={field.onChange}
+                  error={errors.truck_id?.message}
+                  options={trucks.map((t) => ({ value: t.id, label: t.license_plate }))}
+                />
+              )}
             />
-            <Select
-              label="Fornecedor"
-              optional
-              {...register('supplier_id')}
-              error={errors.supplier_id?.message}
-              options={suppliers.map((s) => ({ value: s.id, label: s.name }))}
+            <Controller
+              name="supplier_id"
+              control={control}
+              render={({ field }) => (
+                <Select
+                  label="Fornecedor"
+                  optional
+                  value={field.value}
+                  onChange={field.onChange}
+                  error={errors.supplier_id?.message}
+                  options={suppliers.map((s) => ({ value: s.id, label: s.name }))}
+                />
+              )}
             />
-            <Select
-              label="Motorista"
-              optional
-              {...register('driver_id')}
-              error={errors.driver_id?.message}
-              options={drivers.map((d) => ({ value: d.id, label: d.name }))}
+            <Controller
+              name="driver_id"
+              control={control}
+              render={({ field }) => (
+                <Select
+                  label="Motorista"
+                  optional
+                  value={field.value}
+                  onChange={field.onChange}
+                  error={errors.driver_id?.message}
+                  options={drivers.map((d) => ({ value: d.id, label: d.name }))}
+                />
+              )}
             />
             <div className="col-span-2">
               <Input

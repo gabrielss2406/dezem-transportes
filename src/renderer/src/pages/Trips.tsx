@@ -67,12 +67,18 @@ export function TripsPage() {
     load()
   }, [load])
 
+  // Limpeza automática ao fechar o modal
+  useEffect(() => {
+    if (!modal) {
+      reset(EMPTY)
+    }
+  }, [modal])
+
   const onSubmit = async (data: Omit<Trip, 'id'>) => {
     try {
       await window.api.trips.create(data)
       show('Viagem registrada!')
       setModal(false)
-      reset()
       load()
     } catch (e: any) {
       show(e.message || 'Erro ao salvar', 'error')
@@ -108,10 +114,7 @@ export function TripsPage() {
           </p>
         </div>
         <button
-          onClick={() => {
-            reset()
-            setModal(true)
-          }}
+          onClick={() => setModal(true)}
           className="flex items-center gap-3 bg-primary text-on-primary px-8 py-4 rounded font-extrabold shadow-lg shadow-primary/20 hover:brightness-110 active:scale-95 transition-all"
         >
           <span className="material-symbols-outlined">add</span>
@@ -220,48 +223,83 @@ export function TripsPage() {
             <div className="grid grid-cols-2 gap-5">
               <Input label="Data" type="date" {...register('date')} error={errors.date?.message} />
 
-              <Select
-                label="Caminhão"
-                icon="local_shipping"
-                {...register('truck_id')}
-                error={errors.truck_id?.message}
-                options={trucks.map((t) => ({
-                  value: t.id,
-                  label: `${t.license_plate} — ${t.model}`,
-                }))}
+              <Controller
+                name="truck_id"
+                control={control}
+                render={({ field }) => (
+                  <Select
+                    label="Caminhão"
+                    icon="local_shipping"
+                    value={field.value}
+                    onChange={field.onChange}
+                    error={errors.truck_id?.message}
+                    options={trucks.map((t) => ({
+                      value: t.id,
+                      label: `${t.license_plate} — ${t.model}`,
+                    }))}
+                  />
+                )}
               />
 
-              <Select
-                label="Motorista"
-                icon="person"
-                {...register('driver_id')}
-                error={errors.driver_id?.message}
-                options={drivers.map((d) => ({ value: d.id, label: d.name }))}
+              <Controller
+                name="driver_id"
+                control={control}
+                render={({ field }) => (
+                  <Select
+                    label="Motorista"
+                    icon="person"
+                    value={field.value}
+                    onChange={field.onChange}
+                    error={errors.driver_id?.message}
+                    options={drivers.map((d) => ({ value: d.id, label: d.name }))}
+                  />
+                )}
               />
 
-              <Select
-                label="Produto"
-                icon="inventory_2"
-                {...register('product_id')}
-                error={errors.product_id?.message}
-                options={products.map((p) => ({ value: p.id, label: p.name }))}
+              <Controller
+                name="product_id"
+                control={control}
+                render={({ field }) => (
+                  <Select
+                    label="Produto"
+                    icon="inventory_2"
+                    value={field.value}
+                    onChange={field.onChange}
+                    error={errors.product_id?.message}
+                    options={products.map((p) => ({ value: p.id, label: p.name }))}
+                  />
+                )}
               />
 
-              <Select
-                label="Cliente"
-                optional
-                icon="business"
-                {...register('customer_id')}
-                error={errors.customer_id?.message}
-                options={customers.map((c) => ({ value: c.id, label: c.name }))}
+              <Controller
+                name="customer_id"
+                control={control}
+                render={({ field }) => (
+                  <Select
+                    label="Cliente"
+                    optional
+                    icon="business"
+                    value={field.value}
+                    onChange={field.onChange}
+                    error={errors.customer_id?.message}
+                    options={customers.map((c) => ({ value: c.id, label: c.name }))}
+                  />
+                )}
               />
 
-              <Select
-                label="Rota"
-                optional
-                {...register('route_id')}
-                error={errors.route_id?.message}
-                options={routes.map((r) => ({ value: r.id, label: r.name }))}
+              <Controller
+                name="route_id"
+                control={control}
+                render={({ field }) => (
+                  <Select
+                    label="Rota"
+                    optional
+                    value={field.value}
+                    onChange={field.onChange}
+                    error={errors.route_id?.message}
+                    options={routes.map((r) => ({ value: r.id, label: r.name }))}
+                  />
+                )}
               />
 
               <Input
@@ -294,12 +332,19 @@ export function TripsPage() {
                 error={errors.km_driven?.message}
               />
 
-              <Select
-                label="Posto"
-                optional
-                {...register('supplier_id')}
-                error={errors.supplier_id?.message}
-                options={suppliers.map((s) => ({ value: s.id, label: s.name }))}
+              <Controller
+                name="supplier_id"
+                control={control}
+                render={({ field }) => (
+                  <Select
+                    label="Posto"
+                    optional
+                    value={field.value}
+                    onChange={field.onChange}
+                    error={errors.supplier_id?.message}
+                    options={suppliers.map((s) => ({ value: s.id, label: s.name }))}
+                  />
+                )}
               />
 
               <div className="col-span-2">
