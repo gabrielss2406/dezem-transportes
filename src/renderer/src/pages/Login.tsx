@@ -13,9 +13,11 @@ export function LoginPage({ onLogin }: LoginProps) {
     handleSubmit,
     formState: { errors },
     watch,
+    reset,
   } = useForm<{ password: string }>({
     resolver: zodResolver(loginSchema),
     defaultValues: { password: '' },
+    mode: 'all',
   })
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)

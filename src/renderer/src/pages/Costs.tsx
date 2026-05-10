@@ -1,8 +1,8 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useCallback, useEffect, useState } from 'react'
-import { useForm } from 'react-hook-form'
+import { Controller, useForm } from 'react-hook-form'
 import { costSchema } from '../../../shared/schemas'
-import { Button, Modal, Toast, useToast } from '../components/ui'
+import { Button, CurrencyInput, Input, Modal, Select, Toast, useToast } from '../components/ui'
 import type { Cost, Driver, Supplier, Truck } from '../lib/types'
 import { COST_CATEGORIES, currentMonthKey, formatBRL, formatDate } from '../lib/utils'
 
@@ -40,9 +40,11 @@ export function CostsPage() {
     setValue,
     formState: { errors },
     reset,
+    control,
   } = useForm<Omit<Cost, 'id'>>({
     resolver: zodResolver(costSchema),
     defaultValues: { ...EMPTY },
+    mode: 'all',
   })
 
   const load = useCallback(async () => {
@@ -151,15 +153,17 @@ export function CostsPage() {
               options={COST_CATEGORIES}
             />
             <Input label="Data" type="date" {...register('date')} error={errors.date?.message} />
-            <Input
-              label="Valor (R$)"
-              type="number"
-              step="0.01"
-              placeholder="0,00"
-              mask="999.999.999,99"
-              maskChar=""
-              {...register('value')}
-              error={errors.value?.message}
+            <Controller
+              name="value"
+              control={control}
+              render={({ field }) => (
+                <CurrencyInput
+                  label="Valor"
+                  value={field.value}
+                  onChange={field.onChange}
+                  error={errors.value?.message}
+                />
+              )}
             />
             <Select
               label="Veículo"
@@ -316,11 +320,17 @@ export function CostsPage() {
               />
             </div>
             <Input label="Data" type="date" {...register('date')} error={errors.date?.message} />
-            <Input
-              label="Valor (R$)"
-              type="number"
-              {...register('value')}
-              error={errors.value?.message}
+            <Controller
+              name="value"
+              control={control}
+              render={({ field }) => (
+                <CurrencyInput
+                  label="Valor"
+                  value={field.value}
+                  onChange={field.onChange}
+                  error={errors.value?.message}
+                />
+              )}
             />
             <Select
               label="Veículo"

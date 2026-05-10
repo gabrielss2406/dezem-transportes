@@ -22,6 +22,7 @@ export function TrucksPage() {
   } = useForm<Omit<Truck, 'id'>>({
     resolver: zodResolver(truckSchema),
     defaultValues: { ...EMPTY },
+    mode: 'all',
   })
 
   const load = useCallback(() => window.api.trucks.list().then(setRows), [])

@@ -1,8 +1,8 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useCallback, useEffect, useState } from 'react'
-import { useForm } from 'react-hook-form'
+import { Controller, useForm } from 'react-hook-form'
 import { driverSchema } from '../../../../shared/schemas'
-import { Button, Input, Modal, Select, Toast, useToast } from '../../components/ui'
+import { Button, CurrencyInput, Input, Modal, Select, Toast, useToast } from '../../components/ui'
 import type { Driver, Truck } from '../../lib/types'
 import { formatBRL } from '../../lib/utils'
 
@@ -31,6 +31,7 @@ export function DriversPage() {
     formState: { errors },
     reset,
     watch,
+    control,
   } = useForm<Omit<Driver, 'id'>>({
     resolver: zodResolver(driverSchema),
     defaultValues: { ...EMPTY, monthly_salary: 0, truck_id: null },
@@ -248,11 +249,17 @@ export function DriversPage() {
               {...register('phone')}
               error={errors.phone?.message}
             />
-            <Input
-              label="Salário mensal (R$)"
-              type="number"
-              {...register('monthly_salary')}
-              error={errors.monthly_salary?.message}
+            <Controller
+              name="monthly_salary"
+              control={control}
+              render={({ field }) => (
+                <CurrencyInput
+                  label="Salário mensal"
+                  value={field.value}
+                  onChange={field.onChange}
+                  error={errors.monthly_salary?.message}
+                />
+              )}
             />
             <Select
               label="Caminhão vinculado"

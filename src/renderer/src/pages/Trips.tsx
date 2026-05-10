@@ -1,9 +1,9 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useCallback, useEffect, useState } from 'react'
-import { useForm } from 'react-hook-form'
+import { Controller, useForm } from 'react-hook-form'
 import { tripSchema } from '../../../shared/schemas'
 import type { Customer, Driver, Product, Route, Supplier, Trip, Truck } from '../../lib/types'
-import { Button, Modal, Toast, useToast } from '../components/ui'
+import { Button, CurrencyInput, Input, Modal, Select, Toast, useToast } from '../components/ui'
 import { formatBRL, formatDate } from '../lib/utils'
 
 const EMPTY = {
@@ -37,9 +37,11 @@ export function TripsPage() {
     setValue,
     formState: { errors },
     reset,
+    control,
   } = useForm<Omit<Trip, 'id'>>({
     resolver: zodResolver(tripSchema),
     defaultValues: { ...EMPTY },
+    mode: 'all',
   })
 
   const load = useCallback(async () => {
@@ -267,30 +269,27 @@ export function TripsPage() {
                 type="number"
                 step="0.01"
                 placeholder="0,00"
-                mask="99.99"
-                maskChar=""
                 {...register('weight_ton')}
                 error={errors.weight_ton?.message}
               />
 
-              <Input
-                label="Valor cobrado (R$)"
-                type="number"
-                step="0.01"
-                placeholder="0,00"
-                icon="payments"
-                mask="999.999.999,99"
-                maskChar=""
-                {...register('price_charged')}
-                error={errors.price_charged?.message}
+              <Controller
+                name="price_charged"
+                control={control}
+                render={({ field }) => (
+                  <CurrencyInput
+                    label="Valor cobrado"
+                    value={field.value}
+                    onChange={field.onChange}
+                    error={errors.price_charged?.message}
+                  />
+                )}
               />
 
               <Input
                 label="Km percorrido"
                 type="number"
                 placeholder="0"
-                mask="99999"
-                maskChar=""
                 {...register('km_driven')}
                 error={errors.km_driven?.message}
               />

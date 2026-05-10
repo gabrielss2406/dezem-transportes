@@ -61,6 +61,68 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
   },
 )
 
+// ── CurrencyInput ────────────────────────────────────────────────────────────
+interface CurrencyInputProps {
+  label?: string
+  optional?: boolean
+  error?: string
+  value: number | string
+  onChange: (value: number) => void
+  placeholder?: string
+  className?: string
+}
+
+export function CurrencyInput({
+  label,
+  optional,
+  error,
+  value,
+  onChange,
+  placeholder = '0,00',
+  className = '',
+}: CurrencyInputProps) {
+  // Converte o número para string formatada (ex: 1250.5 -> 1.250,50)
+  const format = (val: number | string) => {
+    const n = typeof val === 'number' ? val : Number(val) || 0
+    return new Intl.NumberFormat('pt-BR', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(n)
+  }
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    // Remove tudo que não for dígito
+    const digits = e.target.value.replace(/\D/g, '')
+    // Converte para centavos (ex: "1250" -> 12.50)
+    const cents = Number(digits) / 100
+    onChange(cents)
+  }
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      {label && (
+        <label className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
+          {label}{' '}
+          {optional && <span className="text-outline font-normal normal-case">(opcional)</span>}
+        </label>
+      )}
+      <div className="relative">
+        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant/40 text-sm font-bold">
+          R$
+        </span>
+        <input
+          type="text"
+          value={format(value)}
+          onChange={handleChange}
+          placeholder={placeholder}
+          className={`w-full bg-surface-container-lowest border border-outline-variant/30 rounded-lg pl-10 pr-4 py-3 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all ${error ? 'border-error' : ''} ${className}`}
+        />
+      </div>
+      {error && <span className="text-xs text-error">{error}</span>}
+    </div>
+  )
+}
+
 // ── Select ───────────────────────────────────────────────────────────────────
 interface SelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
   label?: string
