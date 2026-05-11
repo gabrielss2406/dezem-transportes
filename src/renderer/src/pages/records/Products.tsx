@@ -2,6 +2,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { useCallback, useEffect, useState } from 'react'
 import { Controller, useForm } from 'react-hook-form'
 import { productSchema } from '../../../../shared/schemas'
+import { PageHeader } from '../../components/PageHeader'
 import { Button, Input, Modal, Select, Toast, useToast } from '../../components/ui'
 import type { Product } from '../../lib/types'
 
@@ -17,6 +18,8 @@ export function ProductsPage() {
   const [rows, setRows] = useState<Product[]>([])
   const [modal, setModal] = useState(false)
   const [editing, setEditing] = useState<Product | null>(null)
+  const [search, setSearch] = useState('')
+  const [appliedSearch, setAppliedSearch] = useState('')
   const { toast, show } = useToast()
 
   const {
@@ -32,10 +35,21 @@ export function ProductsPage() {
     mode: 'all',
   })
 
-  const load = useCallback(() => window.api.products.list().then(setRows), [])
+  const load = useCallback(
+    () => window.api.products.list(appliedSearch).then(setRows),
+    [appliedSearch],
+  )
   useEffect(() => {
     load()
   }, [load])
+
+  // Limpeza automática ao fechar o modal
+  useEffect(() => {
+    if (!modal) {
+      setEditing(null)
+      reset(EMPTY)
+    }
+  }, [modal])
 
   const onSubmit = async (data: Omit<Product, 'id'>) => {
     try {
@@ -43,8 +57,6 @@ export function ProductsPage() {
       else await window.api.products.create(data)
       show(editing ? 'Produto atualizado!' : 'Produto cadastrado!')
       setModal(false)
-      setEditing(null)
-      reset(EMPTY)
       load()
     } catch (e: any) {
       show(e.message, 'error')
@@ -72,27 +84,36 @@ export function ProductsPage() {
       {toast && <Toast message={toast.message} type={toast.type} />}
 
       {/* Header */}
-      <div className="flex items-end justify-between mb-10">
-        <div>
-          <span className="text-primary font-bold tracking-widest text-xs uppercase block mb-2">
-            Gestão de Inventário
-          </span>
-          <h1 className="text-5xl font-black font-headline tracking-tighter text-on-surface">
-            Catálogo de <span className="text-primary">Produtos</span>
-          </h1>
+      <PageHeader
+        pretitle="Gestão de Inventário"
+        title="Catálogo de Produtos"
+        actionLabel="Novo Produto"
+        onAction={() => setModal(true)}
+      >
+        <div className="flex items-center bg-surface-container-highest rounded-lg p-1 border border-outline-variant/10 shadow-sm">
+          <div className="relative flex items-center h-9">
+            <span className="material-symbols-outlined absolute left-3 text-outline text-lg">
+              search
+            </span>
+            <input
+              type="text"
+              placeholder="Buscar por nome..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') setAppliedSearch(search)
+              }}
+              className="pl-10 pr-3 py-2 bg-transparent border-none w-48 focus:ring-0 transition-all placeholder:text-outline/50 text-sm outline-none text-on-surface"
+            />
+          </div>
+          <button
+            onClick={() => setAppliedSearch(search)}
+            className="bg-primary text-on-primary px-4 py-1.5 rounded-md font-bold text-xs hover:brightness-110 active:scale-95 transition-all ml-1 mr-0.5"
+          >
+            Filtrar
+          </button>
         </div>
-        <button
-          onClick={() => {
-            setEditing(null)
-            reset(EMPTY)
-            setModal(true)
-          }}
-          className="flex items-center gap-2 bg-surface-container-low border border-primary/20 text-primary px-8 py-4 rounded font-bold text-sm hover:bg-primary hover:text-on-primary active:scale-95 transition-all"
-        >
-          <span className="material-symbols-outlined">add</span>
-          Novo Produto
-        </button>
-      </div>
+      </PageHeader>
 
       {/* Stats */}
       <div className="grid grid-cols-3 gap-6 mb-10">
@@ -141,7 +162,7 @@ export function ProductsPage() {
             {rows.length === 0 && (
               <tr>
                 <td colSpan={3} className="px-8 py-12 text-center text-on-surface-variant text-sm">
-                  Nenhum produto cadastrado
+                  Nenhum produto encontrado
                 </td>
               </tr>
             )}
@@ -192,7 +213,6 @@ export function ProductsPage() {
         <div className="px-8 py-4 bg-surface-container-high/50 border-t border-outline-variant/10">
           <p className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">
             {rows.length} produto{rows.length !== 1 ? 's' : ''} cadastrado
-            {rows.length !== 1 ? 's' : ''}
           </p>
         </div>
       </div>

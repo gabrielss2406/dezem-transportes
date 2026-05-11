@@ -2,6 +2,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { useCallback, useEffect, useState } from 'react'
 import { Controller, useForm } from 'react-hook-form'
 import { driverSchema } from '../../../../shared/schemas'
+import { PageHeader } from '../../components/PageHeader'
 import { Button, CurrencyInput, Input, Modal, Select, Toast, useToast } from '../../components/ui'
 import type { Driver, Truck } from '../../lib/types'
 import { formatBRL } from '../../lib/utils'
@@ -22,6 +23,8 @@ export function DriversPage() {
   const [trucks, setTrucks] = useState<Truck[]>([])
   const [modal, setModal] = useState(false)
   const [editing, setEditing] = useState<Driver | null>(null)
+  const [filters, setFilters] = useState({ name: '', cpf: '', truck_id: '' })
+  const [appliedFilters, setAppliedFilters] = useState({ name: '', cpf: '', truck_id: '' })
   const { toast, show } = useToast()
 
   const FORM_EMPTY = { ...EMPTY, monthly_salary: 0, truck_id: null }
@@ -48,10 +51,13 @@ export function DriversPage() {
       : '(99) 9999-9999'
 
   const load = useCallback(async () => {
-    const [d, t] = await Promise.all([window.api.drivers.list(), window.api.trucks.list()])
+    const [d, t] = await Promise.all([
+      window.api.drivers.list(appliedFilters),
+      window.api.trucks.list(),
+    ])
     setRows(d)
     setTrucks(t)
-  }, [])
+  }, [appliedFilters])
   useEffect(() => {
     load()
   }, [load])
@@ -106,31 +112,71 @@ export function DriversPage() {
     setModal(true)
   }
 
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      setAppliedFilters(filters)
+    }
+  }
+
   return (
     <div className="p-12 max-w-7xl mx-auto">
       {toast && <Toast message={toast.message} type={toast.type} />}
 
       {/* Header */}
-      <div className="flex items-end justify-between mb-10">
-        <div>
-          <span className="text-primary font-bold tracking-widest text-xs uppercase block mb-2">
-            Gestão de Frota
-          </span>
-          <h1 className="text-5xl font-black font-headline tracking-tighter text-on-surface">
-            Motoristas
-          </h1>
-          <p className="text-on-surface-variant mt-2 text-base">
-            Gerencie os motoristas vinculados à frota.
-          </p>
+      <PageHeader
+        pretitle="Gestão de Frota"
+        title="Motoristas"
+        subtitle="Gerencie os motoristas vinculados à frota."
+        actionLabel="Novo Motorista"
+        onAction={() => setModal(true)}
+      >
+        <div className="flex items-center bg-surface-container-highest rounded-lg p-1 border border-outline-variant/10 shadow-sm">
+          <div className="relative flex items-center h-9">
+            <span className="material-symbols-outlined absolute left-3 text-outline text-lg">
+              person
+            </span>
+            <input
+              type="text"
+              placeholder="Nome..."
+              value={filters.name}
+              onChange={(e) => setFilters((f) => ({ ...f, name: e.target.value }))}
+              onKeyDown={handleKeyDown}
+              className="pl-10 pr-3 py-2 bg-transparent border-none w-32 focus:ring-0 transition-all placeholder:text-outline/50 text-sm outline-none text-on-surface"
+            />
+          </div>
+          <div className="w-[1px] bg-outline-variant/20 h-6 mx-1" />
+          <div className="relative flex items-center h-9">
+            <span className="material-symbols-outlined absolute left-3 text-outline text-lg">
+              badge
+            </span>
+            <input
+              type="text"
+              placeholder="CPF..."
+              value={filters.cpf}
+              onChange={(e) => setFilters((f) => ({ ...f, cpf: e.target.value }))}
+              onKeyDown={handleKeyDown}
+              className="pl-10 pr-3 py-2 bg-transparent border-none w-32 focus:ring-0 transition-all placeholder:text-outline/50 text-sm outline-none text-on-surface"
+            />
+          </div>
+          <div className="w-[1px] bg-outline-variant/20 h-6 mx-1" />
+          <div className="w-36">
+            <Select
+              placeholder="Caminhão"
+              value={filters.truck_id}
+              onChange={(val) => setFilters((f) => ({ ...f, truck_id: val }))}
+              options={trucks.map((t) => ({ value: t.id, label: t.license_plate }))}
+              optional
+              className="scale-90 origin-left"
+            />
+          </div>
+          <button
+            onClick={() => setAppliedFilters(filters)}
+            className="bg-primary text-on-primary px-4 py-1.5 rounded-md font-bold text-xs hover:brightness-110 active:scale-95 transition-all ml-1 mr-0.5"
+          >
+            Filtrar
+          </button>
         </div>
-        <button
-          onClick={() => setModal(true)}
-          className="flex items-center gap-3 bg-primary text-on-primary px-8 py-4 rounded font-bold text-sm shadow-lg shadow-primary/20 hover:brightness-110 active:scale-95 transition-all"
-        >
-          <span className="material-symbols-outlined">person_add</span>
-          Novo Motorista
-        </button>
-      </div>
+      </PageHeader>
 
       {/* Stats */}
       <div className="grid grid-cols-3 gap-6 mb-10">
@@ -236,7 +282,6 @@ export function DriversPage() {
         <div className="px-6 py-4 bg-surface-container-high/50 border-t border-outline-variant/10">
           <p className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">
             {rows.length} motorista{rows.length !== 1 ? 's' : ''} cadastrado
-            {rows.length !== 1 ? 's' : ''}
           </p>
         </div>
       </div>

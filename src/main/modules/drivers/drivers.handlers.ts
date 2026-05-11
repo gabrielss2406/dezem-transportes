@@ -10,17 +10,32 @@ import {
 export function registerDriverHandlers(): void {
   const db = () => getDb()
 
-  ipcMain.handle('drivers:list', () => {
-    return db()
-      .prepare(
-        `
+  ipcMain.handle('drivers:list', (_e, filters: any = {}) => {
+    let query = `
       SELECT d.*, t.license_plate as truck_license_plate
       FROM drivers d
       LEFT JOIN trucks t ON d.truck_id = t.id
-      ORDER BY d.name
-    `,
-      )
-      .all()
+      WHERE 1=1
+    `
+    const params: any[] = []
+
+    if (filters.name) {
+      query += ' AND d.name LIKE ?'
+      params.push(`%${filters.name}%`)
+    }
+    if (filters.cpf) {
+      query += ' AND d.cpf LIKE ?'
+      params.push(`%${filters.cpf}%`)
+    }
+    if (filters.truck_id) {
+      query += ' AND d.truck_id = ?'
+      params.push(filters.truck_id)
+    }
+
+    query += ' ORDER BY d.name'
+    return db()
+      .prepare(query)
+      .all(...params)
   })
 
   createValidatedHandler('drivers:create', driverSchema, (data) => {

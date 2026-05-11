@@ -10,10 +10,26 @@ import {
 export function registerSupplierHandlers(): void {
   const db = () => getDb()
 
-  ipcMain.handle('suppliers:list', (_e, search = '') => {
+  ipcMain.handle('suppliers:list', (_e, filters: any = {}) => {
+    let query = 'SELECT * FROM suppliers WHERE 1=1'
+    const params: any[] = []
+
+    const nameSearch = typeof filters === 'string' ? filters : filters.name
+    const typeFilter = filters.type
+
+    if (nameSearch) {
+      query += ' AND name LIKE ?'
+      params.push(`%${nameSearch}%`)
+    }
+    if (typeFilter) {
+      query += ' AND type = ?'
+      params.push(typeFilter)
+    }
+
+    query += ' ORDER BY name'
     return db()
-      .prepare('SELECT * FROM suppliers WHERE name LIKE ? ORDER BY name')
-      .all(`%${search}%`)
+      .prepare(query)
+      .all(...params)
   })
 
   createValidatedHandler('suppliers:create', supplierSchema, (data) => {

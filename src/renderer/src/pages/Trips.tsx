@@ -3,7 +3,17 @@ import { useCallback, useEffect, useState } from 'react'
 import { Controller, useForm } from 'react-hook-form'
 import { tripSchema } from '../../../shared/schemas'
 import type { Customer, Driver, Product, Route, Supplier, Trip, Truck } from '../../lib/types'
-import { Button, CurrencyInput, Input, Modal, Select, Toast, useToast } from '../components/ui'
+import { PageHeader } from '../components/PageHeader'
+import {
+  Button,
+  CurrencyInput,
+  DatePicker,
+  Input,
+  Modal,
+  Select,
+  Toast,
+  useToast,
+} from '../components/ui'
 import { formatBRL, formatDate } from '../lib/utils'
 
 const EMPTY = {
@@ -29,6 +39,15 @@ export function TripsPage() {
   const [routes, setRoutes] = useState<Route[]>([])
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [modal, setModal] = useState(false)
+  const [filters, setFilters] = useState({
+    startDate: '',
+    endDate: '',
+    truck_id: '',
+    driver_id: '',
+    product_id: '',
+    customer_id: '',
+    route_id: '',
+  })
   const { toast, show } = useToast()
 
   const {
@@ -46,7 +65,7 @@ export function TripsPage() {
 
   const load = useCallback(async () => {
     const [t, tr, d, p, c, r, s] = await Promise.all([
-      window.api.trips.list(),
+      window.api.trips.list(filters),
       window.api.trucks.list(),
       window.api.drivers.list(),
       window.api.products.list(),
@@ -61,7 +80,7 @@ export function TripsPage() {
     setCustomers(c)
     setRoutes(r)
     setSuppliers(s)
-  }, [])
+  }, [filters])
 
   useEffect(() => {
     load()
@@ -101,25 +120,77 @@ export function TripsPage() {
       {toast && <Toast message={toast.message} type={toast.type} />}
 
       {/* Header */}
-      <div className="flex items-end justify-between mb-10">
-        <div>
-          <span className="text-primary font-bold tracking-widest text-xs uppercase block mb-2">
-            Gestão Operacional
-          </span>
-          <h1 className="text-5xl font-black font-headline tracking-tighter text-on-surface">
-            Viagens
-          </h1>
-          <p className="text-on-surface-variant mt-2 max-w-xl text-base">
-            Gerencie os manifestos de transporte e histórico de fretes.
-          </p>
+      <PageHeader
+        pretitle="Gestão Operacional"
+        title="Viagens"
+        subtitle="Gerencie os manifestos de transporte e histórico de fretes."
+        actionLabel="Nova Viagem"
+        onAction={() => setModal(true)}
+      />
+
+      {/* Filters */}
+      <div className="bg-surface-container-low p-4 rounded-xl mb-10 border border-outline-variant/10 shadow-sm">
+        <div className="flex flex-wrap items-end gap-4">
+          <div className="flex-1 min-w-[150px]">
+            <DatePicker
+              label="Início"
+              value={filters.startDate}
+              onChange={(e) => setFilters((f) => ({ ...f, startDate: e.target.value }))}
+            />
+          </div>
+          <div className="flex-1 min-w-[150px]">
+            <DatePicker
+              label="Fim"
+              value={filters.endDate}
+              onChange={(e) => setFilters((f) => ({ ...f, endDate: e.target.value }))}
+            />
+          </div>
+          <div className="flex-1 min-w-[150px]">
+            <Select
+              label="Caminhão"
+              value={filters.truck_id}
+              onChange={(v) => setFilters((f) => ({ ...f, truck_id: v }))}
+              options={trucks.map((t) => ({ value: t.id, label: t.license_plate }))}
+              optional
+            />
+          </div>
+          <div className="flex-1 min-w-[150px]">
+            <Select
+              label="Motorista"
+              value={filters.driver_id}
+              onChange={(v) => setFilters((f) => ({ ...f, driver_id: v }))}
+              options={drivers.map((d) => ({ value: d.id, label: d.name }))}
+              optional
+            />
+          </div>
+          <div className="flex-1 min-w-[150px]">
+            <Select
+              label="Produto"
+              value={filters.product_id}
+              onChange={(v) => setFilters((f) => ({ ...f, product_id: v }))}
+              options={products.map((p) => ({ value: p.id, label: p.name }))}
+              optional
+            />
+          </div>
+          <div className="flex-1 min-w-[150px]">
+            <Select
+              label="Cliente"
+              value={filters.customer_id}
+              onChange={(v) => setFilters((f) => ({ ...f, customer_id: v }))}
+              options={customers.map((c) => ({ value: c.id, label: c.name }))}
+              optional
+            />
+          </div>
+          <div className="flex-1 min-w-[150px]">
+            <Select
+              label="Rota"
+              value={filters.route_id}
+              onChange={(v) => setFilters((f) => ({ ...f, route_id: v }))}
+              options={routes.map((r) => ({ value: r.id, label: r.name }))}
+              optional
+            />
+          </div>
         </div>
-        <button
-          onClick={() => setModal(true)}
-          className="flex items-center gap-3 bg-primary text-on-primary px-8 py-4 rounded font-extrabold shadow-lg shadow-primary/20 hover:brightness-110 active:scale-95 transition-all"
-        >
-          <span className="material-symbols-outlined">add</span>
-          Nova Viagem
-        </button>
       </div>
 
       {/* KPI row */}
@@ -131,7 +202,7 @@ export function TripsPage() {
         ].map(({ label, value, icon }) => (
           <div
             key={label}
-            className="bg-surface-container-low p-6 rounded-xl flex items-center gap-4"
+            className="bg-surface-container-low p-6 rounded-xl flex items-center gap-4 border border-outline-variant/5 shadow-sm"
           >
             <div className="w-12 h-12 bg-surface-container rounded-lg flex items-center justify-center shrink-0">
               <span className="material-symbols-outlined text-primary">{icon}</span>
@@ -147,7 +218,7 @@ export function TripsPage() {
       </div>
 
       {/* Table */}
-      <div className="bg-surface-container rounded-xl overflow-hidden border border-outline-variant/10">
+      <div className="bg-surface-container rounded-xl overflow-hidden border border-outline-variant/10 shadow-sm">
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-surface-container-high">
@@ -175,7 +246,7 @@ export function TripsPage() {
             {trips.length === 0 && (
               <tr>
                 <td colSpan={9} className="px-6 py-12 text-center text-on-surface-variant text-sm">
-                  Nenhuma viagem registrada
+                  Nenhuma viagem encontrada com os filtros selecionados
                 </td>
               </tr>
             )}
@@ -221,7 +292,7 @@ export function TripsPage() {
         <Modal title="Nova Viagem" onClose={() => setModal(false)}>
           <div className="space-y-5">
             <div className="grid grid-cols-2 gap-5">
-              <Input label="Data" type="date" {...register('date')} error={errors.date?.message} />
+              <DatePicker label="Data" {...register('date')} error={errors.date?.message} />
 
               <Controller
                 name="truck_id"

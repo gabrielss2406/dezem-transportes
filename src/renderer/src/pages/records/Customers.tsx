@@ -2,6 +2,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { useCallback, useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { customerSchema } from '../../../../shared/schemas'
+import { PageHeader } from '../../components/PageHeader'
 import { Button, Input, Modal, Toast, useToast } from '../../components/ui'
 import type { Customer } from '../../lib/types'
 
@@ -94,38 +95,26 @@ export function CustomersPage() {
       {toast && <Toast message={toast.message} type={toast.type} />}
 
       {/* Header */}
-      <div className="flex items-end justify-between mb-10">
-        <div>
-          <span className="text-primary font-bold tracking-widest text-xs uppercase block mb-2">
-            Gestão Operacional
+      <PageHeader
+        pretitle="Gestão Operacional"
+        title="Clientes"
+        subtitle="Gerencie sua base de parceiros comerciais."
+        actionLabel="Novo Cliente"
+        onAction={() => setModal(true)}
+      >
+        <div className="relative">
+          <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-outline text-sm">
+            search
           </span>
-          <h1 className="text-4xl font-black font-headline tracking-tighter text-on-surface">
-            Clientes
-          </h1>
-          <p className="text-on-surface-variant mt-1">Gerencie sua base de parceiros comerciais.</p>
+          <input
+            type="text"
+            placeholder="Buscar por nome..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-11 pr-4 py-3 bg-surface-container-highest border-none rounded-lg w-64 focus:ring-2 focus:ring-primary/20 focus:bg-surface-container-lowest transition-all placeholder:text-outline/60 text-sm outline-none text-on-surface"
+          />
         </div>
-        <div className="flex items-center gap-3">
-          <div className="relative">
-            <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-outline text-sm">
-              search
-            </span>
-            <input
-              type="text"
-              placeholder="Buscar por nome..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-11 pr-4 py-3 bg-surface-container-highest border-none rounded-lg w-64 focus:ring-2 focus:ring-primary/20 focus:bg-surface-container-lowest transition-all placeholder:text-outline/60 text-sm outline-none text-on-surface"
-            />
-          </div>
-          <button
-            onClick={() => setModal(true)}
-            className="flex items-center gap-2 bg-primary text-on-primary px-6 py-3 rounded font-bold text-sm shadow-lg shadow-primary/20 hover:brightness-110 active:scale-95 transition-all"
-          >
-            <span className="material-symbols-outlined text-xl">add</span>
-            Novo Cliente
-          </button>
-        </div>
-      </div>
+      </PageHeader>
 
       {/* Table */}
       <div className="bg-surface-container rounded-xl overflow-hidden border border-outline-variant/10">

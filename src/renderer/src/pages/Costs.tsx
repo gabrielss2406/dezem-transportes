@@ -2,7 +2,17 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { useCallback, useEffect, useState } from 'react'
 import { Controller, useForm } from 'react-hook-form'
 import { costSchema } from '../../../shared/schemas'
-import { Button, CurrencyInput, Input, Modal, Select, Toast, useToast } from '../components/ui'
+import { PageHeader } from '../components/PageHeader'
+import {
+  Button,
+  CurrencyInput,
+  DatePicker,
+  Input,
+  Modal,
+  Select,
+  Toast,
+  useToast,
+} from '../components/ui'
 import type { Cost, Driver, Supplier, Truck } from '../lib/types'
 import { COST_CATEGORIES, currentMonthKey, formatBRL, formatDate } from '../lib/utils'
 
@@ -105,18 +115,11 @@ export function CostsPage() {
       {toast && <Toast message={toast.message} type={toast.type} />}
 
       {/* Header */}
-      <div className="flex items-end justify-between mb-10">
-        <div>
-          <span className="text-primary font-bold tracking-widest text-xs uppercase block mb-2">
-            Gestão Financeira
-          </span>
-          <h1 className="text-5xl font-black font-headline tracking-tighter text-on-surface">
-            Custos da Frota
-          </h1>
-          <p className="text-on-surface-variant mt-2 max-w-xl text-base">
-            Gerencie as despesas operacionais com precisão.
-          </p>
-        </div>
+      <PageHeader
+        pretitle="Gestão Financeira"
+        title="Custos da Frota"
+        subtitle="Gerencie as despesas operacionais com precisão."
+      >
         <div className="flex flex-col items-end gap-3">
           <div className="bg-surface-container-low p-5 rounded-xl text-right min-w-[200px]">
             <p className="text-xs text-on-surface-variant mb-1">Total do Período</p>
@@ -142,12 +145,12 @@ export function CostsPage() {
             </button>
           </div>
         </div>
-      </div>
+      </PageHeader>
 
       {/* Asymmetric grid: form left, table right */}
       <div className="grid grid-cols-12 gap-8 items-start">
         {/* Quick-add form */}
-        <div className="col-span-4 bg-surface-container-low p-8 rounded-xl border-l-4 border-primary relative">
+        {/* <div className="col-span-4 bg-surface-container-low p-8 rounded-xl border-l-4 border-primary relative">
           <h4 className="text-base font-headline font-bold mb-6 flex items-center gap-2 text-on-surface">
             <span className="material-symbols-outlined text-primary">add_circle</span>
             Lançar Custo
@@ -166,7 +169,7 @@ export function CostsPage() {
                 />
               )}
             />
-            <Input label="Data" type="date" {...register('date')} error={errors.date?.message} />
+            <DatePicker label="Data" {...register('date')} error={errors.date?.message} />
             <Controller
               name="value"
               control={control}
@@ -236,10 +239,10 @@ export function CostsPage() {
               Confirmar Lançamento
             </button>
           </div>
-        </div>
+        </div> */}
 
         {/* Table */}
-        <div className="col-span-8 space-y-6">
+        <div className="col-span-12 space-y-6">
           {/* Category chips */}
           <div className="flex flex-wrap gap-2">
             <button
@@ -361,7 +364,7 @@ export function CostsPage() {
                 )}
               />
             </div>
-            <Input label="Data" type="date" {...register('date')} error={errors.date?.message} />
+            <DatePicker label="Data" {...register('date')} error={errors.date?.message} />
             <Controller
               name="value"
               control={control}

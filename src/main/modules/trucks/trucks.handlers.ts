@@ -10,8 +10,23 @@ import {
 export function registerTruckHandlers(): void {
   const db = () => getDb()
 
-  ipcMain.handle('trucks:list', () => {
-    return db().prepare('SELECT * FROM trucks ORDER BY license_plate').all()
+  ipcMain.handle('trucks:list', (_e, filters: any = {}) => {
+    let query = 'SELECT * FROM trucks WHERE 1=1'
+    const params: any[] = []
+
+    if (filters.license_plate) {
+      query += ' AND license_plate LIKE ?'
+      params.push(`%${filters.license_plate}%`)
+    }
+    if (filters.capacity_ton) {
+      query += ' AND capacity_ton >= ?'
+      params.push(Number(filters.capacity_ton))
+    }
+
+    query += ' ORDER BY license_plate'
+    return db()
+      .prepare(query)
+      .all(...params)
   })
 
   createValidatedHandler('trucks:create', truckSchema, (data) => {
