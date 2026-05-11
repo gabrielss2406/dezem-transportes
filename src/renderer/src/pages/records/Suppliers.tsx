@@ -2,6 +2,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { useCallback, useEffect, useState } from 'react'
 import { Controller, useForm } from 'react-hook-form'
 import { supplierSchema } from '../../../../shared/schemas'
+import { PageHeader } from '../../components/PageHeader'
 import { Button, Input, Modal, Select, Toast, useToast } from '../../components/ui'
 import type { Supplier } from '../../lib/types'
 import { SUPPLIER_TYPES } from '../../lib/utils'
@@ -105,59 +106,47 @@ export function SuppliersPage() {
       {toast && <Toast message={toast.message} type={toast.type} />}
 
       {/* Header */}
-      <div className="flex items-end justify-between mb-10">
-        <div>
-          <span className="text-primary font-bold tracking-widest text-xs uppercase block mb-2">
-            Gestão Operacional
-          </span>
-          <h1 className="text-5xl font-black font-headline tracking-tighter text-on-surface">
-            Fornecedores
-          </h1>
-        </div>
-        <div className="flex items-center gap-3">
-          <div className="flex items-center bg-surface-container-highest rounded-lg p-1 border border-outline-variant/10 shadow-sm">
-            <div className="relative flex items-center h-9">
-              <span className="material-symbols-outlined absolute left-3 text-outline text-lg">
-                search
-              </span>
-              <input
-                type="text"
-                placeholder="Buscar por nome..."
-                value={filters.name}
-                onChange={(e) => setFilters((f) => ({ ...f, name: e.target.value }))}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') setAppliedFilters(filters)
-                }}
-                className="pl-10 pr-3 py-2 bg-transparent border-none w-48 focus:ring-0 transition-all placeholder:text-outline/50 text-sm outline-none text-on-surface"
-              />
-            </div>
-            <div className="w-[1px] bg-outline-variant/20 h-6 mx-1" />
-            <div className="w-36">
-              <Select
-                placeholder="Tipo"
-                value={filters.type}
-                onChange={(val) => setFilters((f) => ({ ...f, type: val }))}
-                options={SUPPLIER_TYPES}
-                optional
-                className="scale-75 origin-left -ml-2"
-              />
-            </div>
-            <button
-              onClick={() => setAppliedFilters(filters)}
-              className="bg-primary text-on-primary px-4 py-1.5 rounded-md font-bold text-xs hover:brightness-110 active:scale-95 transition-all ml-1 mr-0.5"
-            >
-              Filtrar
-            </button>
+      <PageHeader
+        pretitle="Gestão Operacional"
+        title="Fornecedores"
+        actionLabel="Novo Fornecedor"
+        onAction={() => setModal(true)}
+      >
+        <div className="flex items-center bg-surface-container-highest rounded-lg p-1 border border-outline-variant/10 shadow-sm">
+          <div className="relative flex items-center h-9">
+            <span className="material-symbols-outlined absolute left-3 text-outline text-lg">
+              search
+            </span>
+            <input
+              type="text"
+              placeholder="Buscar por nome..."
+              value={filters.name}
+              onChange={(e) => setFilters((f) => ({ ...f, name: e.target.value }))}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') setAppliedFilters(filters)
+              }}
+              className="pl-10 pr-3 py-2 bg-transparent border-none w-48 focus:ring-0 transition-all placeholder:text-outline/50 text-sm outline-none text-on-surface"
+            />
+          </div>
+          <div className="w-[1px] bg-outline-variant/20 h-6 mx-1" />
+          <div className="w-36">
+            <Select
+              placeholder="Tipo"
+              value={filters.type}
+              onChange={(val) => setFilters((f) => ({ ...f, type: val }))}
+              options={SUPPLIER_TYPES}
+              optional
+              className="scale-75 origin-left -ml-2"
+            />
           </div>
           <button
-            onClick={() => setModal(true)}
-            className="flex items-center gap-3 bg-primary text-on-primary px-8 py-4 rounded font-bold text-sm shadow-lg shadow-primary/20 hover:brightness-110 active:scale-95 transition-all"
+            onClick={() => setAppliedFilters(filters)}
+            className="bg-primary text-on-primary px-4 py-1.5 rounded-md font-bold text-xs hover:brightness-110 active:scale-95 transition-all ml-1 mr-0.5"
           >
-            <span className="material-symbols-outlined">person_add</span>
-            Novo Fornecedor
+            Filtrar
           </button>
         </div>
-      </div>
+      </PageHeader>
 
       {/* Stats */}
       <div className="grid grid-cols-3 gap-6 mb-10">

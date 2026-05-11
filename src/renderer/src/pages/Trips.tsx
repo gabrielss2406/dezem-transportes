@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Controller, useForm } from 'react-hook-form'
 import { tripSchema } from '../../../shared/schemas'
 import type { Customer, Driver, Product, Route, Supplier, Trip, Truck } from '../../lib/types'
+import { PageHeader } from '../components/PageHeader'
 import {
   Button,
   CurrencyInput,
@@ -119,30 +120,17 @@ export function TripsPage() {
       {toast && <Toast message={toast.message} type={toast.type} />}
 
       {/* Header */}
-      <div className="flex items-end justify-between mb-10">
-        <div>
-          <span className="text-primary font-bold tracking-widest text-xs uppercase block mb-2">
-            Gestão Operacional
-          </span>
-          <h1 className="text-5xl font-black font-headline tracking-tighter text-on-surface">
-            Viagens
-          </h1>
-          <p className="text-on-surface-variant mt-2 max-w-xl text-base">
-            Gerencie os manifestos de transporte e histórico de fretes.
-          </p>
-        </div>
-        <button
-          onClick={() => setModal(true)}
-          className="flex items-center gap-3 bg-primary text-on-primary px-8 py-4 rounded font-extrabold shadow-lg shadow-primary/20 hover:brightness-110 active:scale-95 transition-all"
-        >
-          <span className="material-symbols-outlined">add</span>
-          Nova Viagem
-        </button>
-      </div>
+      <PageHeader
+        pretitle="Gestão Operacional"
+        title="Viagens"
+        subtitle="Gerencie os manifestos de transporte e histórico de fretes."
+        actionLabel="Nova Viagem"
+        onAction={() => setModal(true)}
+      />
 
       {/* Filters */}
       <div className="bg-surface-container-low p-4 rounded-xl mb-10 border border-outline-variant/10 shadow-sm">
-        <div className="flex flex-wrap items-center gap-4">
+        <div className="flex flex-wrap items-end gap-4">
           <div className="flex-1 min-w-[150px]">
             <DatePicker
               label="Início"
@@ -159,7 +147,7 @@ export function TripsPage() {
           </div>
           <div className="flex-1 min-w-[150px]">
             <Select
-              placeholder="Caminhão"
+              label="Caminhão"
               value={filters.truck_id}
               onChange={(v) => setFilters((f) => ({ ...f, truck_id: v }))}
               options={trucks.map((t) => ({ value: t.id, label: t.license_plate }))}
@@ -168,7 +156,7 @@ export function TripsPage() {
           </div>
           <div className="flex-1 min-w-[150px]">
             <Select
-              placeholder="Motorista"
+              label="Motorista"
               value={filters.driver_id}
               onChange={(v) => setFilters((f) => ({ ...f, driver_id: v }))}
               options={drivers.map((d) => ({ value: d.id, label: d.name }))}
@@ -177,7 +165,7 @@ export function TripsPage() {
           </div>
           <div className="flex-1 min-w-[150px]">
             <Select
-              placeholder="Produto"
+              label="Produto"
               value={filters.product_id}
               onChange={(v) => setFilters((f) => ({ ...f, product_id: v }))}
               options={products.map((p) => ({ value: p.id, label: p.name }))}
@@ -186,7 +174,7 @@ export function TripsPage() {
           </div>
           <div className="flex-1 min-w-[150px]">
             <Select
-              placeholder="Cliente"
+              label="Cliente"
               value={filters.customer_id}
               onChange={(v) => setFilters((f) => ({ ...f, customer_id: v }))}
               options={customers.map((c) => ({ value: c.id, label: c.name }))}
@@ -195,7 +183,7 @@ export function TripsPage() {
           </div>
           <div className="flex-1 min-w-[150px]">
             <Select
-              placeholder="Rota"
+              label="Rota"
               value={filters.route_id}
               onChange={(v) => setFilters((f) => ({ ...f, route_id: v }))}
               options={routes.map((r) => ({ value: r.id, label: r.name }))}

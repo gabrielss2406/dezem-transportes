@@ -2,6 +2,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { useCallback, useEffect, useState } from 'react'
 import { Controller, useForm } from 'react-hook-form'
 import { truckSchema } from '../../../../shared/schemas'
+import { PageHeader } from '../../components/PageHeader'
 import { Button, Input, Modal, Toast, useToast } from '../../components/ui'
 import type { Truck } from '../../lib/types'
 
@@ -96,63 +97,49 @@ export function TrucksPage() {
       {toast && <Toast message={toast.message} type={toast.type} />}
 
       {/* Header */}
-      <div className="flex items-end justify-between mb-10">
-        <div>
-          <span className="text-primary font-bold tracking-widest text-xs uppercase block mb-2">
-            Gestão de Frota
-          </span>
-          <h1 className="text-5xl font-black font-headline tracking-tighter text-on-surface">
-            Caminhões
-          </h1>
-          <p className="text-on-surface-variant mt-2 text-base">
-            Gerencie os veículos da sua frota.
-          </p>
-        </div>
-        <div className="flex items-center gap-3">
-          <div className="flex items-center bg-surface-container-highest rounded-lg p-1 border border-outline-variant/10 shadow-sm">
-            <div className="relative flex items-center h-9">
-              <span className="material-symbols-outlined absolute left-3 text-outline text-lg">
-                badge
-              </span>
-              <input
-                type="text"
-                placeholder="Placa..."
-                value={filters.license_plate}
-                onChange={(e) => setFilters((f) => ({ ...f, license_plate: e.target.value }))}
-                onKeyDown={handleKeyDown}
-                className="pl-10 pr-3 py-2 bg-transparent border-none w-48 focus:ring-0 transition-all placeholder:text-outline/50 text-sm outline-none text-on-surface"
-              />
-            </div>
-            <div className="w-[1px] bg-outline-variant/20 h-6 mx-1" />
-            <div className="relative flex items-center h-9">
-              <span className="material-symbols-outlined absolute left-3 text-outline text-lg">
-                scale
-              </span>
-              <input
-                type="number"
-                placeholder="Capac. mín..."
-                value={filters.capacity_ton}
-                onChange={(e) => setFilters((f) => ({ ...f, capacity_ton: e.target.value }))}
-                onKeyDown={handleKeyDown}
-                className="pl-10 pr-3 py-2 bg-transparent border-none w-48 focus:ring-0 transition-all placeholder:text-outline/50 text-sm outline-none text-on-surface"
-              />
-            </div>
-            <button
-              onClick={() => setAppliedFilters(filters)}
-              className="bg-primary text-on-primary px-4 py-1.5 rounded-md font-bold text-xs hover:brightness-110 active:scale-95 transition-all ml-1 mr-0.5"
-            >
-              Filtrar
-            </button>
+      <PageHeader
+        pretitle="Gestão de Frota"
+        title="Caminhões"
+        subtitle="Gerencie os veículos da sua frota."
+        actionLabel="Novo Caminhão"
+        onAction={() => setModal(true)}
+      >
+        <div className="flex items-center bg-surface-container-highest rounded-lg p-1 border border-outline-variant/10 shadow-sm">
+          <div className="relative flex items-center h-9">
+            <span className="material-symbols-outlined absolute left-3 text-outline text-lg">
+              badge
+            </span>
+            <input
+              type="text"
+              placeholder="Placa..."
+              value={filters.license_plate}
+              onChange={(e) => setFilters((f) => ({ ...f, license_plate: e.target.value }))}
+              onKeyDown={handleKeyDown}
+              className="pl-10 pr-3 py-2 bg-transparent border-none w-48 focus:ring-0 transition-all placeholder:text-outline/50 text-sm outline-none text-on-surface"
+            />
+          </div>
+          <div className="w-[1px] bg-outline-variant/20 h-6 mx-1" />
+          <div className="relative flex items-center h-9">
+            <span className="material-symbols-outlined absolute left-3 text-outline text-lg">
+              scale
+            </span>
+            <input
+              type="number"
+              placeholder="Capac. mín..."
+              value={filters.capacity_ton}
+              onChange={(e) => setFilters((f) => ({ ...f, capacity_ton: e.target.value }))}
+              onKeyDown={handleKeyDown}
+              className="pl-10 pr-3 py-2 bg-transparent border-none w-48 focus:ring-0 transition-all placeholder:text-outline/50 text-sm outline-none text-on-surface"
+            />
           </div>
           <button
-            onClick={() => setModal(true)}
-            className="flex items-center gap-3 bg-primary text-on-primary px-6 py-3 rounded font-bold text-sm shadow-lg shadow-primary/20 hover:brightness-110 active:scale-95 transition-all"
+            onClick={() => setAppliedFilters(filters)}
+            className="bg-primary text-on-primary px-4 py-1.5 rounded-md font-bold text-xs hover:brightness-110 active:scale-95 transition-all ml-1 mr-0.5"
           >
-            <span className="material-symbols-outlined text-xl">add</span>
-            Novo Caminhão
+            Filtrar
           </button>
         </div>
-      </div>
+      </PageHeader>
 
       {/* Stats */}
       <div className="grid grid-cols-3 gap-6 mb-10">

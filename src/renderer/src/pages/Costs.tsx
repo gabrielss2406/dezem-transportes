@@ -2,6 +2,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { useCallback, useEffect, useState } from 'react'
 import { Controller, useForm } from 'react-hook-form'
 import { costSchema } from '../../../shared/schemas'
+import { PageHeader } from '../components/PageHeader'
 import {
   Button,
   CurrencyInput,
@@ -114,18 +115,11 @@ export function CostsPage() {
       {toast && <Toast message={toast.message} type={toast.type} />}
 
       {/* Header */}
-      <div className="flex items-end justify-between mb-10">
-        <div>
-          <span className="text-primary font-bold tracking-widest text-xs uppercase block mb-2">
-            Gestão Financeira
-          </span>
-          <h1 className="text-5xl font-black font-headline tracking-tighter text-on-surface">
-            Custos da Frota
-          </h1>
-          <p className="text-on-surface-variant mt-2 max-w-xl text-base">
-            Gerencie as despesas operacionais com precisão.
-          </p>
-        </div>
+      <PageHeader
+        pretitle="Gestão Financeira"
+        title="Custos da Frota"
+        subtitle="Gerencie as despesas operacionais com precisão."
+      >
         <div className="flex flex-col items-end gap-3">
           <div className="bg-surface-container-low p-5 rounded-xl text-right min-w-[200px]">
             <p className="text-xs text-on-surface-variant mb-1">Total do Período</p>
@@ -151,7 +145,7 @@ export function CostsPage() {
             </button>
           </div>
         </div>
-      </div>
+      </PageHeader>
 
       {/* Asymmetric grid: form left, table right */}
       <div className="grid grid-cols-12 gap-8 items-start">

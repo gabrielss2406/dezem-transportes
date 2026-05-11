@@ -1,6 +1,7 @@
 import type React from 'react'
 
 interface PageHeaderProps {
+  pretitle?: string
   title: string
   subtitle?: string
   actionLabel?: string
@@ -8,12 +9,19 @@ interface PageHeaderProps {
   children?: React.ReactNode
 }
 
-export function PageHeader({ title, subtitle, actionLabel, onAction, children }: PageHeaderProps) {
+export function PageHeader({
+  pretitle,
+  title,
+  subtitle,
+  actionLabel,
+  onAction,
+  children,
+}: PageHeaderProps) {
   return (
     <div className="flex items-end justify-between mb-10">
       <div>
         <span className="text-primary font-bold tracking-widest text-xs uppercase block mb-2">
-          Dezem Transportes
+          {pretitle || 'Dezem Transportes'}
         </span>
         <h1 className="text-4xl font-black font-headline tracking-tighter text-on-surface">
           {title}
