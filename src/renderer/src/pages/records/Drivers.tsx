@@ -23,6 +23,7 @@ export function DriversPage() {
   const [modal, setModal] = useState(false)
   const [editing, setEditing] = useState<Driver | null>(null)
   const [filters, setFilters] = useState({ name: '', cpf: '', truck_id: '' })
+  const [appliedFilters, setAppliedFilters] = useState({ name: '', cpf: '', truck_id: '' })
   const { toast, show } = useToast()
 
   const FORM_EMPTY = { ...EMPTY, monthly_salary: 0, truck_id: null }
@@ -49,10 +50,13 @@ export function DriversPage() {
       : '(99) 9999-9999'
 
   const load = useCallback(async () => {
-    const [d, t] = await Promise.all([window.api.drivers.list(filters), window.api.trucks.list()])
+    const [d, t] = await Promise.all([
+      window.api.drivers.list(appliedFilters),
+      window.api.trucks.list(),
+    ])
     setRows(d)
     setTrucks(t)
-  }, [filters])
+  }, [appliedFilters])
   useEffect(() => {
     load()
   }, [load])
@@ -107,6 +111,12 @@ export function DriversPage() {
     setModal(true)
   }
 
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      setAppliedFilters(filters)
+    }
+  }
+
   return (
     <div className="p-12 max-w-7xl mx-auto">
       {toast && <Toast message={toast.message} type={toast.type} />}
@@ -125,9 +135,9 @@ export function DriversPage() {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <div className="flex bg-surface-container-highest rounded-lg p-1">
-            <div className="relative">
-              <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-xs">
+          <div className="flex items-center bg-surface-container-highest rounded-lg p-1 border border-outline-variant/10 shadow-sm">
+            <div className="relative flex items-center h-9">
+              <span className="material-symbols-outlined absolute left-3 text-outline text-lg">
                 person
               </span>
               <input
@@ -135,12 +145,13 @@ export function DriversPage() {
                 placeholder="Nome..."
                 value={filters.name}
                 onChange={(e) => setFilters((f) => ({ ...f, name: e.target.value }))}
-                className="pl-9 pr-3 py-2 bg-transparent border-none w-32 focus:ring-0 transition-all placeholder:text-outline/60 text-xs outline-none text-on-surface"
+                onKeyDown={handleKeyDown}
+                className="pl-10 pr-3 py-2 bg-transparent border-none w-32 focus:ring-0 transition-all placeholder:text-outline/50 text-sm outline-none text-on-surface"
               />
             </div>
-            <div className="w-[1px] bg-outline-variant/20 my-2" />
-            <div className="relative">
-              <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-xs">
+            <div className="w-[1px] bg-outline-variant/20 h-6 mx-1" />
+            <div className="relative flex items-center h-9">
+              <span className="material-symbols-outlined absolute left-3 text-outline text-lg">
                 badge
               </span>
               <input
@@ -148,11 +159,12 @@ export function DriversPage() {
                 placeholder="CPF..."
                 value={filters.cpf}
                 onChange={(e) => setFilters((f) => ({ ...f, cpf: e.target.value }))}
-                className="pl-9 pr-3 py-2 bg-transparent border-none w-32 focus:ring-0 transition-all placeholder:text-outline/60 text-xs outline-none text-on-surface"
+                onKeyDown={handleKeyDown}
+                className="pl-10 pr-3 py-2 bg-transparent border-none w-32 focus:ring-0 transition-all placeholder:text-outline/50 text-sm outline-none text-on-surface"
               />
             </div>
-            <div className="w-[1px] bg-outline-variant/20 my-2" />
-            <div className="w-40 px-1">
+            <div className="w-[1px] bg-outline-variant/20 h-6 mx-1" />
+            <div className="w-36">
               <Select
                 placeholder="Caminhão"
                 value={filters.truck_id}
@@ -162,6 +174,12 @@ export function DriversPage() {
                 className="scale-90 origin-left"
               />
             </div>
+            <button
+              onClick={() => setAppliedFilters(filters)}
+              className="bg-primary text-on-primary px-4 py-1.5 rounded-md font-bold text-xs hover:brightness-110 active:scale-95 transition-all ml-1 mr-0.5"
+            >
+              Filtrar
+            </button>
           </div>
           <button
             onClick={() => setModal(true)}

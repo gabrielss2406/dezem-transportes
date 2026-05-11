@@ -183,6 +183,19 @@ export function Select({
   const containerRef = useRef<HTMLDivElement>(null)
   const buttonRef = useRef<HTMLButtonElement>(null)
   const [coords, setCoords] = useState({ top: 0, left: 0, width: 0 })
+  const uniqueId = useRef(Math.random())
+
+  useEffect(() => {
+    const handleClose = (e: CustomEvent) => {
+      if (e.detail.id !== uniqueId.current) {
+        setIsOpen(false)
+      }
+    }
+    document.addEventListener('close-other-selects', handleClose as EventListener)
+    return () => {
+      document.removeEventListener('close-other-selects', handleClose as EventListener)
+    }
+  }, [])
 
   const selectedOption = options.find((o) => String(o.value) === String(value))
 
@@ -235,7 +248,13 @@ export function Select({
         type="button"
         onClick={(e) => {
           e.stopPropagation()
-          setIsOpen(!isOpen)
+          const newIsOpen = !isOpen
+          setIsOpen(newIsOpen)
+          if (newIsOpen) {
+            document.dispatchEvent(
+              new CustomEvent('close-other-selects', { detail: { id: uniqueId.current } }),
+            )
+          }
         }}
         className={`flex items-center justify-between bg-surface-container-lowest border border-outline-variant/30 rounded-lg px-4 py-3 text-sm text-on-surface text-left focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all ${error ? 'border-error' : ''}`}
       >

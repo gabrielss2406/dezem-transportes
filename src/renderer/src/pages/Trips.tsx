@@ -141,87 +141,68 @@ export function TripsPage() {
       </div>
 
       {/* Filters */}
-      <div className="bg-surface-container-low p-4 rounded-xl mb-10 flex flex-wrap gap-4 items-end border border-outline-variant/10 shadow-sm">
-        <div className="flex-1 min-w-[150px]">
-          <DatePicker
-            label="Início"
-            value={filters.startDate}
-            onChange={(e) => setFilters((f) => ({ ...f, startDate: e.target.value }))}
-          />
+      <div className="bg-surface-container-low p-4 rounded-xl mb-10 border border-outline-variant/10 shadow-sm">
+        <div className="flex flex-wrap items-center gap-4">
+          <div className="flex-1 min-w-[150px]">
+            <DatePicker
+              label="Início"
+              value={filters.startDate}
+              onChange={(e) => setFilters((f) => ({ ...f, startDate: e.target.value }))}
+            />
+          </div>
+          <div className="flex-1 min-w-[150px]">
+            <DatePicker
+              label="Fim"
+              value={filters.endDate}
+              onChange={(e) => setFilters((f) => ({ ...f, endDate: e.target.value }))}
+            />
+          </div>
+          <div className="flex-1 min-w-[150px]">
+            <Select
+              placeholder="Caminhão"
+              value={filters.truck_id}
+              onChange={(v) => setFilters((f) => ({ ...f, truck_id: v }))}
+              options={trucks.map((t) => ({ value: t.id, label: t.license_plate }))}
+              optional
+            />
+          </div>
+          <div className="flex-1 min-w-[150px]">
+            <Select
+              placeholder="Motorista"
+              value={filters.driver_id}
+              onChange={(v) => setFilters((f) => ({ ...f, driver_id: v }))}
+              options={drivers.map((d) => ({ value: d.id, label: d.name }))}
+              optional
+            />
+          </div>
+          <div className="flex-1 min-w-[150px]">
+            <Select
+              placeholder="Produto"
+              value={filters.product_id}
+              onChange={(v) => setFilters((f) => ({ ...f, product_id: v }))}
+              options={products.map((p) => ({ value: p.id, label: p.name }))}
+              optional
+            />
+          </div>
+          <div className="flex-1 min-w-[150px]">
+            <Select
+              placeholder="Cliente"
+              value={filters.customer_id}
+              onChange={(v) => setFilters((f) => ({ ...f, customer_id: v }))}
+              options={customers.map((c) => ({ value: c.id, label: c.name }))}
+              optional
+            />
+          </div>
+          <div className="flex-1 min-w-[150px]">
+            <Select
+              placeholder="Rota"
+              value={filters.route_id}
+              onChange={(v) => setFilters((f) => ({ ...f, route_id: v }))}
+              options={routes.map((r) => ({ value: r.id, label: r.name }))}
+              optional
+            />
+          </div>
         </div>
-        <div className="flex-1 min-w-[150px]">
-          <DatePicker
-            label="Fim"
-            value={filters.endDate}
-            onChange={(e) => setFilters((f) => ({ ...f, endDate: e.target.value }))}
-          />
-        </div>
-        <div className="flex-1 min-w-[150px]">
-          <Select
-            placeholder="Caminhão"
-            value={filters.truck_id}
-            onChange={(v) => setFilters((f) => ({ ...f, truck_id: v }))}
-            options={trucks.map((t) => ({ value: t.id, label: t.license_plate }))}
-            optional
-            className="scale-90 origin-bottom"
-          />
-        </div>
-        <div className="flex-1 min-w-[150px]">
-          <Select
-            placeholder="Motorista"
-            value={filters.driver_id}
-            onChange={(v) => setFilters((f) => ({ ...f, driver_id: v }))}
-            options={drivers.map((d) => ({ value: d.id, label: d.name }))}
-            optional
-            className="scale-90 origin-bottom"
-          />
-        </div>
-        <div className="flex-1 min-w-[150px]">
-          <Select
-            placeholder="Produto"
-            value={filters.product_id}
-            onChange={(v) => setFilters((f) => ({ ...f, product_id: v }))}
-            options={products.map((p) => ({ value: p.id, label: p.name }))}
-            optional
-            className="scale-90 origin-bottom"
-          />
-        </div>
-        <div className="flex-1 min-w-[150px]">
-          <Select
-            placeholder="Cliente"
-            value={filters.customer_id}
-            onChange={(v) => setFilters((f) => ({ ...f, customer_id: v }))}
-            options={customers.map((c) => ({ value: c.id, label: c.name }))}
-            optional
-            className="scale-90 origin-bottom"
-          />
-        </div>
-        <div className="flex-1 min-w-[150px]">
-          <Select
-            placeholder="Rota"
-            value={filters.route_id}
-            onChange={(v) => setFilters((f) => ({ ...f, route_id: v }))}
-            options={routes.map((r) => ({ value: r.id, label: r.name }))}
-            optional
-            className="scale-90 origin-bottom"
-          />
-        </div>
-        <button
-          onClick={() =>
-            setFilters({
-              startDate: '',
-              endDate: '',
-              truck_id: '',
-              driver_id: '',
-              product_id: '',
-              customer_id: '',
-              route_id: '',
-            })
-          }
-          className="px-4 py-2 text-primary text-xs font-bold uppercase hover:bg-primary/10 rounded-lg transition-all mb-1"
-        >
-          Limpar
-        </button>
       </div>
 
       {/* KPI row */}

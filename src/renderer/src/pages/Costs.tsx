@@ -156,7 +156,7 @@ export function CostsPage() {
       {/* Asymmetric grid: form left, table right */}
       <div className="grid grid-cols-12 gap-8 items-start">
         {/* Quick-add form */}
-        <div className="col-span-4 bg-surface-container-low p-8 rounded-xl border-l-4 border-primary relative">
+        {/* <div className="col-span-4 bg-surface-container-low p-8 rounded-xl border-l-4 border-primary relative">
           <h4 className="text-base font-headline font-bold mb-6 flex items-center gap-2 text-on-surface">
             <span className="material-symbols-outlined text-primary">add_circle</span>
             Lançar Custo
@@ -245,10 +245,10 @@ export function CostsPage() {
               Confirmar Lançamento
             </button>
           </div>
-        </div>
+        </div> */}
 
         {/* Table */}
-        <div className="col-span-8 space-y-6">
+        <div className="col-span-12 space-y-6">
           {/* Category chips */}
           <div className="flex flex-wrap gap-2">
             <button
