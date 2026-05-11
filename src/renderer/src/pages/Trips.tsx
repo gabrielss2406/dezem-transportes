@@ -24,9 +24,9 @@ const EMPTY = {
   customer_id: '',
   route_id: '',
   supplier_id: '',
-  weight_ton: '',
-  price_charged: '',
-  km_driven: '',
+  weight_ton: 0,
+  price_charged: 0,
+  km_driven: 0,
   observation: '',
 }
 

@@ -5,7 +5,6 @@ import { supplierSchema } from '../../../../shared/schemas'
 import { PageHeader } from '../../components/PageHeader'
 import { Button, Input, Modal, Select, Toast, useToast } from '../../components/ui'
 import type { Supplier } from '../../lib/types'
-import { SUPPLIER_TYPES } from '../../lib/utils'
 
 const EMPTY = { name: '', type: 'gas_station' as Supplier['type'], phone: '' }
 
@@ -18,6 +17,7 @@ const typeIcon: Record<string, string> = {
 
 export function SuppliersPage() {
   const [rows, setRows] = useState<Supplier[]>([])
+  const [supplierTypes, setSupplierTypes] = useState<{ value: string; label: string }[]>([])
   const [modal, setModal] = useState(false)
   const [editing, setEditing] = useState<Supplier | null>(null)
   const [filters, setFilters] = useState({ name: '', type: '' })
@@ -45,10 +45,15 @@ export function SuppliersPage() {
       ? '(99) 99999-9999'
       : '(99) 9999 - 9999'
 
-  const load = useCallback(
-    () => window.api.suppliers.list(appliedFilters).then(setRows),
-    [appliedFilters],
-  )
+  const load = useCallback(async () => {
+    const [s, st] = await Promise.all([
+      window.api.suppliers.list(appliedFilters),
+      window.api['supplier-types'].list(),
+    ])
+    setRows(s)
+    setSupplierTypes(st)
+  }, [appliedFilters])
+
   useEffect(() => {
     load()
   }, [load])
@@ -134,7 +139,7 @@ export function SuppliersPage() {
               placeholder="Tipo"
               value={filters.type}
               onChange={(val) => setFilters((f) => ({ ...f, type: val }))}
-              options={SUPPLIER_TYPES}
+              options={supplierTypes}
               optional
               className="scale-75 origin-left -ml-2"
             />
@@ -200,7 +205,7 @@ export function SuppliersPage() {
               </tr>
             )}
             {rows.map((row, i) => {
-              const typeLabel = SUPPLIER_TYPES.find((t) => t.value === row.type)?.label ?? row.type
+              const typeLabel = supplierTypes.find((t) => t.value === row.type)?.label ?? row.type
               return (
                 <tr
                   key={row.id}
@@ -265,7 +270,7 @@ export function SuppliersPage() {
                   value={field.value}
                   onChange={field.onChange}
                   error={errors.type?.message}
-                  options={SUPPLIER_TYPES}
+                  options={supplierTypes}
                 />
               )}
             />

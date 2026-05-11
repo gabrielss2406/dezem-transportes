@@ -1,0 +1,194 @@
+import { zodResolver } from '@hookform/resolvers/zod'
+import { useCallback, useEffect, useState } from 'react'
+import { useForm } from 'react-hook-form'
+import { z } from 'zod'
+import { PageHeader } from '../components/PageHeader'
+import { Button, Input, Toast, useToast } from '../components/ui'
+
+// Generic type for categories/types
+interface DynamicType {
+  id: number
+  value: string
+  label: string
+  is_deletable: number
+}
+
+// Zod schema for the form
+const formSchema = z.object({
+  label: z.string().min(1, 'O rótulo é obrigatório'),
+})
+type FormData = z.infer<typeof formSchema>
+
+// Section component for styling
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="bg-surface-container-low p-8 rounded-xl border border-outline-variant/10">
+      <h2 className="text-lg font-bold font-headline text-on-surface mb-6">{title}</h2>
+      <div className="space-y-4">{children}</div>
+    </div>
+  )
+}
+
+// Generic component to manage dynamic types
+function DynamicTypeManager({
+  title,
+  api,
+}: {
+  title: string
+  api: {
+    list: () => Promise<DynamicType[]>
+    create: (data: { value: string; label: string }) => Promise<{ id?: number }>
+    delete: (id: number) => Promise<{ ok: boolean; error?: string }>
+  }
+}) {
+  const [items, setItems] = useState<DynamicType[]>([])
+  const { toast, show } = useToast()
+
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+    reset,
+  } = useForm<FormData>({
+    resolver: zodResolver(formSchema),
+    defaultValues: { label: '' },
+  })
+
+  const load = useCallback(() => {
+    if (!api) return
+    api.list().then(setItems)
+  }, [api])
+
+  useEffect(() => {
+    load()
+  }, [load])
+
+  const onSubmit = async ({ label }: FormData) => {
+    if (!api) return
+    const value = label.toLowerCase().replace(/\s+/g, '_')
+    try {
+      const result = await api.create({ value, label })
+      if (result.id) {
+        show(`${title} adicionado(a)!`)
+        reset()
+        load()
+      } else {
+        show(`Erro ao adicionar ${title.toLowerCase()}. Verifique se o valor já existe.`, 'error')
+      }
+    } catch (error: any) {
+      show(error.message || 'Erro desconhecido.', 'error')
+    }
+  }
+
+  const handleDelete = async (id: number) => {
+    if (!api) return
+    if (!confirm('Tem certeza que deseja excluir este item?')) return
+    try {
+      const result = await api.delete(id)
+      if (result.ok) {
+        show(`${title} excluído(a)!`)
+        load()
+      } else {
+        show(result.error || `Erro ao excluir ${title.toLowerCase()}.`, 'error')
+      }
+    } catch (error: any) {
+      show(error.message || 'Erro desconhecido.', 'error')
+    }
+  }
+
+  if (!api) {
+    return (
+      <Section title={title}>
+        <div className="bg-error-container text-on-error-container p-4 rounded-lg text-sm">
+          <strong>Erro:</strong> A API para "{title}" não foi encontrada. Pode ser necessário
+          reiniciar a aplicação.
+        </div>
+      </Section>
+    )
+  }
+
+  return (
+    <Section title={title}>
+      {toast && <Toast message={toast.message} type={toast.type} />}
+      <div className="space-y-3 max-h-60 overflow-y-auto pr-2">
+        {items.map((item) => (
+          <div
+            key={item.id}
+            className="flex items-center justify-between bg-surface-container p-3 rounded-lg"
+          >
+            <div>
+              <p className="font-bold text-on-surface text-sm">{item.label}</p>
+              <p className="text-xs text-on-surface-variant font-mono">{item.value}</p>
+            </div>
+            <button
+              onClick={() => handleDelete(item.id)}
+              disabled={item.is_deletable === 0}
+              className="p-2 text-on-surface-variant rounded-full disabled:text-outline-variant/30 disabled:cursor-not-allowed hover:text-error enabled:hover:bg-error/10"
+              title={item.is_deletable === 0 ? 'Este item padrão não pode ser excluído' : 'Excluir'}
+            >
+              <span className="material-symbols-outlined text-xl">delete</span>
+            </button>
+          </div>
+        ))}
+      </div>
+
+      <div className="border-t border-outline-variant/20 pt-6">
+        <p className="text-sm font-bold text-on-surface mb-3">Adicionar Novo</p>
+        <form onSubmit={handleSubmit(onSubmit)} className="flex items-start gap-4">
+          <Input
+            placeholder="Rótulo..."
+            {...register('label')}
+            error={errors.label?.message}
+            className="flex-1"
+          />
+          <Button type="submit" size="sm" className="h-11">
+            Adicionar
+          </Button>
+        </form>
+      </div>
+    </Section>
+  )
+}
+
+// Main Settings Page Component
+interface SettingsPageProps {
+  theme: 'light' | 'dark'
+  onToggleTheme: () => void
+}
+
+export function SettingsPage({ theme, onToggleTheme }: SettingsPageProps) {
+  return (
+    <div className="p-12 max-w-7xl mx-auto">
+      <PageHeader
+        pretitle="Administração"
+        title="Configurações"
+        subtitle="Ajuste as configurações gerais do sistema."
+      />
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 mt-10 items-start">
+        <DynamicTypeManager title="Tipos de Fornecedor" api={window.api['supplier-types']} />
+        <DynamicTypeManager title="Categorias de Custo" api={window.api['cost-categories']} />
+
+        <Section title="Tema e Aparência">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="font-bold text-on-surface">Tema</p>
+              <p className="text-on-surface-variant text-sm capitalize">
+                Atualmente: {theme === 'dark' ? 'Escuro' : 'Claro'}
+              </p>
+            </div>
+            <button
+              onClick={onToggleTheme}
+              className="flex items-center gap-3 px-5 py-2.5 rounded-lg font-bold text-sm text-on-surface-variant bg-surface-container-high hover:text-on-surface transition-colors"
+            >
+              <span className="material-symbols-outlined text-xl">
+                {theme === 'dark' ? 'light_mode' : 'dark_mode'}
+              </span>
+              <span>Mudar para tema {theme === 'dark' ? 'Claro' : 'Escuro'}</span>
+            </button>
+          </div>
+        </Section>
+      </div>
+    </div>
+  )
+}
