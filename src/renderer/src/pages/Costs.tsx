@@ -2,7 +2,16 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { useCallback, useEffect, useState } from 'react'
 import { Controller, useForm } from 'react-hook-form'
 import { costSchema } from '../../../shared/schemas'
-import { Button, CurrencyInput, Input, Modal, Select, Toast, useToast } from '../components/ui'
+import {
+  Button,
+  CurrencyInput,
+  DatePicker,
+  Input,
+  Modal,
+  Select,
+  Toast,
+  useToast,
+} from '../components/ui'
 import type { Cost, Driver, Supplier, Truck } from '../lib/types'
 import { COST_CATEGORIES, currentMonthKey, formatBRL, formatDate } from '../lib/utils'
 
@@ -166,7 +175,7 @@ export function CostsPage() {
                 />
               )}
             />
-            <Input label="Data" type="date" {...register('date')} error={errors.date?.message} />
+            <DatePicker label="Data" {...register('date')} error={errors.date?.message} />
             <Controller
               name="value"
               control={control}
@@ -361,7 +370,7 @@ export function CostsPage() {
                 )}
               />
             </div>
-            <Input label="Data" type="date" {...register('date')} error={errors.date?.message} />
+            <DatePicker label="Data" {...register('date')} error={errors.date?.message} />
             <Controller
               name="value"
               control={control}

@@ -19,6 +19,8 @@ export function SuppliersPage() {
   const [rows, setRows] = useState<Supplier[]>([])
   const [modal, setModal] = useState(false)
   const [editing, setEditing] = useState<Supplier | null>(null)
+  const [filters, setFilters] = useState({ name: '', type: '' })
+  const [appliedFilters, setAppliedFilters] = useState({ name: '', type: '' })
   const { toast, show } = useToast()
 
   const {
@@ -40,9 +42,12 @@ export function SuppliersPage() {
   const phoneMask =
     digits.length > 10 || (digits.length >= 3 && digits[2] === '9')
       ? '(99) 99999-9999'
-      : '(99) 9999-9999'
+      : '(99) 9999 - 9999'
 
-  const load = useCallback(() => window.api.suppliers.list().then(setRows), [])
+  const load = useCallback(
+    () => window.api.suppliers.list(appliedFilters).then(setRows),
+    [appliedFilters],
+  )
   useEffect(() => {
     load()
   }, [load])
@@ -109,13 +114,49 @@ export function SuppliersPage() {
             Fornecedores
           </h1>
         </div>
-        <button
-          onClick={() => setModal(true)}
-          className="flex items-center gap-3 bg-primary text-on-primary px-8 py-4 rounded font-bold text-sm shadow-lg shadow-primary/20 hover:brightness-110 active:scale-95 transition-all"
-        >
-          <span className="material-symbols-outlined">person_add</span>
-          Novo Fornecedor
-        </button>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center bg-surface-container-highest rounded-lg p-1 border border-outline-variant/10 shadow-sm">
+            <div className="relative flex items-center h-9">
+              <span className="material-symbols-outlined absolute left-3 text-outline text-lg">
+                search
+              </span>
+              <input
+                type="text"
+                placeholder="Buscar por nome..."
+                value={filters.name}
+                onChange={(e) => setFilters((f) => ({ ...f, name: e.target.value }))}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') setAppliedFilters(filters)
+                }}
+                className="pl-10 pr-3 py-2 bg-transparent border-none w-48 focus:ring-0 transition-all placeholder:text-outline/50 text-sm outline-none text-on-surface"
+              />
+            </div>
+            <div className="w-[1px] bg-outline-variant/20 h-6 mx-1" />
+            <div className="w-36">
+              <Select
+                placeholder="Tipo"
+                value={filters.type}
+                onChange={(val) => setFilters((f) => ({ ...f, type: val }))}
+                options={SUPPLIER_TYPES}
+                optional
+                className="scale-75 origin-left -ml-2"
+              />
+            </div>
+            <button
+              onClick={() => setAppliedFilters(filters)}
+              className="bg-primary text-on-primary px-4 py-1.5 rounded-md font-bold text-xs hover:brightness-110 active:scale-95 transition-all ml-1 mr-0.5"
+            >
+              Filtrar
+            </button>
+          </div>
+          <button
+            onClick={() => setModal(true)}
+            className="flex items-center gap-3 bg-primary text-on-primary px-8 py-4 rounded font-bold text-sm shadow-lg shadow-primary/20 hover:brightness-110 active:scale-95 transition-all"
+          >
+            <span className="material-symbols-outlined">person_add</span>
+            Novo Fornecedor
+          </button>
+        </div>
       </div>
 
       {/* Stats */}
@@ -165,7 +206,7 @@ export function SuppliersPage() {
             {rows.length === 0 && (
               <tr>
                 <td colSpan={4} className="px-8 py-12 text-center text-on-surface-variant text-sm">
-                  Nenhum fornecedor cadastrado
+                  Nenhum fornecedor encontrado com os filtros selecionados
                 </td>
               </tr>
             )}

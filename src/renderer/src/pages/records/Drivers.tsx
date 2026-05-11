@@ -22,6 +22,7 @@ export function DriversPage() {
   const [trucks, setTrucks] = useState<Truck[]>([])
   const [modal, setModal] = useState(false)
   const [editing, setEditing] = useState<Driver | null>(null)
+  const [filters, setFilters] = useState({ name: '', cpf: '', truck_id: '' })
   const { toast, show } = useToast()
 
   const FORM_EMPTY = { ...EMPTY, monthly_salary: 0, truck_id: null }
@@ -48,10 +49,10 @@ export function DriversPage() {
       : '(99) 9999-9999'
 
   const load = useCallback(async () => {
-    const [d, t] = await Promise.all([window.api.drivers.list(), window.api.trucks.list()])
+    const [d, t] = await Promise.all([window.api.drivers.list(filters), window.api.trucks.list()])
     setRows(d)
     setTrucks(t)
-  }, [])
+  }, [filters])
   useEffect(() => {
     load()
   }, [load])
@@ -123,13 +124,53 @@ export function DriversPage() {
             Gerencie os motoristas vinculados à frota.
           </p>
         </div>
-        <button
-          onClick={() => setModal(true)}
-          className="flex items-center gap-3 bg-primary text-on-primary px-8 py-4 rounded font-bold text-sm shadow-lg shadow-primary/20 hover:brightness-110 active:scale-95 transition-all"
-        >
-          <span className="material-symbols-outlined">person_add</span>
-          Novo Motorista
-        </button>
+        <div className="flex items-center gap-3">
+          <div className="flex bg-surface-container-highest rounded-lg p-1">
+            <div className="relative">
+              <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-xs">
+                person
+              </span>
+              <input
+                type="text"
+                placeholder="Nome..."
+                value={filters.name}
+                onChange={(e) => setFilters((f) => ({ ...f, name: e.target.value }))}
+                className="pl-9 pr-3 py-2 bg-transparent border-none w-32 focus:ring-0 transition-all placeholder:text-outline/60 text-xs outline-none text-on-surface"
+              />
+            </div>
+            <div className="w-[1px] bg-outline-variant/20 my-2" />
+            <div className="relative">
+              <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-xs">
+                badge
+              </span>
+              <input
+                type="text"
+                placeholder="CPF..."
+                value={filters.cpf}
+                onChange={(e) => setFilters((f) => ({ ...f, cpf: e.target.value }))}
+                className="pl-9 pr-3 py-2 bg-transparent border-none w-32 focus:ring-0 transition-all placeholder:text-outline/60 text-xs outline-none text-on-surface"
+              />
+            </div>
+            <div className="w-[1px] bg-outline-variant/20 my-2" />
+            <div className="w-40 px-1">
+              <Select
+                placeholder="Caminhão"
+                value={filters.truck_id}
+                onChange={(val) => setFilters((f) => ({ ...f, truck_id: val }))}
+                options={trucks.map((t) => ({ value: t.id, label: t.license_plate }))}
+                optional
+                className="scale-90 origin-left"
+              />
+            </div>
+          </div>
+          <button
+            onClick={() => setModal(true)}
+            className="flex items-center gap-3 bg-primary text-on-primary px-6 py-3 rounded font-bold text-sm shadow-lg shadow-primary/20 hover:brightness-110 active:scale-95 transition-all"
+          >
+            <span className="material-symbols-outlined">person_add</span>
+            Novo Motorista
+          </button>
+        </div>
       </div>
 
       {/* Stats */}
@@ -236,7 +277,6 @@ export function DriversPage() {
         <div className="px-6 py-4 bg-surface-container-high/50 border-t border-outline-variant/10">
           <p className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">
             {rows.length} motorista{rows.length !== 1 ? 's' : ''} cadastrado
-            {rows.length !== 1 ? 's' : ''}
           </p>
         </div>
       </div>

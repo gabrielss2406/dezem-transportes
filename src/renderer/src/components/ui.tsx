@@ -62,6 +62,40 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
   },
 )
 
+// ── DatePicker ───────────────────────────────────────────────────────────────
+interface DatePickerProps extends React.InputHTMLAttributes<HTMLInputElement> {
+  label?: string
+  optional?: boolean
+  error?: string
+}
+
+export const DatePicker = forwardRef<HTMLInputElement, DatePickerProps>(
+  ({ label, optional, error, className = '', ...props }, ref) => {
+    return (
+      <div className="flex flex-col gap-1.5">
+        {label && (
+          <label className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
+            {label}{' '}
+            {optional && <span className="text-outline font-normal normal-case">(opcional)</span>}
+          </label>
+        )}
+        <div className="relative group">
+          <input
+            type="date"
+            ref={ref}
+            className={`w-full bg-surface-container-lowest border border-outline-variant/30 rounded-lg px-4 py-3 text-sm text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all appearance-none ${error ? 'border-error' : ''} ${className}`}
+            {...props}
+          />
+          <span className="material-symbols-outlined absolute right-4 top-1/2 -translate-y-1/2 text-on-surface-variant/40 pointer-events-none group-hover:text-primary transition-colors text-lg">
+            calendar_today
+          </span>
+        </div>
+        {error && <span className="text-xs text-error">{error}</span>}
+      </div>
+    )
+  },
+)
+
 // ── CurrencyInput ────────────────────────────────────────────────────────────
 interface CurrencyInputProps {
   label?: string

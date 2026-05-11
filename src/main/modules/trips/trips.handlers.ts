@@ -39,6 +39,18 @@ export function registerTripHandlers(): void {
       query += ' AND t.driver_id = ?'
       params.push(filters.driver_id)
     }
+    if (filters.product_id) {
+      query += ' AND t.product_id = ?'
+      params.push(filters.product_id)
+    }
+    if (filters.customer_id) {
+      query += ' AND t.customer_id = ?'
+      params.push(filters.customer_id)
+    }
+    if (filters.route_id) {
+      query += ' AND t.route_id = ?'
+      params.push(filters.route_id)
+    }
     query += ' ORDER BY t.date DESC'
     return db()
       .prepare(query)
