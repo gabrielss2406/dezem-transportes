@@ -38,6 +38,7 @@ export function TripsPage() {
   const [customers, setCustomers] = useState<Customer[]>([])
   const [routes, setRoutes] = useState<Route[]>([])
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
+  const [gasStations, setGasStations] = useState<Supplier[]>([])
   const [modal, setModal] = useState(false)
   const [filters, setFilters] = useState({
     startDate: '',
@@ -64,7 +65,7 @@ export function TripsPage() {
   })
 
   const load = useCallback(async () => {
-    const [t, tr, d, p, c, r, s] = await Promise.all([
+    const [t, tr, d, p, c, r, s, gs] = await Promise.all([
       window.api.trips.list(filters),
       window.api.trucks.list(),
       window.api.drivers.list(),
@@ -72,6 +73,7 @@ export function TripsPage() {
       window.api.customers.list(),
       window.api.routes.list(),
       window.api.suppliers.list(),
+      window.api.suppliers.list({ type: 'gas_station' }),
     ])
     setTrips(t)
     setTrucks(tr)
@@ -80,6 +82,7 @@ export function TripsPage() {
     setCustomers(c)
     setRoutes(r)
     setSuppliers(s)
+    setGasStations(gs)
   }, [filters])
 
   useEffect(() => {
@@ -413,7 +416,7 @@ export function TripsPage() {
                     value={field.value}
                     onChange={field.onChange}
                     error={errors.supplier_id?.message}
-                    options={suppliers.map((s) => ({ value: s.id, label: s.name }))}
+                    options={gasStations.map((s) => ({ value: s.id, label: s.name }))}
                   />
                 )}
               />
