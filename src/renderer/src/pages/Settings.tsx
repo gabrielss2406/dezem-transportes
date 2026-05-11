@@ -5,18 +5,21 @@ import { z } from 'zod'
 import { PageHeader } from '../components/PageHeader'
 import { Button, Input, Toast, useToast } from '../components/ui'
 
-interface SupplierType {
+// Generic type for categories/types
+interface DynamicType {
   id: number
   value: string
   label: string
+  is_deletable: number
 }
 
+// Zod schema for the form
 const formSchema = z.object({
   label: z.string().min(1, 'O rótulo é obrigatório'),
 })
-
 type FormData = z.infer<typeof formSchema>
 
+// Section component for styling
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="bg-surface-container-low p-8 rounded-xl border border-outline-variant/10">
@@ -26,13 +29,19 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   )
 }
 
-interface SettingsPageProps {
-  theme: 'light' | 'dark'
-  onToggleTheme: () => void
-}
-
-export function SettingsPage({ theme, onToggleTheme }: SettingsPageProps) {
-  const [types, setTypes] = useState<SupplierType[]>([])
+// Generic component to manage dynamic types
+function DynamicTypeManager({
+  title,
+  api,
+}: {
+  title: string
+  api: {
+    list: () => Promise<DynamicType[]>
+    create: (data: { value: string; label: string }) => Promise<{ id?: number }>
+    delete: (id: number) => Promise<{ ok: boolean; error?: string }>
+  }
+}) {
+  const [items, setItems] = useState<DynamicType[]>([])
   const { toast, show } = useToast()
 
   const {
@@ -46,23 +55,25 @@ export function SettingsPage({ theme, onToggleTheme }: SettingsPageProps) {
   })
 
   const load = useCallback(() => {
-    window.api['supplier-types'].list().then(setTypes)
-  }, [])
+    if (!api) return
+    api.list().then(setItems)
+  }, [api])
 
   useEffect(() => {
     load()
   }, [load])
 
   const onSubmit = async ({ label }: FormData) => {
+    if (!api) return
     const value = label.toLowerCase().replace(/\s+/g, '_')
     try {
-      const result = await window.api['supplier-types'].create({ value, label })
+      const result = await api.create({ value, label })
       if (result.id) {
-        show('Tipo de fornecedor adicionado!')
+        show(`${title} adicionado(a)!`)
         reset()
         load()
       } else {
-        show('Erro ao adicionar tipo. Verifique se o valor já existe.', 'error')
+        show(`Erro ao adicionar ${title.toLowerCase()}. Verifique se o valor já existe.`, 'error')
       }
     } catch (error: any) {
       show(error.message || 'Erro desconhecido.', 'error')
@@ -70,23 +81,84 @@ export function SettingsPage({ theme, onToggleTheme }: SettingsPageProps) {
   }
 
   const handleDelete = async (id: number) => {
-    if (!confirm('Tem certeza que deseja excluir este tipo?')) return
+    if (!api) return
+    if (!confirm('Tem certeza que deseja excluir este item?')) return
     try {
-      const result = await window.api['supplier-types'].delete(id)
+      const result = await api.delete(id)
       if (result.ok) {
-        show('Tipo de fornecedor excluído!')
+        show(`${title} excluído(a)!`)
         load()
       } else {
-        show(result.error || 'Erro ao excluir tipo.', 'error')
+        show(result.error || `Erro ao excluir ${title.toLowerCase()}.`, 'error')
       }
     } catch (error: any) {
       show(error.message || 'Erro desconhecido.', 'error')
     }
   }
 
+  if (!api) {
+    return (
+      <Section title={title}>
+        <div className="bg-error-container text-on-error-container p-4 rounded-lg text-sm">
+          <strong>Erro:</strong> A API para "{title}" não foi encontrada. Pode ser necessário
+          reiniciar a aplicação.
+        </div>
+      </Section>
+    )
+  }
+
+  return (
+    <Section title={title}>
+      {toast && <Toast message={toast.message} type={toast.type} />}
+      <div className="space-y-3 max-h-60 overflow-y-auto pr-2">
+        {items.map((item) => (
+          <div
+            key={item.id}
+            className="flex items-center justify-between bg-surface-container p-3 rounded-lg"
+          >
+            <div>
+              <p className="font-bold text-on-surface text-sm">{item.label}</p>
+              <p className="text-xs text-on-surface-variant font-mono">{item.value}</p>
+            </div>
+            <button
+              onClick={() => handleDelete(item.id)}
+              disabled={item.is_deletable === 0}
+              className="p-2 text-on-surface-variant rounded-full disabled:text-outline-variant/30 disabled:cursor-not-allowed hover:text-error enabled:hover:bg-error/10"
+              title={item.is_deletable === 0 ? 'Este item padrão não pode ser excluído' : 'Excluir'}
+            >
+              <span className="material-symbols-outlined text-xl">delete</span>
+            </button>
+          </div>
+        ))}
+      </div>
+
+      <div className="border-t border-outline-variant/20 pt-6">
+        <p className="text-sm font-bold text-on-surface mb-3">Adicionar Novo</p>
+        <form onSubmit={handleSubmit(onSubmit)} className="flex items-start gap-4">
+          <Input
+            placeholder="Rótulo..."
+            {...register('label')}
+            error={errors.label?.message}
+            className="flex-1"
+          />
+          <Button type="submit" size="sm" className="h-11">
+            Adicionar
+          </Button>
+        </form>
+      </div>
+    </Section>
+  )
+}
+
+// Main Settings Page Component
+interface SettingsPageProps {
+  theme: 'light' | 'dark'
+  onToggleTheme: () => void
+}
+
+export function SettingsPage({ theme, onToggleTheme }: SettingsPageProps) {
   return (
     <div className="p-12 max-w-7xl mx-auto">
-      {toast && <Toast message={toast.message} type={toast.type} />}
       <PageHeader
         pretitle="Administração"
         title="Configurações"
@@ -94,45 +166,9 @@ export function SettingsPage({ theme, onToggleTheme }: SettingsPageProps) {
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 mt-10 items-start">
-        {/* Coluna 1: Tipos de Fornecedor */}
-        <Section title="Tipos de Fornecedor">
-          <div className="space-y-3">
-            {types.map((type) => (
-              <div
-                key={type.id}
-                className="flex items-center justify-between bg-surface-container p-3 rounded-lg"
-              >
-                <div>
-                  <p className="font-bold text-on-surface text-sm">{type.label}</p>
-                  <p className="text-xs text-on-surface-variant font-mono">{type.value}</p>
-                </div>
-                <button
-                  onClick={() => handleDelete(type.id)}
-                  className="p-2 text-on-surface-variant hover:text-error rounded-full hover:bg-error/10"
-                >
-                  <span className="material-symbols-outlined text-xl">delete</span>
-                </button>
-              </div>
-            ))}
-          </div>
+        <DynamicTypeManager title="Tipos de Fornecedor" api={window.api['supplier-types']} />
+        <DynamicTypeManager title="Categorias de Custo" api={window.api['cost-categories']} />
 
-          <div className="border-t border-outline-variant/20 pt-6">
-            <p className="text-sm font-bold text-on-surface mb-3">Adicionar Novo Tipo</p>
-            <form onSubmit={handleSubmit(onSubmit)} className="flex items-start gap-4">
-              <Input
-                placeholder="Rótulo (ex: Novo Tipo)"
-                {...register('label')}
-                error={errors.label?.message}
-                className="flex-1"
-              />
-              <Button type="submit" size="sm" className="h-11">
-                Adicionar
-              </Button>
-            </form>
-          </div>
-        </Section>
-
-        {/* Coluna 2: Tema e Outras Configs */}
         <Section title="Tema e Aparência">
           <div className="flex items-center justify-between">
             <div>

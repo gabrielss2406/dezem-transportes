@@ -12,7 +12,7 @@ export function registerCostCategoryHandlers(): void {
   const db = () => getDb()
 
   ipcMain.handle('cost-categories:list', () => {
-    return db().prepare('SELECT * FROM cost_categories ORDER BY label').all()
+    return db().prepare('SELECT * FROM cost_categories ORDER BY is_deletable ASC, label ASC').all()
   })
 
   createValidatedHandler('cost-categories:create', costCategorySchema, (data) => {

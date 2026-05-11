@@ -12,7 +12,7 @@ export function registerSupplierTypesHandlers(): void {
   const db = () => getDb()
 
   ipcMain.handle('supplier-types:list', () => {
-    return db().prepare('SELECT * FROM supplier_types ORDER BY label').all()
+    return db().prepare('SELECT * FROM supplier_types ORDER BY is_deletable ASC, label ASC').all()
   })
 
   createValidatedHandler('supplier-types:create', supplierTypeSchema, (data) => {

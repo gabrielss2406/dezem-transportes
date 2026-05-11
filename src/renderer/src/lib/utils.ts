@@ -25,12 +25,3 @@ export function currentMonthKey(): string {
   const m = String(now.getMonth() + 1).padStart(2, '0')
   return `${y}-${m}`
 }
-
-export const COST_CATEGORIES = [
-  { value: 'fuel', label: 'Combustível' },
-  { value: 'oil', label: 'Óleo' },
-  { value: 'maintenance', label: 'Manutenção' },
-  { value: 'salary', label: 'Salário' },
-  { value: 'toll', label: 'Pedágio' },
-  { value: 'others', label: 'Outros' },
-]

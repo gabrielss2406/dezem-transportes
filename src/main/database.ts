@@ -148,6 +148,15 @@ export function setupDatabase(): void {
     db.prepare('INSERT INTO users (name, password_hash) VALUES (?, ?)').run('Admin', hash)
   }
 
+  // Migration: Add is_deletable to supplier_types if it doesn't exist
+  const supplierTypeInfo = db.pragma('table_info(supplier_types)') as { name: string }[]
+  if (!supplierTypeInfo.some((col) => col.name === 'is_deletable')) {
+    db.exec('ALTER TABLE supplier_types ADD COLUMN is_deletable INTEGER NOT NULL DEFAULT 1')
+    db.prepare(
+      `UPDATE supplier_types SET is_deletable = 0 WHERE value IN ('gas_station', 'workshop', 'quarry', 'other')`,
+    ).run()
+  }
+
   // Seed: default supplier types if none exist
   const supplierTypeCount = (db.prepare('SELECT COUNT(*) as c FROM supplier_types').get() as any).c
   if (supplierTypeCount === 0) {

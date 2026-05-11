@@ -14,12 +14,12 @@ import {
   useToast,
 } from '../components/ui'
 import type { Cost, Driver, Supplier, Truck } from '../lib/types'
-import { COST_CATEGORIES, currentMonthKey, formatBRL, formatDate } from '../lib/utils'
+import { currentMonthKey, formatBRL, formatDate } from '../lib/utils'
 
 const EMPTY = {
   date: '',
   category: '',
-  value: '',
+  value: 0,
   truck_id: '',
   supplier_id: '',
   driver_id: '',
@@ -37,6 +37,7 @@ const categoryBadge: Record<string, string> = {
 
 export function CostsPage() {
   const [costs, setCosts] = useState<Cost[]>([])
+  const [costCategories, setCostCategories] = useState<{ value: string; label: string }[]>([])
   const [trucks, setTrucks] = useState<Truck[]>([])
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [drivers, setDrivers] = useState<Driver[]>([])
@@ -58,13 +59,15 @@ export function CostsPage() {
   })
 
   const load = useCallback(async () => {
-    const [c, tr, s, d] = await Promise.all([
+    const [c, cc, tr, s, d] = await Promise.all([
       window.api.costs.list(),
+      window.api['cost-categories'].list(),
       window.api.trucks.list(),
       window.api.suppliers.list(),
       window.api.drivers.list(),
     ])
     setCosts(c)
+    setCostCategories(cc)
     setTrucks(tr)
     setSuppliers(s)
     setDrivers(d)
@@ -149,98 +152,6 @@ export function CostsPage() {
 
       {/* Asymmetric grid: form left, table right */}
       <div className="grid grid-cols-12 gap-8 items-start">
-        {/* Quick-add form */}
-        {/* <div className="col-span-4 bg-surface-container-low p-8 rounded-xl border-l-4 border-primary relative">
-          <h4 className="text-base font-headline font-bold mb-6 flex items-center gap-2 text-on-surface">
-            <span className="material-symbols-outlined text-primary">add_circle</span>
-            Lançar Custo
-          </h4>
-          <div className="space-y-4">
-            <Controller
-              name="category"
-              control={control}
-              render={({ field }) => (
-                <Select
-                  label="Categoria"
-                  value={field.value}
-                  onChange={field.onChange}
-                  error={errors.category?.message}
-                  options={COST_CATEGORIES}
-                />
-              )}
-            />
-            <DatePicker label="Data" {...register('date')} error={errors.date?.message} />
-            <Controller
-              name="value"
-              control={control}
-              render={({ field }) => (
-                <CurrencyInput
-                  label="Valor"
-                  value={field.value}
-                  onChange={field.onChange}
-                  error={errors.value?.message}
-                />
-              )}
-            />
-            <Controller
-              name="truck_id"
-              control={control}
-              render={({ field }) => (
-                <Select
-                  label="Veículo"
-                  optional
-                  value={field.value}
-                  onChange={field.onChange}
-                  error={errors.truck_id?.message}
-                  options={trucks.map((t) => ({ value: t.id, label: t.license_plate }))}
-                />
-              )}
-            />
-            <Controller
-              name="supplier_id"
-              control={control}
-              render={({ field }) => (
-                <Select
-                  label="Fornecedor"
-                  optional
-                  value={field.value}
-                  onChange={field.onChange}
-                  error={errors.supplier_id?.message}
-                  options={suppliers.map((s) => ({ value: s.id, label: s.name }))}
-                />
-              )}
-            />
-            <Controller
-              name="driver_id"
-              control={control}
-              render={({ field }) => (
-                <Select
-                  label="Motorista"
-                  optional
-                  value={field.value}
-                  onChange={field.onChange}
-                  error={errors.driver_id?.message}
-                  options={drivers.map((d) => ({ value: d.id, label: d.name }))}
-                />
-              )}
-            />
-            <Input
-              label="Descrição"
-              optional
-              {...register('description')}
-              error={errors.description?.message}
-              rows={2}
-              placeholder="Detalhes da despesa..."
-            />
-            <button
-              onClick={handleSubmit(onSubmit)}
-              className="w-full py-4 bg-primary text-on-primary font-bold rounded-lg shadow-xl shadow-primary/10 hover:brightness-110 active:scale-95 transition-all text-sm"
-            >
-              Confirmar Lançamento
-            </button>
-          </div>
-        </div> */}
-
         {/* Table */}
         <div className="col-span-12 space-y-6">
           {/* Category chips */}
@@ -256,7 +167,7 @@ export function CostsPage() {
               {!filterCategory && <span className="material-symbols-outlined text-sm">check</span>}
               Todos
             </button>
-            {COST_CATEGORIES.map((c) => (
+            {costCategories.map((c) => (
               <button
                 key={c.value}
                 onClick={() => setFilterCategory(filterCategory === c.value ? '' : c.value)}
@@ -297,7 +208,7 @@ export function CostsPage() {
                   </tr>
                 )}
                 {filtered.map((row) => {
-                  const cat = COST_CATEGORIES.find((c) => c.value === row.category)
+                  const cat = costCategories.find((c) => c.value === row.category)
                   return (
                     <tr key={row.id} className="hover:bg-surface-bright/5 transition-colors group">
                       <td className="px-6 py-4 text-sm text-on-surface-variant">
@@ -359,7 +270,7 @@ export function CostsPage() {
                     value={field.value}
                     onChange={field.onChange}
                     error={errors.category?.message}
-                    options={COST_CATEGORIES}
+                    options={costCategories}
                   />
                 )}
               />
