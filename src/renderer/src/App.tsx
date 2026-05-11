@@ -6,6 +6,7 @@ import { DashboardPage } from './pages/Dashboard'
 import { DesignSystemPage } from './pages/DesignSystem'
 import { LoginPage } from './pages/Login'
 import { OverviewPage } from './pages/Overview'
+import { SettingsPage } from './pages/Settings'
 import { TripsPage } from './pages/Trips'
 import { CustomersPage } from './pages/records/Customers'
 import { DriversPage } from './pages/records/Drivers'
@@ -52,7 +53,7 @@ function AppRoutes() {
         path="*"
         element={
           <div className="flex h-screen bg-surface overflow-hidden">
-            <Sidebar onLogout={handleLogout} theme={theme} onToggleTheme={toggleTheme} />
+            <Sidebar onLogout={handleLogout} />
             <main className="flex-1 overflow-y-auto">
               <Routes>
                 <Route path="/" element={<DashboardPage />} />
@@ -67,6 +68,10 @@ function AppRoutes() {
                 <Route path="/customers" element={<CustomersPage />} />
                 <Route path="/products" element={<ProductsPage />} />
                 <Route path="/suppliers" element={<SuppliersPage />} />
+                <Route
+                  path="/settings"
+                  element={<SettingsPage theme={theme} onToggleTheme={toggleTheme} />}
+                />
                 <Route path="/design-system" element={<DesignSystemPage />} />
               </Routes>
             </main>

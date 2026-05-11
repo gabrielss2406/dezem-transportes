@@ -2,12 +2,14 @@ import { join } from 'path'
 import { BrowserWindow, app, shell } from 'electron'
 import { setupDatabase } from './database'
 import { registerAuthHandlers } from './modules/auth/auth.handlers'
+import { registerCostCategoryHandlers } from './modules/cost-categories/cost-categories.handlers'
 import { registerCostHandlers } from './modules/costs/costs.handlers'
 import { registerCustomerHandlers } from './modules/customers/customers.handlers'
 import { registerDashboardHandlers } from './modules/dashboard/dashboard.handlers'
 import { registerDriverHandlers } from './modules/drivers/drivers.handlers'
 import { registerProductHandlers } from './modules/products/products.handlers'
 import { registerRouteHandlers } from './modules/routes/routes.handlers'
+import { registerSupplierTypesHandlers } from './modules/supplier-types/supplier-types.handlers'
 import { registerSupplierHandlers } from './modules/suppliers/suppliers.handlers'
 import { registerTripHandlers } from './modules/trips/trips.handlers'
 import { registerTruckHandlers } from './modules/trucks/trucks.handlers'
@@ -47,6 +49,7 @@ function createWindow(): void {
 app.whenReady().then(() => {
   setupDatabase()
   registerAuthHandlers()
+  registerCostCategoryHandlers()
   registerCostHandlers()
   registerCustomerHandlers()
   registerDashboardHandlers()
@@ -54,6 +57,7 @@ app.whenReady().then(() => {
   registerProductHandlers()
   registerRouteHandlers()
   registerSupplierHandlers()
+  registerSupplierTypesHandlers()
   registerTripHandlers()
   registerTruckHandlers()
 

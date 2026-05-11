@@ -33,6 +33,13 @@ contextBridge.exposeInMainWorld('api', {
     delete: (id: number) => ipcRenderer.invoke('suppliers:delete', id),
   },
 
+  // Supplier Types
+  'supplier-types': {
+    list: () => ipcRenderer.invoke('supplier-types:list'),
+    create: (data: any) => ipcRenderer.invoke('supplier-types:create', data),
+    delete: (id: number) => ipcRenderer.invoke('supplier-types:delete', id),
+  },
+
   // Trucks
   trucks: {
     list: (filters?: any) => ipcRenderer.invoke('trucks:list', filters),

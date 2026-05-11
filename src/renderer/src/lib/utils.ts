@@ -34,10 +34,3 @@ export const COST_CATEGORIES = [
   { value: 'toll', label: 'Pedágio' },
   { value: 'others', label: 'Outros' },
 ]
-
-export const SUPPLIER_TYPES = [
-  { value: 'gas_station', label: 'Posto' },
-  { value: 'workshop', label: 'Oficina' },
-  { value: 'quarry', label: 'Pedreira' },
-  { value: 'other', label: 'Outro' },
-]
