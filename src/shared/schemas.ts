@@ -40,6 +40,14 @@ const requiredNumber = (max: number, maxMsg: string) =>
 
 export const idSchema = z.number().int().positive()
 
+export const waypointSchema = z.object({
+  id: idSchema.optional(), // id is optional for new waypoints
+  name: z.string().min(1, 'Nome do ponto de parada é obrigatório').max(100),
+  sequence: z.number().int().min(0),
+})
+
+export const waypointsSchema = z.array(waypointSchema)
+
 export const customerSchema = z.object({
   name: z.string().min(3).max(100),
   cnpj: z
@@ -110,6 +118,7 @@ export const driverSchema = z.object({
 export const routeSchema = z.object({
   name: z.string().min(3).max(100),
   distance_km: requiredNumber(100000, 'Distância máxima de 100.000 km'),
+  customer_id: z.preprocess((val) => Number(val), z.number().positive('Selecione um cliente')),
 })
 
 export const tripSchema = z.object({

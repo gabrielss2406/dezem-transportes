@@ -7,6 +7,7 @@ const navItems = [
   { path: '/suppliers', label: 'Fornecedores', icon: 'handshake' },
   { path: '/trucks', label: 'Caminhões', icon: 'local_shipping' },
   { path: '/drivers', label: 'Motoristas', icon: 'badge' },
+  { path: '/routes', label: 'Rotas', icon: 'map' },
   { path: '/trips', label: 'Viagens', icon: 'route' },
   { path: '/costs', label: 'Custos', icon: 'payments' },
   { path: '/settings', label: 'Configurações', icon: 'settings' },
