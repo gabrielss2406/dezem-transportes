@@ -213,14 +213,20 @@ export function DesignSystemPage() {
         <div className="bg-surface-container rounded-xl p-8 border border-outline-variant/10 mt-4">
           <Label>CTA Primário (página) — usado nos headers das páginas</Label>
           <div className="mt-3">
-            <button className="flex items-center gap-3 bg-primary text-on-primary px-8 py-4 rounded font-bold text-sm shadow-lg shadow-primary/20 hover:brightness-110 active:scale-95 transition-all">
+            <button
+              type="button"
+              className="flex items-center gap-3 bg-primary text-on-primary px-8 py-4 rounded font-bold text-sm shadow-lg shadow-primary/20 hover:brightness-110 active:scale-95 transition-all"
+            >
               <span className="material-symbols-outlined">add</span>
               Nova Viagem
             </button>
           </div>
           <Label>CTA Outline — variante usada em Produtos</Label>
           <div className="mt-3">
-            <button className="flex items-center gap-2 bg-surface-container-low border border-primary/20 text-primary px-8 py-4 rounded font-bold text-sm hover:bg-primary hover:text-on-primary active:scale-95 transition-all">
+            <button
+              type="button"
+              className="flex items-center gap-2 bg-surface-container-low border border-primary/20 text-primary px-8 py-4 rounded font-bold text-sm hover:bg-primary hover:text-on-primary active:scale-95 transition-all"
+            >
               <span className="material-symbols-outlined">add</span>
               Novo Produto
             </button>
@@ -400,10 +406,16 @@ export function DesignSystemPage() {
                     <td className="px-6 py-4 text-sm text-on-surface">{row.salary}</td>
                     <td className="px-6 py-4">
                       <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button className="p-2 text-outline hover:text-primary hover:bg-primary/10 rounded-lg transition-all">
+                        <button
+                          type="button"
+                          className="p-2 text-outline hover:text-primary hover:bg-primary/10 rounded-lg transition-all"
+                        >
                           <span className="material-symbols-outlined text-xl">edit</span>
                         </button>
-                        <button className="p-2 text-outline hover:text-error hover:bg-error/10 rounded-lg transition-all">
+                        <button
+                          type="button"
+                          className="p-2 text-outline hover:text-error hover:bg-error/10 rounded-lg transition-all"
+                        >
                           <span className="material-symbols-outlined text-xl">delete</span>
                         </button>
                       </div>

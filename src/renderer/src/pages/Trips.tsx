@@ -2,16 +2,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { useCallback, useEffect, useState } from 'react'
 import { Controller, useFieldArray, useForm } from 'react-hook-form'
 import { tripSchema } from '../../../shared/schemas'
-import type {
-  Customer,
-  Driver,
-  FuelStop,
-  Product,
-  Route,
-  Supplier,
-  Trip,
-  Truck,
-} from '../../lib/types'
+import type { Customer, Driver, Product, Route, Supplier, Trip, Truck } from '../../lib/types'
 import { PageHeader } from '../components/PageHeader'
 import {
   Badge,
@@ -72,7 +63,6 @@ export function TripsPage() {
   const {
     register,
     handleSubmit,
-    setValue,
     formState: { errors },
     reset,
     control,
@@ -119,7 +109,7 @@ export function TripsPage() {
       reset(EMPTY)
       setStopSearchId('')
     }
-  }, [modal])
+  }, [modal, reset])
 
   const onSubmit = async (data: Omit<Trip, 'id'>) => {
     try {
@@ -133,14 +123,18 @@ export function TripsPage() {
   }
 
   async function handleDelete(row: Trip) {
-    if (!confirm('Excluir esta viagem?')) return
+    if (!confirm('Excluir esta viagem?')) {
+      return
+    }
     await window.api.trips.delete(row.id)
     show('Viagem excluída', 'success')
     load()
   }
 
   const handleAddStop = (supplierId: string | number) => {
-    if (!supplierId) return
+    if (!supplierId) {
+      return
+    }
     const supplier = suppliers.find((s) => String(s.id) === String(supplierId))
     if (supplier) {
       append({ supplier_id: supplier.id, value: 0, liters: 0, km_driven: 0 })
@@ -320,6 +314,7 @@ export function TripsPage() {
                 <td className="px-6 py-4">
                   <div className="flex justify-end opacity-0 group-hover:opacity-100 transition-opacity">
                     <button
+                      type="button"
                       onClick={() => handleDelete(row)}
                       className="p-2 text-on-surface-variant hover:text-error hover:bg-error/10 rounded-lg transition-all"
                     >
@@ -524,6 +519,7 @@ export function TripsPage() {
                           </span>
                         </div>
                         <button
+                          type="button"
                           onClick={() => remove(index)}
                           className="text-on-surface-variant hover:text-error transition-colors"
                           title="Remover parada"
@@ -580,7 +576,9 @@ export function TripsPage() {
                                 label={`${(() => {
                                   const liters = watch(`fuel_stops.${index}.liters` as any)
                                   const km = watch(`fuel_stops.${index}.km_driven` as any)
-                                  if (!liters || !km) return '0.00'
+                                  if (!liters || !km) {
+                                    return '0.00'
+                                  }
                                   return (Number(km) / Number(liters)).toFixed(2)
                                 })()} km/L`}
                               />
@@ -605,6 +603,7 @@ export function TripsPage() {
                 Cancelar
               </Button>
               <button
+                type="button"
                 onClick={handleSubmit(onSubmit)}
                 className="flex items-center gap-3 px-8 py-3 bg-primary text-on-primary font-extrabold rounded transition-all hover:brightness-110 active:scale-95 shadow-lg shadow-primary/20"
               >

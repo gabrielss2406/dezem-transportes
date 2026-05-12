@@ -48,7 +48,6 @@ export function CostsPage() {
   const {
     register,
     handleSubmit,
-    setValue,
     formState: { errors },
     reset,
     control,
@@ -82,7 +81,7 @@ export function CostsPage() {
     if (!modal) {
       reset(EMPTY)
     }
-  }, [modal])
+  }, [modal, reset])
 
   const onSubmit = async (data: Omit<Cost, 'id'>) => {
     try {
@@ -97,7 +96,9 @@ export function CostsPage() {
   }
 
   async function handleDelete(row: Cost) {
-    if (!confirm('Excluir este custo?')) return
+    if (!confirm('Excluir este custo?')) {
+      return
+    }
     await window.api.costs.delete(row.id)
     show('Custo excluído')
     load()
@@ -130,6 +131,7 @@ export function CostsPage() {
           </div>
           <div className="flex gap-3">
             <button
+              type="button"
               onClick={issueSalaries}
               className="flex items-center gap-2 px-4 py-2.5 text-sm font-bold border border-outline-variant/30 text-on-surface-variant hover:text-on-surface hover:border-primary/40 rounded transition-all"
             >
@@ -137,6 +139,7 @@ export function CostsPage() {
               Lançar Salários
             </button>
             <button
+              type="button"
               onClick={() => {
                 reset(EMPTY)
                 setModal(true)
@@ -157,6 +160,7 @@ export function CostsPage() {
           {/* Category chips */}
           <div className="flex flex-wrap gap-2">
             <button
+              type="button"
               onClick={() => setFilterCategory('')}
               className={`px-4 py-2 rounded text-xs font-bold flex items-center gap-1.5 transition-colors ${
                 !filterCategory
@@ -169,6 +173,7 @@ export function CostsPage() {
             </button>
             {costCategories.map((c) => (
               <button
+                type="button"
                 key={c.value}
                 onClick={() => setFilterCategory(filterCategory === c.value ? '' : c.value)}
                 className={`px-4 py-2 rounded text-xs font-bold transition-colors ${
@@ -241,6 +246,7 @@ export function CostsPage() {
                       <td className="px-6 py-4">
                         <div className="flex justify-end opacity-0 group-hover:opacity-100 transition-opacity">
                           <button
+                            type="button"
                             onClick={() => handleDelete(row)}
                             className="p-2 text-on-surface-variant hover:text-error hover:bg-error/10 rounded-lg transition-all"
                           >

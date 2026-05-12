@@ -5,19 +5,27 @@ import { isValidCNPJ, isValidCPF, isValidPhone } from './validation'
 // Configuração global de mensagens em Português
 z.setErrorMap((issue, ctx) => {
   if (issue.code === z.ZodIssueCode.invalid_type) {
-    if (issue.received === 'undefined') return { message: 'Obrigatório' }
+    if (issue.received === 'undefined') {
+      return { message: 'Obrigatório' }
+    }
     return { message: 'Valor inválido' }
   }
   if (issue.code === z.ZodIssueCode.too_small) {
-    if (issue.type === 'string') return { message: `Mínimo de ${issue.minimum} caracteres` }
+    if (issue.type === 'string') {
+      return { message: `Mínimo de ${issue.minimum} caracteres` }
+    }
     return { message: `Valor mínimo é ${issue.minimum}` }
   }
   if (issue.code === z.ZodIssueCode.too_big) {
-    if (issue.type === 'string') return { message: `Máximo de ${issue.maximum} caracteres` }
+    if (issue.type === 'string') {
+      return { message: `Máximo de ${issue.maximum} caracteres` }
+    }
     return { message: `Valor máximo permitido é ${issue.maximum}` }
   }
   if (issue.code === z.ZodIssueCode.invalid_string) {
-    if (issue.validation === 'email') return { message: 'E-mail inválido' }
+    if (issue.validation === 'email') {
+      return { message: 'E-mail inválido' }
+    }
     return { message: 'Formato inválido' }
   }
   if (issue.code === z.ZodIssueCode.custom) {

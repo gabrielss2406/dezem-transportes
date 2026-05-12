@@ -16,22 +16,22 @@
     "rules": {
       "recommended": true,
       "style": {
-        "useBlockStatements": "off",
-        "noParameterAssign": "off",
+        "useBlockStatements": "error",
+        "noParameterAssign": "error",
         "useNodejsImportProtocol": "off"
       },
       "suspicious": {
         "noExplicitAny": "off"
       },
       "complexity": {
-        "useLiteralKeys": "off"
+        "useLiteralKeys": "error"
       },
       "correctness": {
-        "useExhaustiveDependencies": "off"
+        "useExhaustiveDependencies": "error"
       },
       "a11y": {
-        "noLabelWithoutControl": "off",
-        "useButtonType": "off"
+        "noLabelWithoutControl": "error",
+        "useButtonType": "error"
       }
     }
   },

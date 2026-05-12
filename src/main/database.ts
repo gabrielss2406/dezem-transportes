@@ -194,7 +194,9 @@ export function setupDatabase(): void {
       'INSERT INTO supplier_types (value, label, is_deletable) VALUES (?, ?, ?)',
     )
     const transaction = db.transaction((types) => {
-      for (const type of types) stmt.run(type.value, type.label, type.is_deletable)
+      for (const type of types) {
+        stmt.run(type.value, type.label, type.is_deletable)
+      }
     })
     transaction([
       { value: 'gas_station', label: 'Posto de Combustível', is_deletable: 0 },
@@ -211,7 +213,9 @@ export function setupDatabase(): void {
       'INSERT INTO cost_categories (value, label, is_deletable) VALUES (?, ?, ?)',
     )
     const transaction = db.transaction((types) => {
-      for (const type of types) stmt.run(type.value, type.label, type.is_deletable)
+      for (const type of types) {
+        stmt.run(type.value, type.label, type.is_deletable)
+      }
     })
     transaction([
       { value: 'fuel', label: 'Combustível', is_deletable: 0 },

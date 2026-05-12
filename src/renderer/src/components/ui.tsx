@@ -39,7 +39,9 @@ interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
 }
 export const Input = forwardRef<HTMLInputElement, InputProps>(
   ({ label, optional, error, mask, className = '', ...props }, ref) => {
+    const id = React.useId()
     const commonProps = {
+      id,
       className: `bg-surface-container-lowest border border-outline-variant/30 rounded-lg px-4 py-3 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all ${
         error ? 'border-error' : ''
       } ${className}`,
@@ -49,7 +51,10 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
     return (
       <div className="flex flex-col gap-1.5">
         {label && (
-          <label className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
+          <label
+            htmlFor={id}
+            className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant"
+          >
             {label}{' '}
             {optional && <span className="text-outline font-normal normal-case">(opcional)</span>}
           </label>
@@ -74,16 +79,21 @@ interface DatePickerProps extends React.InputHTMLAttributes<HTMLInputElement> {
 
 export const DatePicker = forwardRef<HTMLInputElement, DatePickerProps>(
   ({ label, optional, error, className = '', ...props }, ref) => {
+    const id = React.useId()
     return (
       <div className="flex flex-col gap-1.5">
         {label && (
-          <label className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
+          <label
+            htmlFor={id}
+            className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant"
+          >
             {label}{' '}
             {optional && <span className="text-outline font-normal normal-case">(opcional)</span>}
           </label>
         )}
         <div className="relative group">
           <input
+            id={id}
             type="date"
             ref={ref}
             className={`w-full bg-surface-container-lowest border border-outline-variant/30 rounded-lg px-4 py-3 text-sm text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all appearance-none ${error ? 'border-error' : ''} ${className}`}
@@ -119,6 +129,7 @@ export function CurrencyInput({
   placeholder = '0,00',
   className = '',
 }: CurrencyInputProps) {
+  const id = React.useId()
   const format = (val: number | string) => {
     const n = typeof val === 'number' ? val : Number(val) || 0
     return new Intl.NumberFormat('pt-BR', {
@@ -136,7 +147,10 @@ export function CurrencyInput({
   return (
     <div className="flex flex-col gap-1.5">
       {label && (
-        <label className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
+        <label
+          htmlFor={id}
+          className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant"
+        >
           {label}{' '}
           {optional && <span className="text-outline font-normal normal-case">(opcional)</span>}
         </label>
@@ -146,6 +160,7 @@ export function CurrencyInput({
           R$
         </span>
         <input
+          id={id}
           type="text"
           value={format(value)}
           onChange={handleChange}
@@ -189,6 +204,7 @@ export function Select({
   const searchInputRef = useRef<HTMLInputElement>(null)
   const [coords, setCoords] = useState({ top: 0, left: 0, width: 0 })
   const uniqueId = useRef(Math.random())
+  const id = React.useId()
 
   useEffect(() => {
     const handleClose = (e: CustomEvent) => {
@@ -205,9 +221,15 @@ export function Select({
   const selectedOption = options.find((o) => String(o.value) === String(value))
 
   const getSearchableLabel = (option: (typeof options)[0]): string => {
-    if (option.displayLabel) return option.displayLabel
-    if (typeof option.label === 'string') return option.label
-    if (typeof option.label === 'number') return String(option.label)
+    if (option.displayLabel) {
+      return option.displayLabel
+    }
+    if (typeof option.label === 'string') {
+      return option.label
+    }
+    if (typeof option.label === 'number') {
+      return String(option.label)
+    }
     return ''
   }
 
@@ -215,7 +237,7 @@ export function Select({
     getSearchableLabel(option).toLowerCase().includes(searchTerm.toLowerCase()),
   )
 
-  const updateCoords = () => {
+  const updateCoords = React.useCallback(() => {
     if (buttonRef.current) {
       const rect = buttonRef.current.getBoundingClientRect()
       setCoords({
@@ -224,7 +246,7 @@ export function Select({
         width: rect.width,
       })
     }
-  }
+  }, [])
 
   useEffect(() => {
     if (isOpen) {
@@ -238,7 +260,7 @@ export function Select({
       window.removeEventListener('resize', updateCoords)
       window.removeEventListener('scroll', updateCoords, true)
     }
-  }, [isOpen])
+  }, [isOpen, updateCoords])
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -255,13 +277,17 @@ export function Select({
   return (
     <div className={`flex flex-col gap-1.5 relative ${className}`} ref={containerRef}>
       {label && (
-        <label className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
+        <label
+          htmlFor={id}
+          className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant"
+        >
           {label}{' '}
           {optional && <span className="text-outline font-normal normal-case">(opcional)</span>}
         </label>
       )}
 
       <button
+        id={id}
         ref={buttonRef}
         type="button"
         onClick={(e) => {
@@ -296,6 +322,7 @@ export function Select({
       {isOpen &&
         createPortal(
           <button
+            type="button"
             className="fixed z-[9999] bg-surface-container-low border border-outline-variant/20 rounded-xl shadow-2xl overflow-hidden"
             onMouseDown={(e) => e.stopPropagation()}
             onClick={(e) => e.stopPropagation()}
@@ -452,6 +479,7 @@ export function Modal({ title, onClose, children }: ModalProps) {
         <div className="flex items-center justify-between px-6 py-4 border-b border-outline-variant/10">
           <h2 className="font-headline font-bold text-on-surface text-lg">{title}</h2>
           <button
+            type="button"
             onClick={onClose}
             className="text-on-surface-variant hover:text-on-surface text-2xl font-light leading-none transition-colors"
           >
@@ -518,6 +546,7 @@ export function Table({ columns, data, onEdit, onDelete }: TableProps) {
                   <div className="flex gap-1 justify-end opacity-0 group-hover:opacity-100 transition-opacity">
                     {onEdit && (
                       <button
+                        type="button"
                         onClick={() => onEdit(row)}
                         className="p-2 text-on-surface-variant hover:text-primary hover:bg-primary/10 rounded-lg transition-all"
                         title="Editar"
@@ -527,6 +556,7 @@ export function Table({ columns, data, onEdit, onDelete }: TableProps) {
                     )}
                     {onDelete && (
                       <button
+                        type="button"
                         onClick={() => onDelete(row)}
                         className="p-2 text-on-surface-variant hover:text-error hover:bg-error/10 rounded-lg transition-all"
                         title="Excluir"

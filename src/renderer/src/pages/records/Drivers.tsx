@@ -8,6 +8,7 @@ import type { Driver, Truck } from '../../lib/types'
 import { formatBRL } from '../../lib/utils'
 
 const EMPTY = { name: '', cpf: '', phone: '', monthly_salary: '', truck_id: '' }
+const FORM_EMPTY = { ...EMPTY, monthly_salary: 0, truck_id: null }
 
 function initials(name: string) {
   return name
@@ -27,12 +28,9 @@ export function DriversPage() {
   const [appliedFilters, setAppliedFilters] = useState({ name: '', cpf: '', truck_id: '' })
   const { toast, show } = useToast()
 
-  const FORM_EMPTY = { ...EMPTY, monthly_salary: 0, truck_id: null }
-
   const {
     register,
     handleSubmit,
-    setValue,
     formState: { errors },
     reset,
     watch,
@@ -68,7 +66,7 @@ export function DriversPage() {
       setEditing(null)
       reset(FORM_EMPTY)
     }
-  }, [modal])
+  }, [modal, reset])
 
   const onSubmit = async (data: Omit<Driver, 'id'>) => {
     try {
@@ -94,7 +92,9 @@ export function DriversPage() {
   }
 
   async function handleDelete(row: Driver) {
-    if (!confirm('Excluir este motorista?')) return
+    if (!confirm('Excluir este motorista?')) {
+      return
+    }
     await window.api.drivers.delete(row.id)
     show('Motorista excluído')
     load()
@@ -170,6 +170,7 @@ export function DriversPage() {
             />
           </div>
           <button
+            type="button"
             onClick={() => setAppliedFilters(filters)}
             className="bg-primary text-on-primary px-4 py-1.5 rounded-md font-bold text-xs hover:brightness-110 active:scale-95 transition-all ml-1 mr-0.5"
           >
@@ -261,12 +262,14 @@ export function DriversPage() {
                 <td className="px-6 py-4">
                   <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button
+                      type="button"
                       onClick={() => edit(row)}
                       className="p-2 text-outline hover:text-primary hover:bg-primary/10 rounded-lg transition-all"
                     >
                       <span className="material-symbols-outlined text-xl">edit</span>
                     </button>
                     <button
+                      type="button"
                       onClick={() => handleDelete(row)}
                       className="p-2 text-outline hover:text-error hover:bg-error/10 rounded-lg transition-all"
                     >

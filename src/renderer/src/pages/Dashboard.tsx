@@ -55,7 +55,7 @@ export function DashboardPage() {
       setSummary(r)
       setLoading(false)
     })
-  }, [])
+  }, [range.start, range.end])
 
   const now = new Date()
   const monthLabel = now.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })

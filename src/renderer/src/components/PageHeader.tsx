@@ -34,6 +34,7 @@ export function PageHeader({
         {children}
         {actionLabel && onAction && (
           <button
+            type="button"
             onClick={onAction}
             className="flex items-center gap-2 bg-primary text-on-primary px-6 py-3 rounded font-bold text-sm shadow-lg shadow-primary/20 hover:brightness-110 active:scale-95 transition-all"
           >

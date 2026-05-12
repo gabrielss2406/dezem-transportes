@@ -27,7 +27,6 @@ export function SuppliersPage() {
   const {
     register,
     handleSubmit,
-    setValue,
     formState: { errors },
     reset,
     control,
@@ -64,7 +63,7 @@ export function SuppliersPage() {
       setEditing(null)
       reset(EMPTY)
     }
-  }, [modal])
+  }, [modal, reset])
 
   const onSubmit = async (data: Omit<Supplier, 'id'>) => {
     try {
@@ -90,7 +89,9 @@ export function SuppliersPage() {
   }
 
   async function handleDelete(row: Supplier) {
-    if (!confirm('Excluir este fornecedor?')) return
+    if (!confirm('Excluir este fornecedor?')) {
+      return
+    }
     await window.api.suppliers.delete(row.id)
     show('Fornecedor excluído')
     load()
@@ -128,7 +129,9 @@ export function SuppliersPage() {
               value={filters.name}
               onChange={(e) => setFilters((f) => ({ ...f, name: e.target.value }))}
               onKeyDown={(e) => {
-                if (e.key === 'Enter') setAppliedFilters(filters)
+                if (e.key === 'Enter') {
+                  setAppliedFilters(filters)
+                }
               }}
               className="pl-10 pr-3 py-2 bg-transparent border-none w-48 focus:ring-0 transition-all placeholder:text-outline/50 text-sm outline-none text-on-surface"
             />
@@ -145,6 +148,7 @@ export function SuppliersPage() {
             />
           </div>
           <button
+            type="button"
             onClick={() => setAppliedFilters(filters)}
             className="bg-primary text-on-primary px-4 py-1.5 rounded-md font-bold text-xs hover:brightness-110 active:scale-95 transition-all ml-1 mr-0.5"
           >
@@ -234,12 +238,14 @@ export function SuppliersPage() {
                   <td className="px-8 py-5">
                     <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                       <button
+                        type="button"
                         onClick={() => edit(row)}
                         className="p-2 text-on-surface-variant hover:text-primary transition-colors"
                       >
                         <span className="material-symbols-outlined text-xl">edit</span>
                       </button>
                       <button
+                        type="button"
                         onClick={() => handleDelete(row)}
                         className="p-2 text-on-surface-variant hover:text-error transition-colors"
                       >

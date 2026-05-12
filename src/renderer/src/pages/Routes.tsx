@@ -94,7 +94,6 @@ export function RoutesPage() {
   const {
     register,
     handleSubmit,
-    setValue,
     formState: { errors },
     reset,
     control,
@@ -115,25 +114,28 @@ export function RoutesPage() {
     } catch (e: any) {
       show(e.message || 'Erro ao carregar dados', 'error')
     }
-  }, [search])
+  }, [search, show])
 
-  const loadWaypoints = useCallback(async (routeId: number) => {
-    try {
-      const data: { id: number; name: string; sequence: number }[] = await (
-        window as any
-      ).api.routes.getWaypoints(routeId)
-      setWaypoints(
-        data.map((wp) => ({
-          id: crypto.randomUUID(),
-          db_id: wp.id,
-          name: wp.name,
-          sequence: wp.sequence,
-        })),
-      )
-    } catch (e: any) {
-      show('Erro ao carregar pontos de parada', 'error')
-    }
-  }, [])
+  const loadWaypoints = useCallback(
+    async (routeId: number) => {
+      try {
+        const data: { id: number; name: string; sequence: number }[] = await (
+          window as any
+        ).api.routes.getWaypoints(routeId)
+        setWaypoints(
+          data.map((wp) => ({
+            id: crypto.randomUUID(),
+            db_id: wp.id,
+            name: wp.name,
+            sequence: wp.sequence,
+          })),
+        )
+      } catch (e: any) {
+        show('Erro ao carregar pontos de parada', 'error')
+      }
+    },
+    [show],
+  )
 
   useEffect(() => {
     load()
@@ -146,7 +148,7 @@ export function RoutesPage() {
       setWaypoints([])
       setNewWaypointName('')
     }
-  }, [modal])
+  }, [modal, reset])
 
   const onSubmit = async (data: Omit<Route, 'id'>) => {
     try {
@@ -174,7 +176,9 @@ export function RoutesPage() {
   }
 
   async function handleDelete(row: Route) {
-    if (!confirm('Excluir esta rota?')) return
+    if (!confirm('Excluir esta rota?')) {
+      return
+    }
     await (window as any).api.routes.delete(row.id)
     show('Rota excluída')
     load()
@@ -299,12 +303,14 @@ export function RoutesPage() {
                 <td className="px-8 py-5">
                   <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button
+                      type="button"
                       onClick={() => edit(row)}
                       className="p-2 text-outline hover:text-primary hover:bg-primary/10 rounded-lg transition-all"
                     >
                       <span className="material-symbols-outlined text-xl">edit</span>
                     </button>
                     <button
+                      type="button"
                       onClick={() => handleDelete(row)}
                       className="p-2 text-outline hover:text-error hover:bg-error/10 rounded-lg transition-all"
                     >
@@ -366,6 +372,7 @@ export function RoutesPage() {
                   />
                 </div>
                 <button
+                  type="button"
                   onClick={addWaypoint}
                   className="bg-surface-container-highest text-on-surface px-4 rounded-lg font-bold text-sm hover:bg-primary hover:text-on-primary transition-all"
                 >

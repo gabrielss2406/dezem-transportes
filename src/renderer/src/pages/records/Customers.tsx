@@ -18,7 +18,6 @@ export function CustomersPage() {
   const {
     register,
     handleSubmit,
-    setValue,
     formState: { errors },
     reset,
     watch,
@@ -46,7 +45,7 @@ export function CustomersPage() {
       setEditing(null)
       reset(EMPTY)
     }
-  }, [modal])
+  }, [modal, reset])
 
   const onSubmit = async (data: Omit<Customer, 'id'>) => {
     try {
@@ -72,7 +71,9 @@ export function CustomersPage() {
   }
 
   async function handleDelete(row: Customer) {
-    if (!confirm('Excluir este cliente?')) return
+    if (!confirm('Excluir este cliente?')) {
+      return
+    }
     await window.api.customers.delete(row.id)
     show('Cliente excluído')
     load()
@@ -166,12 +167,14 @@ export function CustomersPage() {
                 <td className="px-8 py-5">
                   <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button
+                      type="button"
                       onClick={() => edit(row)}
                       className="p-2 text-outline hover:text-primary hover:bg-primary/10 rounded-lg transition-all"
                     >
                       <span className="material-symbols-outlined text-xl">edit</span>
                     </button>
                     <button
+                      type="button"
                       onClick={() => handleDelete(row)}
                       className="p-2 text-outline hover:text-error hover:bg-error/10 rounded-lg transition-all"
                     >
