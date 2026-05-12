@@ -13,12 +13,13 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
+import { zodResolver } from '@hookform/resolvers/zod'
 import { useCallback, useEffect, useState } from 'react'
-import { toast } from 'sonner'
-import type { z } from 'zod'
+import { Controller, useForm } from 'react-hook-form'
 import { routeSchema } from '../../../shared/schemas'
 import { PageHeader } from '../components/PageHeader'
-import { cn } from '../lib/utils'
+import { Badge, Button, Input, Modal, Select, Toast, useToast } from '../components/ui'
+import type { Customer, Route } from '../lib/types'
 
 type Waypoint = {
   id: string // Client-side generated ID for dnd-kit
@@ -27,20 +28,10 @@ type Waypoint = {
   sequence: number
 }
 
-type Route = {
-  id: number
-  name: string
-  distance_km: number
-  customer_id: number
-  customer_name: string
-}
-
-type FormState = z.infer<typeof routeSchema>
-
-const initialFormState: FormState = {
+const EMPTY = {
   name: '',
   distance_km: 0,
-  customer_id: 0,
+  customer_id: null,
 }
 
 // Componente para um waypoint arrastável
@@ -58,7 +49,7 @@ function SortableWaypoint({
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
-    zIndex: isDragging ? 10 : 0, // Garante que o item arrastado fique acima
+    zIndex: isDragging ? 10 : 0,
   }
 
   return (
@@ -67,160 +58,141 @@ function SortableWaypoint({
       style={style}
       {...attributes}
       {...listeners}
-      className="p-2 border border-outline-variant/30 rounded-md mb-1 bg-surface-container-low flex items-center justify-between gap-2 cursor-grab"
+      className="p-3 border border-outline-variant/20 rounded-lg mb-2 bg-surface-container-lowest flex items-center justify-between gap-2 cursor-grab group/item"
     >
-      <div className="flex items-center gap-2">
-        <span className="material-symbols-outlined text-sm opacity-60">drag_handle</span>
-        {waypoint.name}
+      <div className="flex items-center gap-3">
+        <span className="material-symbols-outlined text-sm text-outline opacity-40">
+          drag_handle
+        </span>
+        <span className="text-sm text-on-surface font-medium">{waypoint.name}</span>
       </div>
       <button
         type="button"
+        onMouseDown={(e) => e.stopPropagation()} // Importante para não disparar o drag
         onClick={() => onRemove(waypoint.id)}
-        className="text-error hover:text-error-container material-symbols-outlined text-sm"
+        className="w-8 h-8 flex items-center justify-center text-outline hover:text-error hover:bg-error/10 rounded-lg transition-all"
         title="Remover ponto"
       >
-        delete
+        <span className="material-symbols-outlined text-lg">delete</span>
       </button>
     </li>
   )
 }
 
 export function RoutesPage() {
-  const [routes, setRoutes] = useState<Route[]>([])
+  const [rows, setRows] = useState<Route[]>([])
   const [customers, setCustomers] = useState<Customer[]>([])
-  const [selectedRouteId, setSelectedRouteId] = useState<number | null>(null)
-  const [formState, setFormState] = useState<Partial<FormState & { id: number }>>(initialFormState)
-  const [errors, setErrors] = useState<Record<string, string>>({})
+  const [modal, setModal] = useState(false)
+  const [editing, setEditing] = useState<Route | null>(null)
+  const [search, setSearch] = useState('')
   const [waypoints, setWaypoints] = useState<Waypoint[]>([])
   const [newWaypointName, setNewWaypointName] = useState('')
 
+  const { toast, show } = useToast()
   const sensors = useSensors(useSensor(MouseSensor), useSensor(TouchSensor))
 
-  const loadData = useCallback(async () => {
+  const {
+    register,
+    handleSubmit,
+    setValue,
+    formState: { errors },
+    reset,
+    control,
+  } = useForm<Omit<Route, 'id'>>({
+    resolver: zodResolver(routeSchema),
+    defaultValues: { ...EMPTY },
+    mode: 'all',
+  })
+
+  const load = useCallback(async () => {
     try {
-      const [routesData, customersData] = await Promise.all([
-        (window as any).api.routes.list(),
-        (window as any).api.customers.list(),
+      const [r, c] = await Promise.all([
+        (window as any).api.routes.list(search),
+        window.api.customers.list(),
       ])
-      setRoutes(routesData)
-      setCustomers(customersData)
-    } catch (err: any) {
-      toast.error(`Falha ao carregar dados: ${err.message}`)
+      setRows(r)
+      setCustomers(c)
+    } catch (e: any) {
+      show(e.message || 'Erro ao carregar dados', 'error')
     }
-  }, [])
+  }, [search])
 
   const loadWaypoints = useCallback(async (routeId: number) => {
     try {
-      const waypointsData: { id: number; name: string; sequence: number }[] = await (
+      const data: { id: number; name: string; sequence: number }[] = await (
         window as any
       ).api.routes.getWaypoints(routeId)
       setWaypoints(
-        waypointsData.map((wp) => ({
-          id: crypto.randomUUID(), // Client-side ID
-          db_id: wp.id, // Database ID
+        data.map((wp) => ({
+          id: crypto.randomUUID(),
+          db_id: wp.id,
           name: wp.name,
           sequence: wp.sequence,
         })),
       )
-    } catch (err: any) {
-      toast.error(`Falha ao carregar pontos de parada: ${err.message}`)
+    } catch (e: any) {
+      show('Erro ao carregar pontos de parada', 'error')
     }
   }, [])
 
   useEffect(() => {
-    loadData()
-  }, [loadData])
+    load()
+  }, [load])
 
   useEffect(() => {
-    if (selectedRouteId) {
-      const route = routes.find((r) => r.id === selectedRouteId)
-      if (route) {
-        setFormState(route)
-        setErrors({})
-        loadWaypoints(selectedRouteId)
-      }
-    } else {
-      setFormState(initialFormState)
-      setErrors({})
+    if (!modal) {
+      setEditing(null)
+      reset({ ...EMPTY })
       setWaypoints([])
+      setNewWaypointName('')
     }
-  }, [selectedRouteId, routes, loadWaypoints])
+  }, [modal])
 
-  const handleSelectRoute = (route: Route) => {
-    setSelectedRouteId(route.id)
-  }
-
-  const handleNew = () => {
-    setSelectedRouteId(null)
-    setFormState(initialFormState)
-    setWaypoints([])
-  }
-
-  const validate = () => {
-    const result = routeSchema.safeParse(formState)
-    if (!result.success) {
-      const newErrors: Record<string, string> = {}
-      for (const error of result.error.errors) {
-        newErrors[error.path[0]] = error.message
-      }
-      setErrors(newErrors)
-      return false
-    }
-    setErrors({})
-    return true
-  }
-
-  const handleSave = async () => {
-    if (!validate()) {
-      toast.error('Por favor, corrija os erros no formulário.')
-      return
-    }
-
-    const data = formState as FormState
+  const onSubmit = async (data: Omit<Route, 'id'>) => {
     try {
-      let result: { id: number }
-      if ('id' in formState && formState.id) {
-        // Update
-        result = await (window as any).api.routes.update({ ...data, id: formState.id })
-        toast.success('Rota atualizada com sucesso!')
+      let routeId: number
+      if (editing) {
+        await (window as any).api.routes.update({ ...data, id: editing.id })
+        routeId = editing.id
       } else {
-        // Create
-        result = await (window as any).api.routes.create(data)
-        toast.success('Rota criada com sucesso!')
+        const res = await (window as any).api.routes.create(data)
+        routeId = res.id
       }
-      setSelectedRouteId(result.id) // Seleciona a nova rota
 
-      // Save waypoints after route is created/updated
+      // Salvar waypoints
       await (window as any).api.routes.updateWaypoints({
-        route_id: result.id,
+        route_id: routeId,
         waypoints: waypoints.map((wp, index) => ({ name: wp.name, sequence: index })),
       })
-      toast.success('Pontos de parada salvos com sucesso!')
 
-      loadData()
-    } catch (err: any) {
-      console.error(err)
-      toast.error(err.message)
+      show(editing ? 'Rota atualizada!' : 'Rota cadastrada!')
+      setModal(false)
+      load()
+    } catch (e: any) {
+      show(e.message || 'Erro ao salvar', 'error')
     }
   }
 
-  const handleDelete = async () => {
-    if ('id' in formState && formState.id) {
-      try {
-        await (window as any).api.routes.delete(formState.id)
-        toast.success('Rota excluída com sucesso!')
-        loadData()
-        handleNew()
-      } catch (err: any) {
-        console.error(err)
-        toast.error(err.message)
-      }
-    }
+  async function handleDelete(row: Route) {
+    if (!confirm('Excluir esta rota?')) return
+    await (window as any).api.routes.delete(row.id)
+    show('Rota excluída')
+    load()
+  }
+
+  function edit(row: Route) {
+    setEditing(row)
+    reset({
+      name: row.name,
+      distance_km: row.distance_km || 0,
+      customer_id: row.customer_id ?? null,
+    })
+    loadWaypoints(row.id)
+    setModal(true)
   }
 
   const handleDragEnd = useCallback((event: any) => {
     const { active, over } = event
-
     if (active.id !== over.id) {
       setWaypoints((items) => {
         const oldIndex = items.findIndex((wp) => wp.id === active.id)
@@ -230,188 +202,212 @@ export function RoutesPage() {
     }
   }, [])
 
-  const handleAddWaypointFromInput = useCallback(() => {
-    if (newWaypointName.trim() !== '') {
-      const newWaypoint: Waypoint = {
-        id: crypto.randomUUID(), // Usar UUID para garantir unicidade
-        name: newWaypointName.trim(),
-        sequence: waypoints.length,
-      }
-      setWaypoints((prev) => [...prev, newWaypoint])
+  const addWaypoint = () => {
+    if (newWaypointName.trim()) {
+      setWaypoints((prev) => [
+        ...prev,
+        {
+          id: crypto.randomUUID(),
+          name: newWaypointName.trim(),
+          sequence: prev.length,
+        },
+      ])
       setNewWaypointName('')
     }
-  }, [newWaypointName, waypoints.length])
+  }
 
-  const removeWaypoint = useCallback((waypointId: string) => {
-    setWaypoints((prev) => prev.filter((wp) => wp.id !== waypointId))
-  }, [])
+  const removeWaypoint = (id: string) => {
+    setWaypoints((prev) => prev.filter((wp) => wp.id !== id))
+  }
 
   return (
-    <div className="p-8 h-full flex flex-col">
+    <div className="p-12 max-w-7xl mx-auto">
+      {toast && <Toast message={toast.message} type={toast.type} />}
+
       <PageHeader
+        pretitle="Logística"
         title="Rotas"
-        description="Gerencie as rotas de entrega para cada cliente e seus pontos de parada."
-      />
-      <div className="flex gap-4 mt-8 flex-1">
-        {/* Coluna 1: Lista de Rotas */}
-        <div className="w-1/3 bg-surface-container-lowest p-4 rounded-lg overflow-y-auto">
-          <h2 className="text-lg font-semibold mb-4">Minhas Rotas</h2>
-          <button
-            onClick={handleNew}
-            className="w-full py-2 bg-primary text-on-primary font-bold rounded text-sm mb-4"
-          >
-            + Nova Rota
-          </button>
-          <ul>
-            {routes.map((route) => (
-              <li
-                key={route.id}
-                className={cn('rounded-md', {
-                  'bg-primary/20': selectedRouteId === route.id,
-                })}
-              >
-                <button
-                  type="button"
-                  onClick={() => handleSelectRoute(route)}
-                  className={cn('w-full text-left p-2 rounded-md', {
-                    'text-primary': selectedRouteId === route.id,
-                    'hover:bg-surface-container-high': selectedRouteId !== route.id,
-                  })}
-                >
-                  <p className="font-medium">{route.name}</p>
-                  <p className="text-sm opacity-70">{route.customer_name}</p>
-                </button>
-              </li>
-            ))}
-          </ul>
+        subtitle="Gerencie trajetos recorrentes e seus pontos de parada."
+        actionLabel="Nova Rota"
+        onAction={() => setModal(true)}
+      >
+        <div className="relative">
+          <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-outline text-sm">
+            search
+          </span>
+          <input
+            type="text"
+            placeholder="Buscar rota..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-11 pr-4 py-3 bg-surface-container-highest border-none rounded-lg w-64 focus:ring-2 focus:ring-primary/20 focus:bg-surface-container-lowest transition-all placeholder:text-outline/60 text-sm outline-none text-on-surface"
+          />
         </div>
+      </PageHeader>
 
-        {/* Coluna 2: Editor de Rota */}
-        <div className="w-2/3 bg-surface-container-lowest p-4 rounded-lg overflow-y-auto">
-          <h2 className="text-lg font-semibold mb-4">
-            {selectedRouteId ? 'Editando Rota' : 'Nova Rota'}
-          </h2>
-          <div className="space-y-4">
-            <div>
-              <label htmlFor="customer" className="block text-sm font-medium text-on-surface/80">
-                Cliente
-              </label>
-              <select
-                id="customer"
-                value={formState.customer_id || ''}
-                onChange={(e) =>
-                  setFormState({ ...formState, customer_id: Number(e.target.value) })
-                }
-                className="mt-1 block w-full p-2 border border-outline-variant/30 rounded-md bg-transparent text-on-surface"
+      {/* Table */}
+      <div className="bg-surface-container rounded-xl overflow-hidden border border-outline-variant/10 shadow-sm">
+        <table className="w-full text-left border-collapse">
+          <thead>
+            <tr className="bg-surface-container-high">
+              {['Nome da Rota', 'Cliente', 'Distância', 'Pontos', ''].map((h) => (
+                <th
+                  key={h}
+                  className="px-8 py-5 text-[10px] font-black uppercase tracking-widest text-on-surface-variant"
+                >
+                  {h}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-outline-variant/10">
+            {rows.length === 0 && (
+              <tr>
+                <td colSpan={5} className="px-8 py-12 text-center text-on-surface-variant text-sm">
+                  Nenhuma rota encontrada
+                </td>
+              </tr>
+            )}
+            {rows.map((row, i) => (
+              <tr
+                key={row.id}
+                className={`hover:bg-primary/5 transition-colors group ${i % 2 === 1 ? 'bg-surface-container-low/30' : ''}`}
               >
-                <option value="">Selecione um cliente</option>
-                {customers.map((customer) => (
-                  <option key={customer.id} value={customer.id}>
-                    {customer.name}
-                  </option>
-                ))}
-              </select>
-              {errors.customer_id && (
-                <p className="text-sm text-error mt-1">{errors.customer_id}</p>
-              )}
-            </div>
+                <td className="px-8 py-5">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-lg bg-secondary-container/10 flex items-center justify-center text-secondary shrink-0">
+                      <span className="material-symbols-outlined text-lg">route</span>
+                    </div>
+                    <span className="font-bold text-on-surface font-headline text-sm">
+                      {row.name}
+                    </span>
+                  </div>
+                </td>
+                <td className="px-8 py-5">
+                  <div className="flex flex-col">
+                    <span className="text-sm text-on-surface font-medium">
+                      {row.customer_name ?? '—'}
+                    </span>
+                  </div>
+                </td>
+                <td className="px-8 py-5">
+                  <Badge label={`${row.distance_km} km`} color="blue" />
+                </td>
+                <td className="px-8 py-5">
+                  <span className="text-xs text-on-surface-variant font-bold">Trajeto Padrão</span>
+                </td>
+                <td className="px-8 py-5">
+                  <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button
+                      onClick={() => edit(row)}
+                      className="p-2 text-outline hover:text-primary hover:bg-primary/10 rounded-lg transition-all"
+                    >
+                      <span className="material-symbols-outlined text-xl">edit</span>
+                    </button>
+                    <button
+                      onClick={() => handleDelete(row)}
+                      className="p-2 text-outline hover:text-error hover:bg-error/10 rounded-lg transition-all"
+                    >
+                      <span className="material-symbols-outlined text-xl">delete</span>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
 
-            <div>
-              <label htmlFor="name" className="block text-sm font-medium text-on-surface/80">
-                Nome da Rota
-              </label>
-              <input
-                type="text"
-                id="name"
-                value={formState.name || ''}
-                onChange={(e) => setFormState({ ...formState, name: e.target.value })}
-                className="mt-1 block w-full p-2 border border-outline-variant/30 rounded-md bg-transparent text-on-surface"
-                placeholder="Ex: Rota da Fazenda"
+      {modal && (
+        <Modal title={editing ? 'Editar Rota' : 'Nova Rota'} onClose={() => setModal(false)}>
+          <div className="space-y-6">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="col-span-2">
+                <Input label="Nome da Rota" {...register('name')} error={errors.name?.message} />
+              </div>
+
+              <Controller
+                name="customer_id"
+                control={control}
+                render={({ field }) => (
+                  <Select
+                    label="Cliente"
+                    optional
+                    icon="business"
+                    value={field.value}
+                    onChange={field.onChange}
+                    error={errors.customer_id?.message}
+                    options={customers.map((c) => ({ value: c.id, label: c.name }))}
+                  />
+                )}
               />
-              {errors.name && <p className="text-sm text-error mt-1">{errors.name}</p>}
-            </div>
 
-            <div>
-              <label htmlFor="distance_km" className="block text-sm font-medium text-on-surface/80">
-                Distância (km)
-              </label>
-              <input
+              <Input
+                label="Distância (km)"
                 type="number"
-                id="distance_km"
-                value={formState.distance_km || ''}
-                onChange={(e) =>
-                  setFormState({ ...formState, distance_km: Number(e.target.value) })
-                }
-                className="mt-1 block w-full p-2 border border-outline-variant/30 rounded-md bg-transparent text-on-surface"
-                placeholder="0"
+                {...register('distance_km')}
+                error={errors.distance_km?.message}
               />
-              {errors.distance_km && (
-                <p className="text-sm text-error mt-1">{errors.distance_km}</p>
-              )}
             </div>
 
-            {/* Waypoints Section */}
-            {selectedRouteId && (
-              <>
-                <h3 className="font-medium mt-4 mb-2">Pontos de Parada:</h3>
-                <div className="flex gap-2 mb-4">
-                  <input
-                    type="text"
+            {/* Waypoints */}
+            <div className="border-t border-outline-variant/10 pt-6">
+              <h3 className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant mb-4">
+                Pontos de Parada (Drag & Drop)
+              </h3>
+
+              <div className="flex gap-2 mb-4">
+                <div className="flex-1">
+                  <Input
+                    placeholder="Adicionar ponto (ex: Posto, Fazenda...)"
                     value={newWaypointName}
                     onChange={(e) => setNewWaypointName(e.target.value)}
-                    className="flex-1 p-2 border border-outline-variant/30 rounded-md bg-transparent text-on-surface"
-                    placeholder="Nome do Ponto (ex: Rua X, Cidade Y)"
+                    onKeyDown={(e) => e.key === 'Enter' && addWaypoint()}
                   />
-                  <button
-                    onClick={handleAddWaypointFromInput}
-                    className="px-4 py-2 bg-secondary text-on-secondary font-bold rounded text-sm"
-                  >
-                    Adicionar
-                  </button>
                 </div>
-
-                <DndContext
-                  sensors={sensors}
-                  collisionDetection={closestCenter}
-                  onDragEnd={handleDragEnd}
-                >
-                  <SortableContext
-                    items={waypoints.map((wp) => wp.id)}
-                    strategy={verticalListSortingStrategy}
-                  >
-                    <ul>
-                      {waypoints.map((waypoint) => (
-                        <SortableWaypoint
-                          key={waypoint.id}
-                          waypoint={waypoint}
-                          onRemove={removeWaypoint}
-                        />
-                      ))}
-                    </ul>
-                  </SortableContext>
-                </DndContext>
-              </>
-            )}
-
-            <div className="flex justify-between items-center pt-4">
-              <button
-                onClick={handleSave}
-                className="px-4 py-2 bg-primary text-on-primary font-bold rounded text-sm"
-              >
-                Salvar Rota
-              </button>
-              {selectedRouteId && (
                 <button
-                  onClick={handleDelete}
-                  className="px-4 py-2 bg-error text-on-error font-bold rounded text-sm"
+                  onClick={addWaypoint}
+                  className="bg-surface-container-highest text-on-surface px-4 rounded-lg font-bold text-sm hover:bg-primary hover:text-on-primary transition-all"
                 >
-                  Excluir Rota
+                  Add
                 </button>
-              )}
+              </div>
+
+              <div className="max-h-60 overflow-y-auto pr-2">
+                {waypoints.length === 0 ? (
+                  <div className="py-8 text-center border-2 border-dashed border-outline-variant/20 rounded-xl text-on-surface-variant text-sm italic">
+                    Nenhum ponto de parada adicionado
+                  </div>
+                ) : (
+                  <DndContext
+                    sensors={sensors}
+                    collisionDetection={closestCenter}
+                    onDragEnd={handleDragEnd}
+                  >
+                    <SortableContext
+                      items={waypoints.map((wp) => wp.id)}
+                      strategy={verticalListSortingStrategy}
+                    >
+                      <ul>
+                        {waypoints.map((wp) => (
+                          <SortableWaypoint key={wp.id} waypoint={wp} onRemove={removeWaypoint} />
+                        ))}
+                      </ul>
+                    </SortableContext>
+                  </DndContext>
+                )}
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 pt-2">
+              <Button variant="ghost" onClick={() => setModal(false)}>
+                Cancelar
+              </Button>
+              <Button onClick={handleSubmit(onSubmit)}>Salvar Rota</Button>
             </div>
           </div>
-        </div>
-      </div>
+        </Modal>
+      )}
     </div>
   )
 }

@@ -44,6 +44,8 @@ export interface Route {
   id: number
   name: string
   distance_km?: number
+  customer_id?: number
+  customer_name?: string
 }
 
 export interface Trip {

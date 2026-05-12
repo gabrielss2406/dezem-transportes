@@ -5,6 +5,7 @@ import { tripSchema } from '../../../shared/schemas'
 import type { Customer, Driver, Product, Route, Supplier, Trip, Truck } from '../../lib/types'
 import { PageHeader } from '../components/PageHeader'
 import {
+  Badge,
   Button,
   CurrencyInput,
   DatePicker,
@@ -58,11 +59,14 @@ export function TripsPage() {
     formState: { errors },
     reset,
     control,
+    watch,
   } = useForm<Omit<Trip, 'id'>>({
     resolver: zodResolver(tripSchema),
     defaultValues: { ...EMPTY },
     mode: 'all',
   })
+
+  const selectedCustomerId = watch('customer_id')
 
   const load = useCallback(async () => {
     const [t, tr, d, p, c, r, s, gs] = await Promise.all([
@@ -371,7 +375,25 @@ export function TripsPage() {
                     value={field.value}
                     onChange={field.onChange}
                     error={errors.route_id?.message}
-                    options={routes.map((r) => ({ value: r.id, label: r.name }))}
+                    options={routes.map((r) => {
+                      const isSelectedCustomer =
+                        r.customer_id && r.customer_id === Number(selectedCustomerId)
+
+                      if (isSelectedCustomer) {
+                        return {
+                          value: r.id,
+                          displayLabel: r.name,
+                          label: (
+                            <div className="flex items-center justify-between w-full">
+                              <span>{r.name}</span>
+                              <Badge label="Cliente" color="blue" />
+                            </div>
+                          ),
+                        }
+                      }
+
+                      return { value: r.id, label: r.name }
+                    })}
                   />
                 )}
               />

@@ -32,8 +32,8 @@ export function CustomersPage() {
   const digits = phoneValue.replace(/\D/g, '')
   const phoneMask =
     digits.length > 10 || (digits.length >= 3 && digits[2] === '9')
-      ? '(99) 99999-9999'
-      : '(99) 9999-9999'
+      ? '(00) 00000-0000'
+      : '(00) 0000-0000'
 
   const load = useCallback(() => window.api.customers.list(search).then(setRows), [search])
   useEffect(() => {
@@ -202,8 +202,7 @@ export function CustomersPage() {
             <Input
               label="CNPJ"
               optional
-              mask="99.999.999/9999-99"
-              maskChar=""
+              mask="00.000.000/0000-00"
               {...register('cnpj')}
               error={errors.cnpj?.message}
             />
@@ -217,7 +216,6 @@ export function CustomersPage() {
               label="Telefone"
               optional
               mask={phoneMask}
-              maskChar={null}
               {...register('phone')}
               error={errors.phone?.message}
             />

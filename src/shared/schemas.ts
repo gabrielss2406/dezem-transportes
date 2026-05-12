@@ -119,7 +119,7 @@ export const driverSchema = z.object({
 export const routeSchema = z.object({
   name: z.string().min(3).max(100),
   distance_km: requiredNumber(100000, 'Distância máxima de 100.000 km'),
-  customer_id: z.preprocess((val) => Number(val), z.number().positive('Selecione um cliente')),
+  customer_id: optionalNumber(999999999, 'ID inválido'),
 })
 
 export const tripSchema = z.object({

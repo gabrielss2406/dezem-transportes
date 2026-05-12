@@ -1,6 +1,6 @@
 import React, { forwardRef, useState, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
-import InputMask from 'react-input-mask'
+import { IMaskInput } from 'react-imask'
 
 // ── Button ───────────────────────────────────────────────────────────────────
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
@@ -35,13 +35,16 @@ interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   label?: string
   optional?: boolean
   error?: string
-  mask?: string
-  maskChar?: string | null
+  mask?: any
 }
 export const Input = forwardRef<HTMLInputElement, InputProps>(
-  ({ label, optional, error, mask, maskChar, className = '', ...props }, ref) => {
-    const InputComponent = mask ? (InputMask as any) : 'input'
-    const maskProps = mask ? { mask, maskChar, inputRef: ref } : { ref }
+  ({ label, optional, error, mask, className = '', ...props }, ref) => {
+    const commonProps = {
+      className: `bg-surface-container-lowest border border-outline-variant/30 rounded-lg px-4 py-3 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all ${
+        error ? 'border-error' : ''
+      } ${className}`,
+      ...props,
+    }
 
     return (
       <div className="flex flex-col gap-1.5">
@@ -51,11 +54,11 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
             {optional && <span className="text-outline font-normal normal-case">(opcional)</span>}
           </label>
         )}
-        <InputComponent
-          {...maskProps}
-          className={`bg-surface-container-lowest border border-outline-variant/30 rounded-lg px-4 py-3 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all ${error ? 'border-error' : ''} ${className}`}
-          {...props}
-        />
+        {mask ? (
+          <IMaskInput {...commonProps} mask={mask} inputRef={ref as any} />
+        ) : (
+          <input {...commonProps} ref={ref} />
+        )}
         {error && <span className="text-xs text-error">{error}</span>}
       </div>
     )
@@ -160,7 +163,7 @@ interface SelectProps {
   label?: string
   optional?: boolean
   error?: string
-  options: { value: string | number; label: string }[]
+  options: { value: string | number; label: React.ReactNode; displayLabel?: string }[]
   value?: string | number
   onChange?: (value: any) => void
   placeholder?: string
@@ -180,8 +183,10 @@ export function Select({
   icon,
 }: SelectProps) {
   const [isOpen, setIsOpen] = useState(false)
+  const [searchTerm, setSearchTerm] = useState('')
   const containerRef = useRef<HTMLDivElement>(null)
   const buttonRef = useRef<HTMLButtonElement>(null)
+  const searchInputRef = useRef<HTMLInputElement>(null)
   const [coords, setCoords] = useState({ top: 0, left: 0, width: 0 })
   const uniqueId = useRef(Math.random())
 
@@ -199,6 +204,17 @@ export function Select({
 
   const selectedOption = options.find((o) => String(o.value) === String(value))
 
+  const getSearchableLabel = (option: (typeof options)[0]): string => {
+    if (option.displayLabel) return option.displayLabel
+    if (typeof option.label === 'string') return option.label
+    if (typeof option.label === 'number') return String(option.label)
+    return ''
+  }
+
+  const filteredOptions = options.filter((option) =>
+    getSearchableLabel(option).toLowerCase().includes(searchTerm.toLowerCase()),
+  )
+
   const updateCoords = () => {
     if (buttonRef.current) {
       const rect = buttonRef.current.getBoundingClientRect()
@@ -215,6 +231,8 @@ export function Select({
       updateCoords()
       window.addEventListener('resize', updateCoords)
       window.addEventListener('scroll', updateCoords, true)
+      setTimeout(() => searchInputRef.current?.focus(), 10)
+      setSearchTerm('')
     }
     return () => {
       window.removeEventListener('resize', updateCoords)
@@ -265,7 +283,7 @@ export function Select({
             </span>
           )}
           <span className={`truncate ${!selectedOption ? 'text-on-surface-variant/40' : ''}`}>
-            {selectedOption ? selectedOption.label : placeholder}
+            {selectedOption ? selectedOption.displayLabel || selectedOption.label : placeholder}
           </span>
         </div>
         <span
@@ -287,8 +305,18 @@ export function Select({
               width: coords.width,
             }}
           >
-            <div className="max-h-60 overflow-y-auto py-2">
-              {optional && (
+            <div className="p-2">
+              <input
+                ref={searchInputRef}
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Pesquisar..."
+                className="w-full bg-surface-container border border-outline-variant/30 rounded-md px-3 py-2 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:outline-none focus:ring-1 focus:ring-primary/50"
+              />
+            </div>
+            <div className="max-h-52 overflow-y-auto py-1">
+              {optional && searchTerm.length === 0 && (
                 <button
                   type="button"
                   onClick={(e) => {
@@ -302,12 +330,12 @@ export function Select({
                   Nenhum
                 </button>
               )}
-              {options.length === 0 ? (
+              {filteredOptions.length === 0 ? (
                 <div className="px-4 py-3 text-xs text-on-surface-variant italic">
-                  Nenhuma opção disponível
+                  Nenhuma opção encontrada
                 </div>
               ) : (
-                options.map((option) => (
+                filteredOptions.map((option) => (
                   <button
                     key={option.value}
                     type="button"

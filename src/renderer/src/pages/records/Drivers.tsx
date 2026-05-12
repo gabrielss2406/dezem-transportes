@@ -47,8 +47,8 @@ export function DriversPage() {
   const digits = phoneValue.replace(/\D/g, '')
   const phoneMask =
     digits.length > 10 || (digits.length >= 3 && digits[2] === '9')
-      ? '(99) 99999-9999'
-      : '(99) 9999-9999'
+      ? '(00) 00000-0000'
+      : '(00) 0000-0000'
 
   const load = useCallback(async () => {
     const [d, t] = await Promise.all([
@@ -298,8 +298,7 @@ export function DriversPage() {
             <Input
               label="CPF"
               optional
-              mask="999.999.999-99"
-              maskChar=""
+              mask="000.000.000-00"
               {...register('cpf')}
               error={errors.cpf?.message}
             />
@@ -307,7 +306,6 @@ export function DriversPage() {
               label="Telefone"
               optional
               mask={phoneMask}
-              maskChar={null}
               {...register('phone')}
               error={errors.phone?.message}
             />

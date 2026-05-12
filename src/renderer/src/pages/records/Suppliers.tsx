@@ -42,8 +42,8 @@ export function SuppliersPage() {
   const digits = phoneValue.replace(/\D/g, '')
   const phoneMask =
     digits.length > 10 || (digits.length >= 3 && digits[2] === '9')
-      ? '(99) 99999-9999'
-      : '(99) 9999 - 9999'
+      ? '(00) 00000-0000'
+      : '(00) 0000-0000'
 
   const load = useCallback(async () => {
     const [s, st] = await Promise.all([
@@ -278,7 +278,6 @@ export function SuppliersPage() {
               label="Telefone"
               optional
               mask={phoneMask}
-              maskChar={null}
               {...register('phone')}
               error={errors.phone?.message}
             />
