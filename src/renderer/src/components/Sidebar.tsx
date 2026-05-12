@@ -9,16 +9,15 @@ const navItems = [
   { path: '/drivers', label: 'Motoristas', icon: 'badge' },
   { path: '/trips', label: 'Viagens', icon: 'route' },
   { path: '/costs', label: 'Custos', icon: 'payments' },
+  { path: '/settings', label: 'Configurações', icon: 'settings' },
   { path: '/overview', label: 'Menu', icon: 'menu' },
 ]
 
 interface SidebarProps {
   onLogout: () => void
-  theme: 'light' | 'dark'
-  onToggleTheme: () => void
 }
 
-export function Sidebar({ onLogout, theme, onToggleTheme }: SidebarProps) {
+export function Sidebar({ onLogout }: SidebarProps) {
   const navigate = useNavigate()
 
   return (
@@ -83,15 +82,6 @@ export function Sidebar({ onLogout, theme, onToggleTheme }: SidebarProps) {
           <span className="material-symbols-outlined text-xl opacity-70">palette</span>
           <span>Design System</span>
         </Link>
-        <button
-          onClick={onToggleTheme}
-          className="flex items-center gap-3 px-2 py-2 w-full text-on-surface-variant hover:text-on-surface transition-colors text-sm"
-        >
-          <span className="material-symbols-outlined text-xl opacity-70">
-            {theme === 'dark' ? 'light_mode' : 'dark_mode'}
-          </span>
-          <span>Tema {theme === 'dark' ? 'Claro' : 'Escuro'}</span>
-        </button>
         <button
           onClick={() => navigate('/trips')}
           className="w-full py-3 bg-primary text-on-primary font-bold rounded text-sm shadow-lg shadow-primary/20 hover:brightness-110 active:scale-95 transition-all"

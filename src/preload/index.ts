@@ -33,9 +33,23 @@ contextBridge.exposeInMainWorld('api', {
     delete: (id: number) => ipcRenderer.invoke('suppliers:delete', id),
   },
 
+  // Supplier Types
+  'supplier-types': {
+    list: () => ipcRenderer.invoke('supplier-types:list'),
+    create: (data: any) => ipcRenderer.invoke('supplier-types:create', data),
+    delete: (id: number) => ipcRenderer.invoke('supplier-types:delete', id),
+  },
+
+  // Cost Categories
+  'cost-categories': {
+    list: () => ipcRenderer.invoke('cost-categories:list'),
+    create: (data: any) => ipcRenderer.invoke('cost-categories:create', data),
+    delete: (id: number) => ipcRenderer.invoke('cost-categories:delete', id),
+  },
+
   // Trucks
   trucks: {
-    list: () => ipcRenderer.invoke('trucks:list'),
+    list: (filters?: any) => ipcRenderer.invoke('trucks:list', filters),
     create: (data: any) => ipcRenderer.invoke('trucks:create', data),
     update: (id: number, data: any) => ipcRenderer.invoke('trucks:update', id, data),
     delete: (id: number) => ipcRenderer.invoke('trucks:delete', id),
@@ -43,7 +57,7 @@ contextBridge.exposeInMainWorld('api', {
 
   // Drivers
   drivers: {
-    list: () => ipcRenderer.invoke('drivers:list'),
+    list: (filters?: any) => ipcRenderer.invoke('drivers:list', filters),
     create: (data: any) => ipcRenderer.invoke('drivers:create', data),
     update: (id: number, data: any) => ipcRenderer.invoke('drivers:update', id, data),
     delete: (id: number) => ipcRenderer.invoke('drivers:delete', id),

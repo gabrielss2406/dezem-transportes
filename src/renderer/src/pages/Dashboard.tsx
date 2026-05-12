@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { PageHeader } from '../components/PageHeader'
 import type { DashboardSummary } from '../lib/types'
 import { currentMonthRange, formatBRL } from '../lib/utils'
 
@@ -62,15 +63,7 @@ export function DashboardPage() {
   return (
     <div className="p-12 max-w-7xl mx-auto">
       {/* Header */}
-      <div className="mb-12">
-        <span className="text-primary font-bold tracking-widest text-xs uppercase block mb-2">
-          Dezem Transportes
-        </span>
-        <h1 className="text-4xl font-black font-headline tracking-tighter text-on-surface">
-          Dashboard
-        </h1>
-        <p className="text-on-surface-variant mt-1 capitalize">{monthLabel}</p>
-      </div>
+      <PageHeader title="Dashboard" subtitle={monthLabel} />
 
       {loading && <p className="text-on-surface-variant text-sm">Carregando...</p>}
 

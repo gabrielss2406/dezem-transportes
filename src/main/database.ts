@@ -45,11 +45,19 @@ export function setupDatabase(): void {
       created_at TEXT DEFAULT (datetime('now'))
     );
 
+    -- Supplier Types (for settings)
+    CREATE TABLE IF NOT EXISTS supplier_types (
+      id            INTEGER PRIMARY KEY AUTOINCREMENT,
+      value         TEXT NOT NULL UNIQUE,
+      label         TEXT NOT NULL,
+      is_deletable  INTEGER NOT NULL DEFAULT 1
+    );
+
     -- Suppliers
     CREATE TABLE IF NOT EXISTS suppliers (
       id         INTEGER PRIMARY KEY AUTOINCREMENT,
       name       TEXT NOT NULL,
-      type       TEXT NOT NULL CHECK(type IN ('gas_station','workshop','quarry','other')),
+      type       TEXT NOT NULL,
       phone      TEXT,
       created_at TEXT DEFAULT (datetime('now'))
     );
@@ -102,11 +110,21 @@ export function setupDatabase(): void {
       created_at    TEXT DEFAULT (datetime('now'))
     );
 
+    -- Cost Categories (for settings)
+    CREATE TABLE IF NOT EXISTS cost_categories (
+      id            INTEGER PRIMARY KEY AUTOINCREMENT,
+      value         TEXT NOT NULL UNIQUE,
+      label         TEXT NOT NULL,
+      is_deletable  INTEGER NOT NULL DEFAULT 1
+    );
+
     -- Costs
+    -- NOTE: The CHECK constraint was removed to allow for dynamic categories.
+    -- This change only applies to new databases.
     CREATE TABLE IF NOT EXISTS costs (
       id            INTEGER PRIMARY KEY AUTOINCREMENT,
       date          TEXT NOT NULL,
-      category      TEXT NOT NULL CHECK(category IN ('fuel','oil','maintenance','salary','toll','others')),
+      category      TEXT NOT NULL,
       value         REAL NOT NULL,
       truck_id      INTEGER REFERENCES trucks(id),
       supplier_id   INTEGER REFERENCES suppliers(id),
@@ -128,6 +146,51 @@ export function setupDatabase(): void {
   if (userCount === 0) {
     const hash = bcrypt.hashSync('dezem2024', 10)
     db.prepare('INSERT INTO users (name, password_hash) VALUES (?, ?)').run('Admin', hash)
+  }
+
+  // Migration: Add is_deletable to supplier_types if it doesn't exist
+  const supplierTypeInfo = db.pragma('table_info(supplier_types)') as { name: string }[]
+  if (!supplierTypeInfo.some((col) => col.name === 'is_deletable')) {
+    db.exec('ALTER TABLE supplier_types ADD COLUMN is_deletable INTEGER NOT NULL DEFAULT 1')
+    db.prepare(
+      `UPDATE supplier_types SET is_deletable = 0 WHERE value IN ('gas_station', 'workshop', 'quarry', 'other')`,
+    ).run()
+  }
+
+  // Seed: default supplier types if none exist
+  const supplierTypeCount = (db.prepare('SELECT COUNT(*) as c FROM supplier_types').get() as any).c
+  if (supplierTypeCount === 0) {
+    const stmt = db.prepare(
+      'INSERT INTO supplier_types (value, label, is_deletable) VALUES (?, ?, ?)',
+    )
+    const transaction = db.transaction((types) => {
+      for (const type of types) stmt.run(type.value, type.label, type.is_deletable)
+    })
+    transaction([
+      { value: 'gas_station', label: 'Posto de Combustível', is_deletable: 0 },
+      { value: 'workshop', label: 'Oficina', is_deletable: 0 },
+      { value: 'quarry', label: 'Pedreira', is_deletable: 0 },
+      { value: 'other', label: 'Outro', is_deletable: 0 },
+    ])
+  }
+
+  // Seed: default cost categories if none exist
+  const costCategoryCount = (db.prepare('SELECT COUNT(*) as c FROM cost_categories').get() as any).c
+  if (costCategoryCount === 0) {
+    const stmt = db.prepare(
+      'INSERT INTO cost_categories (value, label, is_deletable) VALUES (?, ?, ?)',
+    )
+    const transaction = db.transaction((types) => {
+      for (const type of types) stmt.run(type.value, type.label, type.is_deletable)
+    })
+    transaction([
+      { value: 'fuel', label: 'Combustível', is_deletable: 0 },
+      { value: 'oil', label: 'Óleo', is_deletable: 0 },
+      { value: 'maintenance', label: 'Manutenção', is_deletable: 0 },
+      { value: 'salary', label: 'Salário', is_deletable: 0 },
+      { value: 'toll', label: 'Pedágio', is_deletable: 0 },
+      { value: 'others', label: 'Outros', is_deletable: 0 },
+    ])
   }
 
   console.log('[DB] SQLite ready at:', dbPath)

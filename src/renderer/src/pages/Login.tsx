@@ -1,22 +1,35 @@
+import { zodResolver } from '@hookform/resolvers/zod'
 import { useState } from 'react'
+import { useForm } from 'react-hook-form'
+import { loginSchema } from '../../../shared/schemas'
 
 interface LoginProps {
   onLogin: (name: string) => void
 }
 
 export function LoginPage({ onLogin }: LoginProps) {
-  const [password, setPassword] = useState('')
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+    watch,
+    reset,
+  } = useForm<{ password: string }>({
+    resolver: zodResolver(loginSchema),
+    defaultValues: { password: '' },
+    mode: 'all',
+  })
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
+  const onSubmit = async (data: { password: string }) => {
     setLoading(true)
     setError('')
     try {
-      const result = await window.api.auth.login(password)
+      const result = await window.api.auth.login(data.password)
       if (result.ok && result.name) {
         onLogin(result.name)
+        reset()
       } else {
         setError(result.error || 'Senha incorreta')
       }
@@ -48,7 +61,7 @@ export function LoginPage({ onLogin }: LoginProps) {
 
           {/* Card */}
           <div className="bg-surface-container-lowest rounded-xl p-10 shadow-2xl shadow-primary/5 border border-outline-variant/10">
-            <form onSubmit={handleSubmit} className="space-y-8">
+            <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
               {/* Username (display only — auth uses password) */}
               <div className="space-y-2">
                 <label
@@ -86,20 +99,23 @@ export function LoginPage({ onLogin }: LoginProps) {
                   <input
                     id="password"
                     type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
+                    {...register('password')}
                     placeholder="••••••••"
                     className="block w-full pl-10 pr-3 py-4 bg-surface-container-highest border-0 border-b-2 border-transparent focus:border-primary focus:bg-surface-container-lowest transition-all duration-200 outline-none font-medium"
                   />
                 </div>
-                {error && <p className="text-error text-sm font-medium pt-1">{error}</p>}
+                {(error || errors.password?.message) && (
+                  <p className="text-error text-sm font-medium pt-1">
+                    {error || errors.password?.message}
+                  </p>
+                )}
               </div>
 
               {/* Submit */}
               <div className="pt-2">
                 <button
                   type="submit"
-                  disabled={loading || !password}
+                  disabled={loading || !watch('password')}
                   className="w-full py-4 px-6 bg-gradient-to-b from-primary to-primary-container text-on-primary font-bold text-lg rounded-lg shadow-sm hover:scale-[0.98] active:scale-95 transition-transform duration-200 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:scale-100"
                 >
                   <span>{loading ? 'Entrando...' : 'Entrar'}</span>

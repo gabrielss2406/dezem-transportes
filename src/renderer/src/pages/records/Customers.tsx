@@ -1,4 +1,8 @@
+import { zodResolver } from '@hookform/resolvers/zod'
 import { useCallback, useEffect, useState } from 'react'
+import { useForm } from 'react-hook-form'
+import { customerSchema } from '../../../../shared/schemas'
+import { PageHeader } from '../../components/PageHeader'
 import { Button, Input, Modal, Toast, useToast } from '../../components/ui'
 import type { Customer } from '../../lib/types'
 
@@ -8,27 +12,62 @@ export function CustomersPage() {
   const [rows, setRows] = useState<Customer[]>([])
   const [modal, setModal] = useState(false)
   const [editing, setEditing] = useState<Customer | null>(null)
-  const [form, setForm] = useState<any>({ ...EMPTY })
   const [search, setSearch] = useState('')
   const { toast, show } = useToast()
+
+  const {
+    register,
+    handleSubmit,
+    setValue,
+    formState: { errors },
+    reset,
+    watch,
+  } = useForm<Omit<Customer, 'id'>>({
+    resolver: zodResolver(customerSchema),
+    defaultValues: { ...EMPTY },
+    mode: 'all',
+  })
+
+  const phoneValue = watch('phone') || ''
+  const digits = phoneValue.replace(/\D/g, '')
+  const phoneMask =
+    digits.length > 10 || (digits.length >= 3 && digits[2] === '9')
+      ? '(99) 99999-9999'
+      : '(99) 9999-9999'
 
   const load = useCallback(() => window.api.customers.list(search).then(setRows), [search])
   useEffect(() => {
     load()
   }, [load])
-  const set = (k: string, v: any) => setForm((f: any) => ({ ...f, [k]: v }))
 
-  async function save() {
+  // Limpeza automática ao fechar o modal
+  useEffect(() => {
+    if (!modal) {
+      setEditing(null)
+      reset(EMPTY)
+    }
+  }, [modal])
+
+  const onSubmit = async (data: Omit<Customer, 'id'>) => {
     try {
-      if (editing) await window.api.customers.update(editing.id, form)
-      else await window.api.customers.create(form)
+      let res: any
+      if (editing) {
+        res = await window.api.customers.update(editing.id, data)
+      } else {
+        res = await window.api.customers.create(data)
+      }
+
+      if (res && res.ok === false) {
+        const msg = res.errors ? Object.values(res.errors)[0] : 'Erro ao salvar dados'
+        show(String(msg), 'error')
+        return
+      }
+
       show(editing ? 'Cliente atualizado!' : 'Cliente cadastrado!')
       setModal(false)
-      setEditing(null)
-      setForm({ ...EMPTY })
       load()
     } catch (e: any) {
-      show(e.message, 'error')
+      show(e.message || 'Erro de conexão', 'error')
     }
   }
 
@@ -41,7 +80,7 @@ export function CustomersPage() {
 
   function edit(row: Customer) {
     setEditing(row)
-    setForm({
+    reset({
       name: row.name,
       cnpj: row.cnpj ?? '',
       ie: row.ie ?? '',
@@ -56,42 +95,26 @@ export function CustomersPage() {
       {toast && <Toast message={toast.message} type={toast.type} />}
 
       {/* Header */}
-      <div className="flex items-end justify-between mb-10">
-        <div>
-          <span className="text-primary font-bold tracking-widest text-xs uppercase block mb-2">
-            Gestão Operacional
+      <PageHeader
+        pretitle="Gestão Operacional"
+        title="Clientes"
+        subtitle="Gerencie sua base de parceiros comerciais."
+        actionLabel="Novo Cliente"
+        onAction={() => setModal(true)}
+      >
+        <div className="relative">
+          <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-outline text-sm">
+            search
           </span>
-          <h1 className="text-4xl font-black font-headline tracking-tighter text-on-surface">
-            Clientes
-          </h1>
-          <p className="text-on-surface-variant mt-1">Gerencie sua base de parceiros comerciais.</p>
+          <input
+            type="text"
+            placeholder="Buscar por nome..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-11 pr-4 py-3 bg-surface-container-highest border-none rounded-lg w-64 focus:ring-2 focus:ring-primary/20 focus:bg-surface-container-lowest transition-all placeholder:text-outline/60 text-sm outline-none text-on-surface"
+          />
         </div>
-        <div className="flex items-center gap-3">
-          <div className="relative">
-            <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-outline text-sm">
-              search
-            </span>
-            <input
-              type="text"
-              placeholder="Buscar por nome..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-11 pr-4 py-3 bg-surface-container-highest border-none rounded-lg w-64 focus:ring-2 focus:ring-primary/20 focus:bg-surface-container-lowest transition-all placeholder:text-outline/60 text-sm outline-none text-on-surface"
-            />
-          </div>
-          <button
-            onClick={() => {
-              setEditing(null)
-              setForm({ ...EMPTY })
-              setModal(true)
-            }}
-            className="flex items-center gap-2 bg-primary text-on-primary px-6 py-3 rounded font-bold text-sm shadow-lg shadow-primary/20 hover:brightness-110 active:scale-95 transition-all"
-          >
-            <span className="material-symbols-outlined text-xl">add</span>
-            Novo Cliente
-          </button>
-        </div>
-      </div>
+      </PageHeader>
 
       {/* Table */}
       <div className="bg-surface-container rounded-xl overflow-hidden border border-outline-variant/10">
@@ -174,38 +197,42 @@ export function CustomersPage() {
         <Modal title={editing ? 'Editar Cliente' : 'Novo Cliente'} onClose={() => setModal(false)}>
           <div className="grid grid-cols-2 gap-4">
             <div className="col-span-2">
-              <Input label="Nome" value={form.name} onChange={(e) => set('name', e.target.value)} />
+              <Input label="Nome" {...register('name')} error={errors.name?.message} />
             </div>
             <Input
               label="CNPJ"
               optional
-              value={form.cnpj}
-              onChange={(e) => set('cnpj', e.target.value)}
+              mask="99.999.999/9999-99"
+              maskChar=""
+              {...register('cnpj')}
+              error={errors.cnpj?.message}
             />
             <Input
               label="Inscrição Estadual"
               optional
-              value={form.ie}
-              onChange={(e) => set('ie', e.target.value)}
+              {...register('ie')}
+              error={errors.ie?.message}
             />
             <Input
               label="Telefone"
               optional
-              value={form.phone}
-              onChange={(e) => set('phone', e.target.value)}
+              mask={phoneMask}
+              maskChar={null}
+              {...register('phone')}
+              error={errors.phone?.message}
             />
             <Input
               label="Endereço"
               optional
-              value={form.address}
-              onChange={(e) => set('address', e.target.value)}
+              {...register('address')}
+              error={errors.address?.message}
             />
           </div>
           <div className="flex justify-end gap-3 mt-6">
             <Button variant="ghost" onClick={() => setModal(false)}>
               Cancelar
             </Button>
-            <Button onClick={save}>Salvar</Button>
+            <Button onClick={handleSubmit(onSubmit)}>Salvar</Button>
           </div>
         </Modal>
       )}

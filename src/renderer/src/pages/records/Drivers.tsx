@@ -1,5 +1,9 @@
+import { zodResolver } from '@hookform/resolvers/zod'
 import { useCallback, useEffect, useState } from 'react'
-import { Button, Input, Modal, Select, Toast, useToast } from '../../components/ui'
+import { Controller, useForm } from 'react-hook-form'
+import { driverSchema } from '../../../../shared/schemas'
+import { PageHeader } from '../../components/PageHeader'
+import { Button, CurrencyInput, Input, Modal, Select, Toast, useToast } from '../../components/ui'
 import type { Driver, Truck } from '../../lib/types'
 import { formatBRL } from '../../lib/utils'
 
@@ -19,35 +23,73 @@ export function DriversPage() {
   const [trucks, setTrucks] = useState<Truck[]>([])
   const [modal, setModal] = useState(false)
   const [editing, setEditing] = useState<Driver | null>(null)
-  const [form, setForm] = useState<any>({ ...EMPTY })
+  const [filters, setFilters] = useState({ name: '', cpf: '', truck_id: '' })
+  const [appliedFilters, setAppliedFilters] = useState({ name: '', cpf: '', truck_id: '' })
   const { toast, show } = useToast()
 
+  const FORM_EMPTY = { ...EMPTY, monthly_salary: 0, truck_id: null }
+
+  const {
+    register,
+    handleSubmit,
+    setValue,
+    formState: { errors },
+    reset,
+    watch,
+    control,
+  } = useForm<Omit<Driver, 'id'>>({
+    resolver: zodResolver(driverSchema),
+    defaultValues: FORM_EMPTY,
+    mode: 'all',
+  })
+
+  const phoneValue = watch('phone') || ''
+  const digits = phoneValue.replace(/\D/g, '')
+  const phoneMask =
+    digits.length > 10 || (digits.length >= 3 && digits[2] === '9')
+      ? '(99) 99999-9999'
+      : '(99) 9999-9999'
+
   const load = useCallback(async () => {
-    const [d, t] = await Promise.all([window.api.drivers.list(), window.api.trucks.list()])
+    const [d, t] = await Promise.all([
+      window.api.drivers.list(appliedFilters),
+      window.api.trucks.list(),
+    ])
     setRows(d)
     setTrucks(t)
-  }, [])
+  }, [appliedFilters])
   useEffect(() => {
     load()
   }, [load])
-  const set = (k: string, v: any) => setForm((f: any) => ({ ...f, [k]: v }))
 
-  async function save() {
-    const data = {
-      ...form,
-      monthly_salary: Number(form.monthly_salary),
-      truck_id: form.truck_id ? Number(form.truck_id) : null,
+  // Limpeza automática ao fechar o modal
+  useEffect(() => {
+    if (!modal) {
+      setEditing(null)
+      reset(FORM_EMPTY)
     }
+  }, [modal])
+
+  const onSubmit = async (data: Omit<Driver, 'id'>) => {
     try {
-      if (editing) await window.api.drivers.update(editing.id, data)
-      else await window.api.drivers.create(data)
+      let res: any
+      if (editing) {
+        res = await window.api.drivers.update(editing.id, data)
+      } else {
+        res = await window.api.drivers.create(data)
+      }
+
+      if (res && res.ok === false) {
+        const msg = res.errors ? Object.values(res.errors)[0] : 'Erro ao salvar dados'
+        show(String(msg), 'error')
+        return
+      }
+
       show(editing ? 'Motorista atualizado!' : 'Motorista cadastrado!')
       setModal(false)
-      setEditing(null)
-      setForm({ ...EMPTY })
       load()
     } catch (e: any) {
-      show(e.message, 'error')
+      show(e.message || 'Erro de conexão', 'error')
     }
   }
 
@@ -60,14 +102,20 @@ export function DriversPage() {
 
   function edit(row: Driver) {
     setEditing(row)
-    setForm({
+    reset({
       name: row.name,
       cpf: row.cpf ?? '',
       phone: row.phone ?? '',
       monthly_salary: row.monthly_salary,
-      truck_id: row.truck_id ?? '',
+      truck_id: row.truck_id,
     })
     setModal(true)
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      setAppliedFilters(filters)
+    }
   }
 
   return (
@@ -75,30 +123,60 @@ export function DriversPage() {
       {toast && <Toast message={toast.message} type={toast.type} />}
 
       {/* Header */}
-      <div className="flex items-end justify-between mb-10">
-        <div>
-          <span className="text-primary font-bold tracking-widest text-xs uppercase block mb-2">
-            Gestão de Frota
-          </span>
-          <h1 className="text-5xl font-black font-headline tracking-tighter text-on-surface">
-            Motoristas
-          </h1>
-          <p className="text-on-surface-variant mt-2 text-base">
-            Gerencie os motoristas vinculados à frota.
-          </p>
+      <PageHeader
+        pretitle="Gestão de Frota"
+        title="Motoristas"
+        subtitle="Gerencie os motoristas vinculados à frota."
+        actionLabel="Novo Motorista"
+        onAction={() => setModal(true)}
+      >
+        <div className="flex items-center bg-surface-container-highest rounded-lg p-1 border border-outline-variant/10 shadow-sm">
+          <div className="relative flex items-center h-9">
+            <span className="material-symbols-outlined absolute left-3 text-outline text-lg">
+              person
+            </span>
+            <input
+              type="text"
+              placeholder="Nome..."
+              value={filters.name}
+              onChange={(e) => setFilters((f) => ({ ...f, name: e.target.value }))}
+              onKeyDown={handleKeyDown}
+              className="pl-10 pr-3 py-2 bg-transparent border-none w-32 focus:ring-0 transition-all placeholder:text-outline/50 text-sm outline-none text-on-surface"
+            />
+          </div>
+          <div className="w-[1px] bg-outline-variant/20 h-6 mx-1" />
+          <div className="relative flex items-center h-9">
+            <span className="material-symbols-outlined absolute left-3 text-outline text-lg">
+              badge
+            </span>
+            <input
+              type="text"
+              placeholder="CPF..."
+              value={filters.cpf}
+              onChange={(e) => setFilters((f) => ({ ...f, cpf: e.target.value }))}
+              onKeyDown={handleKeyDown}
+              className="pl-10 pr-3 py-2 bg-transparent border-none w-32 focus:ring-0 transition-all placeholder:text-outline/50 text-sm outline-none text-on-surface"
+            />
+          </div>
+          <div className="w-[1px] bg-outline-variant/20 h-6 mx-1" />
+          <div className="w-36">
+            <Select
+              placeholder="Caminhão"
+              value={filters.truck_id}
+              onChange={(val) => setFilters((f) => ({ ...f, truck_id: val }))}
+              options={trucks.map((t) => ({ value: t.id, label: t.license_plate }))}
+              optional
+              className="scale-90 origin-left"
+            />
+          </div>
+          <button
+            onClick={() => setAppliedFilters(filters)}
+            className="bg-primary text-on-primary px-4 py-1.5 rounded-md font-bold text-xs hover:brightness-110 active:scale-95 transition-all ml-1 mr-0.5"
+          >
+            Filtrar
+          </button>
         </div>
-        <button
-          onClick={() => {
-            setEditing(null)
-            setForm({ ...EMPTY })
-            setModal(true)
-          }}
-          className="flex items-center gap-3 bg-primary text-on-primary px-8 py-4 rounded font-bold text-sm shadow-lg shadow-primary/20 hover:brightness-110 active:scale-95 transition-all"
-        >
-          <span className="material-symbols-outlined">person_add</span>
-          Novo Motorista
-        </button>
-      </div>
+      </PageHeader>
 
       {/* Stats */}
       <div className="grid grid-cols-3 gap-6 mb-10">
@@ -204,7 +282,6 @@ export function DriversPage() {
         <div className="px-6 py-4 bg-surface-container-high/50 border-t border-outline-variant/10">
           <p className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">
             {rows.length} motorista{rows.length !== 1 ? 's' : ''} cadastrado
-            {rows.length !== 1 ? 's' : ''}
           </p>
         </div>
       </div>
@@ -216,39 +293,56 @@ export function DriversPage() {
         >
           <div className="grid grid-cols-2 gap-4">
             <div className="col-span-2">
-              <Input label="Nome" value={form.name} onChange={(e) => set('name', e.target.value)} />
+              <Input label="Nome" {...register('name')} error={errors.name?.message} />
             </div>
             <Input
               label="CPF"
               optional
-              value={form.cpf}
-              onChange={(e) => set('cpf', e.target.value)}
+              mask="999.999.999-99"
+              maskChar=""
+              {...register('cpf')}
+              error={errors.cpf?.message}
             />
             <Input
               label="Telefone"
               optional
-              value={form.phone}
-              onChange={(e) => set('phone', e.target.value)}
+              mask={phoneMask}
+              maskChar={null}
+              {...register('phone')}
+              error={errors.phone?.message}
             />
-            <Input
-              label="Salário mensal (R$)"
-              type="number"
-              value={form.monthly_salary}
-              onChange={(e) => set('monthly_salary', e.target.value)}
+            <Controller
+              name="monthly_salary"
+              control={control}
+              render={({ field }) => (
+                <CurrencyInput
+                  label="Salário mensal"
+                  value={field.value}
+                  onChange={field.onChange}
+                  error={errors.monthly_salary?.message}
+                />
+              )}
             />
-            <Select
-              label="Caminhão vinculado"
-              optional
-              value={form.truck_id}
-              onChange={(e) => set('truck_id', e.target.value)}
-              options={trucks.map((t) => ({ value: t.id, label: t.license_plate }))}
+            <Controller
+              name="truck_id"
+              control={control}
+              render={({ field }) => (
+                <Select
+                  label="Caminhão vinculado"
+                  optional
+                  value={field.value}
+                  onChange={field.onChange}
+                  error={errors.truck_id?.message}
+                  options={trucks.map((t) => ({ value: t.id, label: t.license_plate }))}
+                />
+              )}
             />
           </div>
           <div className="flex justify-end gap-3 mt-6">
             <Button variant="ghost" onClick={() => setModal(false)}>
               Cancelar
             </Button>
-            <Button onClick={save}>Salvar</Button>
+            <Button onClick={handleSubmit(onSubmit)}>Salvar</Button>
           </div>
         </Modal>
       )}

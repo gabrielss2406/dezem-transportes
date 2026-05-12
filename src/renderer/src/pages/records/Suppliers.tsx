@@ -1,7 +1,10 @@
+import { zodResolver } from '@hookform/resolvers/zod'
 import { useCallback, useEffect, useState } from 'react'
+import { Controller, useForm } from 'react-hook-form'
+import { supplierSchema } from '../../../../shared/schemas'
+import { PageHeader } from '../../components/PageHeader'
 import { Button, Input, Modal, Select, Toast, useToast } from '../../components/ui'
 import type { Supplier } from '../../lib/types'
-import { SUPPLIER_TYPES } from '../../lib/utils'
 
 const EMPTY = { name: '', type: 'gas_station' as Supplier['type'], phone: '' }
 
@@ -14,28 +17,75 @@ const typeIcon: Record<string, string> = {
 
 export function SuppliersPage() {
   const [rows, setRows] = useState<Supplier[]>([])
+  const [supplierTypes, setSupplierTypes] = useState<{ value: string; label: string }[]>([])
   const [modal, setModal] = useState(false)
   const [editing, setEditing] = useState<Supplier | null>(null)
-  const [form, setForm] = useState<any>({ ...EMPTY })
+  const [filters, setFilters] = useState({ name: '', type: '' })
+  const [appliedFilters, setAppliedFilters] = useState({ name: '', type: '' })
   const { toast, show } = useToast()
 
-  const load = useCallback(() => window.api.suppliers.list().then(setRows), [])
+  const {
+    register,
+    handleSubmit,
+    setValue,
+    formState: { errors },
+    reset,
+    control,
+    watch,
+  } = useForm<Omit<Supplier, 'id'>>({
+    resolver: zodResolver(supplierSchema),
+    defaultValues: { ...EMPTY },
+    mode: 'all',
+  })
+
+  const phoneValue = watch('phone') || ''
+  const digits = phoneValue.replace(/\D/g, '')
+  const phoneMask =
+    digits.length > 10 || (digits.length >= 3 && digits[2] === '9')
+      ? '(99) 99999-9999'
+      : '(99) 9999 - 9999'
+
+  const load = useCallback(async () => {
+    const [s, st] = await Promise.all([
+      window.api.suppliers.list(appliedFilters),
+      window.api['supplier-types'].list(),
+    ])
+    setRows(s)
+    setSupplierTypes(st)
+  }, [appliedFilters])
+
   useEffect(() => {
     load()
   }, [load])
-  const set = (k: string, v: any) => setForm((f: any) => ({ ...f, [k]: v }))
 
-  async function save() {
+  // Limpeza automática ao fechar o modal
+  useEffect(() => {
+    if (!modal) {
+      setEditing(null)
+      reset(EMPTY)
+    }
+  }, [modal])
+
+  const onSubmit = async (data: Omit<Supplier, 'id'>) => {
     try {
-      if (editing) await window.api.suppliers.update(editing.id, form)
-      else await window.api.suppliers.create(form)
+      let res: any
+      if (editing) {
+        res = await window.api.suppliers.update(editing.id, data)
+      } else {
+        res = await window.api.suppliers.create(data)
+      }
+
+      if (res && res.ok === false) {
+        const msg = res.errors ? Object.values(res.errors)[0] : 'Erro ao salvar dados'
+        show(String(msg), 'error')
+        return
+      }
+
       show(editing ? 'Fornecedor atualizado!' : 'Fornecedor cadastrado!')
       setModal(false)
-      setEditing(null)
-      setForm({ ...EMPTY })
       load()
     } catch (e: any) {
-      show(e.message, 'error')
+      show(e.message || 'Erro de conexão', 'error')
     }
   }
 
@@ -48,7 +98,11 @@ export function SuppliersPage() {
 
   function edit(row: Supplier) {
     setEditing(row)
-    setForm({ name: row.name, type: row.type, phone: row.phone ?? '' })
+    reset({
+      name: row.name,
+      type: row.type,
+      phone: row.phone ?? '',
+    })
     setModal(true)
   }
 
@@ -57,27 +111,47 @@ export function SuppliersPage() {
       {toast && <Toast message={toast.message} type={toast.type} />}
 
       {/* Header */}
-      <div className="flex items-end justify-between mb-10">
-        <div>
-          <span className="text-primary font-bold tracking-widest text-xs uppercase block mb-2">
-            Gestão Operacional
-          </span>
-          <h1 className="text-5xl font-black font-headline tracking-tighter text-on-surface">
-            Fornecedores
-          </h1>
+      <PageHeader
+        pretitle="Gestão Operacional"
+        title="Fornecedores"
+        actionLabel="Novo Fornecedor"
+        onAction={() => setModal(true)}
+      >
+        <div className="flex items-center bg-surface-container-highest rounded-lg p-1 border border-outline-variant/10 shadow-sm">
+          <div className="relative flex items-center h-9">
+            <span className="material-symbols-outlined absolute left-3 text-outline text-lg">
+              search
+            </span>
+            <input
+              type="text"
+              placeholder="Buscar por nome..."
+              value={filters.name}
+              onChange={(e) => setFilters((f) => ({ ...f, name: e.target.value }))}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') setAppliedFilters(filters)
+              }}
+              className="pl-10 pr-3 py-2 bg-transparent border-none w-48 focus:ring-0 transition-all placeholder:text-outline/50 text-sm outline-none text-on-surface"
+            />
+          </div>
+          <div className="w-[1px] bg-outline-variant/20 h-6 mx-1" />
+          <div className="w-36">
+            <Select
+              placeholder="Tipo"
+              value={filters.type}
+              onChange={(val) => setFilters((f) => ({ ...f, type: val }))}
+              options={supplierTypes}
+              optional
+              className="scale-75 origin-left -ml-2"
+            />
+          </div>
+          <button
+            onClick={() => setAppliedFilters(filters)}
+            className="bg-primary text-on-primary px-4 py-1.5 rounded-md font-bold text-xs hover:brightness-110 active:scale-95 transition-all ml-1 mr-0.5"
+          >
+            Filtrar
+          </button>
         </div>
-        <button
-          onClick={() => {
-            setEditing(null)
-            setForm({ ...EMPTY })
-            setModal(true)
-          }}
-          className="flex items-center gap-3 bg-primary text-on-primary px-8 py-4 rounded font-bold text-sm shadow-lg shadow-primary/20 hover:brightness-110 active:scale-95 transition-all"
-        >
-          <span className="material-symbols-outlined">person_add</span>
-          Novo Fornecedor
-        </button>
-      </div>
+      </PageHeader>
 
       {/* Stats */}
       <div className="grid grid-cols-3 gap-6 mb-10">
@@ -126,12 +200,12 @@ export function SuppliersPage() {
             {rows.length === 0 && (
               <tr>
                 <td colSpan={4} className="px-8 py-12 text-center text-on-surface-variant text-sm">
-                  Nenhum fornecedor cadastrado
+                  Nenhum fornecedor encontrado com os filtros selecionados
                 </td>
               </tr>
             )}
             {rows.map((row, i) => {
-              const typeLabel = SUPPLIER_TYPES.find((t) => t.value === row.type)?.label ?? row.type
+              const typeLabel = supplierTypes.find((t) => t.value === row.type)?.label ?? row.type
               return (
                 <tr
                   key={row.id}
@@ -186,25 +260,34 @@ export function SuppliersPage() {
           onClose={() => setModal(false)}
         >
           <div className="flex flex-col gap-4">
-            <Input label="Nome" value={form.name} onChange={(e) => set('name', e.target.value)} />
-            <Select
-              label="Tipo"
-              value={form.type}
-              onChange={(e) => set('type', e.target.value)}
-              options={SUPPLIER_TYPES}
+            <Input label="Nome" {...register('name')} error={errors.name?.message} />
+            <Controller
+              name="type"
+              control={control}
+              render={({ field }) => (
+                <Select
+                  label="Tipo"
+                  value={field.value}
+                  onChange={field.onChange}
+                  error={errors.type?.message}
+                  options={supplierTypes}
+                />
+              )}
             />
             <Input
               label="Telefone"
               optional
-              value={form.phone}
-              onChange={(e) => set('phone', e.target.value)}
+              mask={phoneMask}
+              maskChar={null}
+              {...register('phone')}
+              error={errors.phone?.message}
             />
           </div>
           <div className="flex justify-end gap-3 mt-6">
             <Button variant="ghost" onClick={() => setModal(false)}>
               Cancelar
             </Button>
-            <Button onClick={save}>Salvar</Button>
+            <Button onClick={handleSubmit(onSubmit)}>Salvar</Button>
           </div>
         </Modal>
       )}
