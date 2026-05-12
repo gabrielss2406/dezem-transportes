@@ -1,4 +1,5 @@
 import { z } from 'zod'
+export { z }
 import { isValidCNPJ, isValidCPF, isValidPhone } from './validation'
 
 // Configuração global de mensagens em Português
