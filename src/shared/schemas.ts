@@ -133,7 +133,7 @@ export const routeSchema = z.object({
 export const fuelStopSchema = z.object({
   supplier_id: requiredNumber(999999999, 'ID inválido'),
   value: requiredNumber(1000000, 'Valor máximo de R$ 1.000.000'),
-  liters: requiredNumber(10000, 'Máximo de 10.000 litros'),
+  liters: optionalNumber(10000, 'Máximo de 10.000 litros'),
   km_driven: optionalNumber(10000, 'KM máximo de 10.000'),
 })
 

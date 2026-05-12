@@ -196,7 +196,7 @@ export function DashboardPage() {
             <div className="p-6 grid grid-cols-2 md:grid-cols-3 gap-4">
               {summary.perCategory.map((c) => (
                 <div key={c.category} className="bg-surface-container-high p-5 rounded-lg">
-                  <p className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant mb-2 capitalize">
+                  <p className="text-[10px] font-black tracking-widest text-on-surface-variant mb-2 capitalize">
                     {c.category}
                   </p>
                   <p className="font-black text-on-surface text-xl font-headline">

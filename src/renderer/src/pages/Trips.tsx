@@ -137,7 +137,7 @@ export function TripsPage() {
     }
     const supplier = suppliers.find((s) => String(s.id) === String(supplierId))
     if (supplier) {
-      append({ supplier_id: supplier.id, value: 0, liters: 0, km_driven: 0 })
+      append({ supplier_id: supplier.id, value: 0, liters: null, km_driven: 0 })
       setStopSearchId('') // Reset selection
     }
   }
@@ -550,6 +550,7 @@ export function TripsPage() {
                             <div className="col-span-1">
                               <Input
                                 label="Litros"
+                                optional
                                 type="number"
                                 step="0.01"
                                 placeholder="0,00"
@@ -576,7 +577,7 @@ export function TripsPage() {
                                 label={`${(() => {
                                   const liters = watch(`fuel_stops.${index}.liters` as any)
                                   const km = watch(`fuel_stops.${index}.km_driven` as any)
-                                  if (!liters || !km) {
+                                  if (!liters || !km || Number(liters) === 0) {
                                     return '0.00'
                                   }
                                   return (Number(km) / Number(liters)).toFixed(2)
