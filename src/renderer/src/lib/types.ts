@@ -44,6 +44,18 @@ export interface Route {
   id: number
   name: string
   distance_km?: number
+  customer_id?: number
+  customer_name?: string
+}
+
+export interface FuelStop {
+  id?: number
+  trip_id?: number
+  supplier_id: number
+  supplier_name?: string
+  value: number
+  liters: number
+  km_driven: number
 }
 
 export interface Trip {
@@ -59,6 +71,8 @@ export interface Trip {
   price_charged: number
   km_driven: number
   observation?: string
+  fuel_stops?: FuelStop[]
+  fuel_stops_count?: number
   // joins
   truck_license_plate?: string
   truck_model?: string
@@ -140,6 +154,7 @@ declare global {
         list(filters?: any): Promise<Trip[]>
         create(data: Omit<Trip, 'id'>): Promise<{ id: number }>
         delete(id: number): Promise<{ ok: boolean }>
+        getFuelStops(tripId: number): Promise<FuelStop[]>
       }
       costs: {
         list(filters?: any): Promise<Cost[]>

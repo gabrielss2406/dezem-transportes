@@ -25,7 +25,6 @@ export function ProductsPage() {
   const {
     register,
     handleSubmit,
-    setValue,
     formState: { errors },
     reset,
     control,
@@ -49,12 +48,15 @@ export function ProductsPage() {
       setEditing(null)
       reset(EMPTY)
     }
-  }, [modal])
+  }, [modal, reset])
 
   const onSubmit = async (data: Omit<Product, 'id'>) => {
     try {
-      if (editing) await window.api.products.update(editing.id, data)
-      else await window.api.products.create(data)
+      if (editing) {
+        await window.api.products.update(editing.id, data)
+      } else {
+        await window.api.products.create(data)
+      }
       show(editing ? 'Produto atualizado!' : 'Produto cadastrado!')
       setModal(false)
       load()
@@ -64,7 +66,9 @@ export function ProductsPage() {
   }
 
   async function handleDelete(row: Product) {
-    if (!confirm('Excluir este produto?')) return
+    if (!confirm('Excluir este produto?')) {
+      return
+    }
     await window.api.products.delete(row.id)
     show('Produto excluído')
     load()
@@ -101,12 +105,15 @@ export function ProductsPage() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === 'Enter') setAppliedSearch(search)
+                if (e.key === 'Enter') {
+                  setAppliedSearch(search)
+                }
               }}
               className="pl-10 pr-3 py-2 bg-transparent border-none w-48 focus:ring-0 transition-all placeholder:text-outline/50 text-sm outline-none text-on-surface"
             />
           </div>
           <button
+            type="button"
             onClick={() => setAppliedSearch(search)}
             className="bg-primary text-on-primary px-4 py-1.5 rounded-md font-bold text-xs hover:brightness-110 active:scale-95 transition-all ml-1 mr-0.5"
           >
@@ -191,12 +198,14 @@ export function ProductsPage() {
                   <td className="px-8 py-5">
                     <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                       <button
+                        type="button"
                         onClick={() => edit(row)}
                         className="p-2 text-outline hover:text-primary hover:bg-primary/10 rounded-lg transition-all"
                       >
                         <span className="material-symbols-outlined text-xl">edit</span>
                       </button>
                       <button
+                        type="button"
                         onClick={() => handleDelete(row)}
                         className="p-2 text-outline hover:text-error hover:bg-error/10 rounded-lg transition-all"
                       >

@@ -90,7 +90,16 @@ export function setupDatabase(): void {
       id          INTEGER PRIMARY KEY AUTOINCREMENT,
       name        TEXT NOT NULL,
       distance_km REAL,
+      customer_id INTEGER REFERENCES customers(id),
       created_at  TEXT DEFAULT (datetime('now'))
+    );
+
+    -- Route Waypoints
+    CREATE TABLE IF NOT EXISTS route_waypoints (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      route_id   INTEGER NOT NULL REFERENCES routes(id) ON DELETE CASCADE,
+      name       TEXT NOT NULL,
+      sequence   INTEGER NOT NULL
     );
 
     -- Trips
@@ -133,12 +142,25 @@ export function setupDatabase(): void {
       created_at    TEXT DEFAULT (datetime('now'))
     );
 
+    -- Trip Fuel Stops
+    CREATE TABLE IF NOT EXISTS trip_fuel_stops (
+      id            INTEGER PRIMARY KEY AUTOINCREMENT,
+      trip_id       INTEGER NOT NULL REFERENCES trips(id) ON DELETE CASCADE,
+      supplier_id   INTEGER NOT NULL REFERENCES suppliers(id),
+      value         REAL    NOT NULL DEFAULT 0,
+      liters        REAL    NOT NULL DEFAULT 0,
+      km_driven     REAL    NOT NULL DEFAULT 0,
+      created_at    TEXT    DEFAULT (datetime('now'))
+    );
+
     -- Indexes for performance on frequent queries
     CREATE INDEX IF NOT EXISTS idx_trips_date      ON trips(date);
     CREATE INDEX IF NOT EXISTS idx_trips_truck     ON trips(truck_id);
     CREATE INDEX IF NOT EXISTS idx_trips_driver    ON trips(driver_id);
     CREATE INDEX IF NOT EXISTS idx_costs_date      ON costs(date);
     CREATE INDEX IF NOT EXISTS idx_costs_category  ON costs(category);
+    CREATE INDEX IF NOT EXISTS idx_route_waypoints_route_id ON route_waypoints(route_id);
+    CREATE INDEX IF NOT EXISTS idx_trip_fuel_stops_trip_id  ON trip_fuel_stops(trip_id);
   `)
 
   // Seed: default admin user if none exists
@@ -157,6 +179,14 @@ export function setupDatabase(): void {
     ).run()
   }
 
+  // Migration: Add customer_id to routes if it doesn't exist
+  const routeInfo = db.pragma('table_info(routes)') as { name: string }[]
+  if (!routeInfo.some((col) => col.name === 'customer_id')) {
+    db.exec('ALTER TABLE routes ADD COLUMN customer_id INTEGER REFERENCES customers(id)')
+  }
+  // This needs to be after the column is guaranteed to exist
+  db.exec('CREATE INDEX IF NOT EXISTS idx_routes_customer ON routes(customer_id)')
+
   // Seed: default supplier types if none exist
   const supplierTypeCount = (db.prepare('SELECT COUNT(*) as c FROM supplier_types').get() as any).c
   if (supplierTypeCount === 0) {
@@ -164,7 +194,9 @@ export function setupDatabase(): void {
       'INSERT INTO supplier_types (value, label, is_deletable) VALUES (?, ?, ?)',
     )
     const transaction = db.transaction((types) => {
-      for (const type of types) stmt.run(type.value, type.label, type.is_deletable)
+      for (const type of types) {
+        stmt.run(type.value, type.label, type.is_deletable)
+      }
     })
     transaction([
       { value: 'gas_station', label: 'Posto de Combustível', is_deletable: 0 },
@@ -181,7 +213,9 @@ export function setupDatabase(): void {
       'INSERT INTO cost_categories (value, label, is_deletable) VALUES (?, ?, ?)',
     )
     const transaction = db.transaction((types) => {
-      for (const type of types) stmt.run(type.value, type.label, type.is_deletable)
+      for (const type of types) {
+        stmt.run(type.value, type.label, type.is_deletable)
+      }
     })
     transaction([
       { value: 'fuel', label: 'Combustível', is_deletable: 0 },

@@ -1,10 +1,11 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useCallback, useEffect, useState } from 'react'
-import { Controller, useForm } from 'react-hook-form'
+import { Controller, useFieldArray, useForm } from 'react-hook-form'
 import { tripSchema } from '../../../shared/schemas'
 import type { Customer, Driver, Product, Route, Supplier, Trip, Truck } from '../../lib/types'
 import { PageHeader } from '../components/PageHeader'
 import {
+  Badge,
   Button,
   CurrencyInput,
   DatePicker,
@@ -28,6 +29,14 @@ const EMPTY = {
   price_charged: 0,
   km_driven: 0,
   observation: '',
+  fuel_stops: [],
+}
+
+const typeIcon: Record<string, string> = {
+  gas_station: 'local_gas_station',
+  workshop: 'build',
+  quarry: 'foundation',
+  other: 'handshake',
 }
 
 export function TripsPage() {
@@ -38,8 +47,8 @@ export function TripsPage() {
   const [customers, setCustomers] = useState<Customer[]>([])
   const [routes, setRoutes] = useState<Route[]>([])
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
-  const [gasStations, setGasStations] = useState<Supplier[]>([])
   const [modal, setModal] = useState(false)
+  const [stopSearchId, setStopSearchId] = useState<string | number>('')
   const [filters, setFilters] = useState({
     startDate: '',
     endDate: '',
@@ -54,18 +63,25 @@ export function TripsPage() {
   const {
     register,
     handleSubmit,
-    setValue,
     formState: { errors },
     reset,
     control,
+    watch,
   } = useForm<Omit<Trip, 'id'>>({
     resolver: zodResolver(tripSchema),
     defaultValues: { ...EMPTY },
     mode: 'all',
   })
 
+  const { fields, append, remove } = useFieldArray({
+    control,
+    name: 'fuel_stops' as any,
+  })
+
+  const selectedCustomerId = watch('customer_id')
+
   const load = useCallback(async () => {
-    const [t, tr, d, p, c, r, s, gs] = await Promise.all([
+    const [t, tr, d, p, c, r, s] = await Promise.all([
       window.api.trips.list(filters),
       window.api.trucks.list(),
       window.api.drivers.list(),
@@ -73,7 +89,6 @@ export function TripsPage() {
       window.api.customers.list(),
       window.api.routes.list(),
       window.api.suppliers.list(),
-      window.api.suppliers.list({ type: 'gas_station' }),
     ])
     setTrips(t)
     setTrucks(tr)
@@ -82,7 +97,6 @@ export function TripsPage() {
     setCustomers(c)
     setRoutes(r)
     setSuppliers(s)
-    setGasStations(gs)
   }, [filters])
 
   useEffect(() => {
@@ -93,8 +107,9 @@ export function TripsPage() {
   useEffect(() => {
     if (!modal) {
       reset(EMPTY)
+      setStopSearchId('')
     }
-  }, [modal])
+  }, [modal, reset])
 
   const onSubmit = async (data: Omit<Trip, 'id'>) => {
     try {
@@ -108,10 +123,23 @@ export function TripsPage() {
   }
 
   async function handleDelete(row: Trip) {
-    if (!confirm('Excluir esta viagem?')) return
+    if (!confirm('Excluir esta viagem?')) {
+      return
+    }
     await window.api.trips.delete(row.id)
     show('Viagem excluída', 'success')
     load()
+  }
+
+  const handleAddStop = (supplierId: string | number) => {
+    if (!supplierId) {
+      return
+    }
+    const supplier = suppliers.find((s) => String(s.id) === String(supplierId))
+    if (supplier) {
+      append({ supplier_id: supplier.id, value: 0, liters: null, km_driven: 0 })
+      setStopSearchId('') // Reset selection
+    }
   }
 
   const totalRevenue = trips.reduce((s, t) => s + t.price_charged, 0)
@@ -267,7 +295,16 @@ export function TripsPage() {
                 <td className="px-6 py-4 text-sm text-on-surface">{row.driver_name}</td>
                 <td className="px-6 py-4 text-sm text-on-surface">{row.product_name}</td>
                 <td className="px-6 py-4 text-sm text-on-surface-variant">{row.weight_ton} ton</td>
-                <td className="px-6 py-4 text-sm text-on-surface-variant">{row.km_driven} km</td>
+                <td className="px-6 py-4 text-sm text-on-surface-variant">
+                  {row.km_driven} km
+                  {row.fuel_stops_count
+                    ? row.fuel_stops_count > 0 && (
+                        <div className="mt-1">
+                          <Badge label={`${row.fuel_stops_count} paradas`} color="amber" />
+                        </div>
+                      )
+                    : null}
+                </td>
                 <td className="px-6 py-4 text-sm font-bold text-on-surface">
                   {formatBRL(row.price_charged)}
                 </td>
@@ -277,6 +314,7 @@ export function TripsPage() {
                 <td className="px-6 py-4">
                   <div className="flex justify-end opacity-0 group-hover:opacity-100 transition-opacity">
                     <button
+                      type="button"
                       onClick={() => handleDelete(row)}
                       className="p-2 text-on-surface-variant hover:text-error hover:bg-error/10 rounded-lg transition-all"
                     >
@@ -293,7 +331,7 @@ export function TripsPage() {
       {/* Modal: Nova Viagem */}
       {modal && (
         <Modal title="Nova Viagem" onClose={() => setModal(false)}>
-          <div className="space-y-5">
+          <div className="space-y-6">
             <div className="grid grid-cols-2 gap-5">
               <DatePicker label="Data" {...register('date')} error={errors.date?.message} />
 
@@ -371,7 +409,25 @@ export function TripsPage() {
                     value={field.value}
                     onChange={field.onChange}
                     error={errors.route_id?.message}
-                    options={routes.map((r) => ({ value: r.id, label: r.name }))}
+                    options={routes.map((r) => {
+                      const isSelectedCustomer =
+                        r.customer_id && r.customer_id === Number(selectedCustomerId)
+
+                      if (isSelectedCustomer) {
+                        return {
+                          value: r.id,
+                          displayLabel: r.name,
+                          label: (
+                            <div className="flex items-center justify-between w-full">
+                              <span>{r.name}</span>
+                              <Badge label="Cliente" color="blue" />
+                            </div>
+                          ),
+                        }
+                      }
+
+                      return { value: r.id, label: r.name }
+                    })}
                   />
                 )}
               />
@@ -399,26 +455,11 @@ export function TripsPage() {
               />
 
               <Input
-                label="Km percorrido"
+                label="Km total da viagem"
                 type="number"
                 placeholder="0"
                 {...register('km_driven')}
                 error={errors.km_driven?.message}
-              />
-
-              <Controller
-                name="supplier_id"
-                control={control}
-                render={({ field }) => (
-                  <Select
-                    label="Posto"
-                    optional
-                    value={field.value}
-                    onChange={field.onChange}
-                    error={errors.supplier_id?.message}
-                    options={gasStations.map((s) => ({ value: s.id, label: s.name }))}
-                  />
-                )}
               />
 
               <div className="col-span-2">
@@ -431,11 +472,139 @@ export function TripsPage() {
               </div>
             </div>
 
-            <div className="flex justify-end gap-3 pt-2">
+            {/* Paradas e Custos */}
+            <div className="border-t border-outline-variant/10 pt-6">
+              <h3 className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant mb-4">
+                Paradas e Custos Extra (Postos, Oficinas, etc.)
+              </h3>
+
+              <div className="mb-6">
+                <Select
+                  placeholder="Pesquisar local/fornecedor para adicionar..."
+                  value={stopSearchId}
+                  onChange={handleAddStop}
+                  options={suppliers.map((s) => ({
+                    value: s.id,
+                    label: (
+                      <div className="flex items-center justify-between w-full">
+                        <div className="flex items-center gap-2">
+                          <span className="material-symbols-outlined text-sm opacity-60">
+                            {typeIcon[s.type] || 'handshake'}
+                          </span>
+                          <span>{s.name}</span>
+                        </div>
+                        <Badge label={s.type} color={s.type === 'gas_station' ? 'amber' : 'gray'} />
+                      </div>
+                    ),
+                    displayLabel: s.name,
+                  }))}
+                />
+              </div>
+
+              <div className="space-y-4">
+                {fields.map((field: any, index) => {
+                  const supplier = suppliers.find((s) => s.id === field.supplier_id)
+                  return (
+                    <div
+                      key={field.id}
+                      className="bg-surface-container-lowest border border-outline-variant/20 rounded-xl overflow-hidden shadow-sm"
+                    >
+                      <div className="px-4 py-2 bg-surface-container-low border-b border-outline-variant/10 flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="material-symbols-outlined text-sm text-primary">
+                            {supplier ? typeIcon[supplier.type] : 'location_on'}
+                          </span>
+                          <span className="text-xs font-bold text-on-surface uppercase tracking-wider">
+                            {supplier?.name || 'Local'}
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => remove(index)}
+                          className="text-on-surface-variant hover:text-error transition-colors"
+                          title="Remover parada"
+                        >
+                          <span className="material-symbols-outlined text-lg">close</span>
+                        </button>
+                      </div>
+
+                      <div className="p-4 grid grid-cols-3 gap-4 animate-in fade-in slide-in-from-top-1 duration-200">
+                        <div
+                          className={supplier?.type === 'gas_station' ? 'col-span-1' : 'col-span-3'}
+                        >
+                          <Controller
+                            name={`fuel_stops.${index}.value` as any}
+                            control={control}
+                            render={({ field }) => (
+                              <CurrencyInput
+                                label="Valor Gasto"
+                                value={field.value}
+                                onChange={field.onChange}
+                                error={(errors.fuel_stops as any)?.[index]?.value?.message}
+                              />
+                            )}
+                          />
+                        </div>
+                        {supplier?.type === 'gas_station' && (
+                          <>
+                            <div className="col-span-1">
+                              <Input
+                                label="Litros"
+                                optional
+                                type="number"
+                                step="0.01"
+                                placeholder="0,00"
+                                {...register(`fuel_stops.${index}.liters` as any)}
+                                error={(errors.fuel_stops as any)?.[index]?.liters?.message}
+                              />
+                            </div>
+                            <div className="col-span-1">
+                              <Input
+                                label="Andou (km)"
+                                optional
+                                type="number"
+                                placeholder="0"
+                                {...register(`fuel_stops.${index}.km_driven` as any)}
+                                error={(errors.fuel_stops as any)?.[index]?.km_driven?.message}
+                              />
+                            </div>
+                            <div className="col-span-3 flex items-center justify-between bg-tertiary-container/10 px-4 py-2 rounded-lg">
+                              <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
+                                Rendimento Estimado
+                              </span>
+                              <Badge
+                                color="green"
+                                label={`${(() => {
+                                  const liters = watch(`fuel_stops.${index}.liters` as any)
+                                  const km = watch(`fuel_stops.${index}.km_driven` as any)
+                                  if (!liters || !km || Number(liters) === 0) {
+                                    return '0.00'
+                                  }
+                                  return (Number(km) / Number(liters)).toFixed(2)
+                                })()} km/L`}
+                              />
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+
+                {fields.length === 0 && (
+                  <div className="py-8 text-center border-2 border-dashed border-outline-variant/10 rounded-xl text-on-surface-variant text-sm italic">
+                    Utilize a busca acima para registrar paradas (abastecimentos, gastos, etc.)
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 pt-4 border-t border-outline-variant/10">
               <Button variant="ghost" onClick={() => setModal(false)}>
                 Cancelar
               </Button>
               <button
+                type="button"
                 onClick={handleSubmit(onSubmit)}
                 className="flex items-center gap-3 px-8 py-3 bg-primary text-on-primary font-extrabold rounded transition-all hover:brightness-110 active:scale-95 shadow-lg shadow-primary/20"
               >

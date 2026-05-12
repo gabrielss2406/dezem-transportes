@@ -55,7 +55,9 @@ function DynamicTypeManager({
   })
 
   const load = useCallback(() => {
-    if (!api) return
+    if (!api) {
+      return
+    }
     api.list().then(setItems)
   }, [api])
 
@@ -64,7 +66,9 @@ function DynamicTypeManager({
   }, [load])
 
   const onSubmit = async ({ label }: FormData) => {
-    if (!api) return
+    if (!api) {
+      return
+    }
     const value = label.toLowerCase().replace(/\s+/g, '_')
     try {
       const result = await api.create({ value, label })
@@ -81,8 +85,12 @@ function DynamicTypeManager({
   }
 
   const handleDelete = async (id: number) => {
-    if (!api) return
-    if (!confirm('Tem certeza que deseja excluir este item?')) return
+    if (!api) {
+      return
+    }
+    if (!confirm('Tem certeza que deseja excluir este item?')) {
+      return
+    }
     try {
       const result = await api.delete(id)
       if (result.ok) {
@@ -121,6 +129,7 @@ function DynamicTypeManager({
               <p className="text-xs text-on-surface-variant font-mono">{item.value}</p>
             </div>
             <button
+              type="button"
               onClick={() => handleDelete(item.id)}
               disabled={item.is_deletable === 0}
               className="p-2 text-on-surface-variant rounded-full disabled:text-outline-variant/30 disabled:cursor-not-allowed hover:text-error enabled:hover:bg-error/10"
@@ -178,6 +187,7 @@ export function SettingsPage({ theme, onToggleTheme }: SettingsPageProps) {
               </p>
             </div>
             <button
+              type="button"
               onClick={onToggleTheme}
               className="flex items-center gap-3 px-5 py-2.5 rounded-lg font-bold text-sm text-on-surface-variant bg-surface-container-high hover:text-on-surface transition-colors"
             >

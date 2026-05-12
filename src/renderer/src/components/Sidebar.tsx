@@ -7,6 +7,7 @@ const navItems = [
   { path: '/suppliers', label: 'Fornecedores', icon: 'handshake' },
   { path: '/trucks', label: 'Caminhões', icon: 'local_shipping' },
   { path: '/drivers', label: 'Motoristas', icon: 'badge' },
+  { path: '/routes', label: 'Rotas', icon: 'map' },
   { path: '/trips', label: 'Viagens', icon: 'route' },
   { path: '/costs', label: 'Custos', icon: 'payments' },
   { path: '/settings', label: 'Configurações', icon: 'settings' },
@@ -83,12 +84,14 @@ export function Sidebar({ onLogout }: SidebarProps) {
           <span>Design System</span>
         </Link>
         <button
+          type="button"
           onClick={() => navigate('/trips')}
           className="w-full py-3 bg-primary text-on-primary font-bold rounded text-sm shadow-lg shadow-primary/20 hover:brightness-110 active:scale-95 transition-all"
         >
           Nova Viagem
         </button>
         <button
+          type="button"
           onClick={onLogout}
           className="flex items-center gap-3 px-2 py-2 w-full text-on-surface-variant hover:text-on-surface transition-colors text-sm"
         >

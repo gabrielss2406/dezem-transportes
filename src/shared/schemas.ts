@@ -1,22 +1,31 @@
 import { z } from 'zod'
+export { z }
 import { isValidCNPJ, isValidCPF, isValidPhone } from './validation'
 
 // Configuração global de mensagens em Português
 z.setErrorMap((issue, ctx) => {
   if (issue.code === z.ZodIssueCode.invalid_type) {
-    if (issue.received === 'undefined') return { message: 'Obrigatório' }
+    if (issue.received === 'undefined') {
+      return { message: 'Obrigatório' }
+    }
     return { message: 'Valor inválido' }
   }
   if (issue.code === z.ZodIssueCode.too_small) {
-    if (issue.type === 'string') return { message: `Mínimo de ${issue.minimum} caracteres` }
+    if (issue.type === 'string') {
+      return { message: `Mínimo de ${issue.minimum} caracteres` }
+    }
     return { message: `Valor mínimo é ${issue.minimum}` }
   }
   if (issue.code === z.ZodIssueCode.too_big) {
-    if (issue.type === 'string') return { message: `Máximo de ${issue.maximum} caracteres` }
+    if (issue.type === 'string') {
+      return { message: `Máximo de ${issue.maximum} caracteres` }
+    }
     return { message: `Valor máximo permitido é ${issue.maximum}` }
   }
   if (issue.code === z.ZodIssueCode.invalid_string) {
-    if (issue.validation === 'email') return { message: 'E-mail inválido' }
+    if (issue.validation === 'email') {
+      return { message: 'E-mail inválido' }
+    }
     return { message: 'Formato inválido' }
   }
   if (issue.code === z.ZodIssueCode.custom) {
@@ -39,6 +48,14 @@ const requiredNumber = (max: number, maxMsg: string) =>
   )
 
 export const idSchema = z.number().int().positive()
+
+export const waypointSchema = z.object({
+  id: idSchema.optional(), // id is optional for new waypoints
+  name: z.string().min(1, 'Nome do ponto de parada é obrigatório').max(100),
+  sequence: z.number().int().min(0),
+})
+
+export const waypointsSchema = z.array(waypointSchema)
 
 export const customerSchema = z.object({
   name: z.string().min(3).max(100),
@@ -110,6 +127,14 @@ export const driverSchema = z.object({
 export const routeSchema = z.object({
   name: z.string().min(3).max(100),
   distance_km: requiredNumber(100000, 'Distância máxima de 100.000 km'),
+  customer_id: optionalNumber(999999999, 'ID inválido'),
+})
+
+export const fuelStopSchema = z.object({
+  supplier_id: requiredNumber(999999999, 'ID inválido'),
+  value: requiredNumber(1000000, 'Valor máximo de R$ 1.000.000'),
+  liters: optionalNumber(10000, 'Máximo de 10.000 litros'),
+  km_driven: optionalNumber(10000, 'KM máximo de 10.000'),
 })
 
 export const tripSchema = z.object({
@@ -119,11 +144,12 @@ export const tripSchema = z.object({
   product_id: requiredNumber(999999999, 'ID inválido'),
   customer_id: optionalNumber(999999999, 'ID inválido'),
   route_id: optionalNumber(999999999, 'ID inválido'),
-  supplier_id: optionalNumber(999999999, 'ID inválido'),
+  supplier_id: optionalNumber(999999999, 'ID inválido'), // Keep for backward compatibility or main supplier
   weight_ton: requiredNumber(100, 'Peso máximo de 100 toneladas'),
   price_charged: requiredNumber(1000000, 'Valor máximo de R$ 1.000.000'),
   km_driven: requiredNumber(10000, 'KM máximo de 10.000'),
   observation: z.string().max(500).optional(),
+  fuel_stops: z.array(fuelStopSchema).optional(),
 })
 
 export const costSchema = z.object({

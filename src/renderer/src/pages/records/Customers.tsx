@@ -18,7 +18,6 @@ export function CustomersPage() {
   const {
     register,
     handleSubmit,
-    setValue,
     formState: { errors },
     reset,
     watch,
@@ -32,8 +31,8 @@ export function CustomersPage() {
   const digits = phoneValue.replace(/\D/g, '')
   const phoneMask =
     digits.length > 10 || (digits.length >= 3 && digits[2] === '9')
-      ? '(99) 99999-9999'
-      : '(99) 9999-9999'
+      ? '(00) 00000-0000'
+      : '(00) 0000-0000'
 
   const load = useCallback(() => window.api.customers.list(search).then(setRows), [search])
   useEffect(() => {
@@ -46,7 +45,7 @@ export function CustomersPage() {
       setEditing(null)
       reset(EMPTY)
     }
-  }, [modal])
+  }, [modal, reset])
 
   const onSubmit = async (data: Omit<Customer, 'id'>) => {
     try {
@@ -72,7 +71,9 @@ export function CustomersPage() {
   }
 
   async function handleDelete(row: Customer) {
-    if (!confirm('Excluir este cliente?')) return
+    if (!confirm('Excluir este cliente?')) {
+      return
+    }
     await window.api.customers.delete(row.id)
     show('Cliente excluído')
     load()
@@ -166,12 +167,14 @@ export function CustomersPage() {
                 <td className="px-8 py-5">
                   <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button
+                      type="button"
                       onClick={() => edit(row)}
                       className="p-2 text-outline hover:text-primary hover:bg-primary/10 rounded-lg transition-all"
                     >
                       <span className="material-symbols-outlined text-xl">edit</span>
                     </button>
                     <button
+                      type="button"
                       onClick={() => handleDelete(row)}
                       className="p-2 text-outline hover:text-error hover:bg-error/10 rounded-lg transition-all"
                     >
@@ -202,8 +205,7 @@ export function CustomersPage() {
             <Input
               label="CNPJ"
               optional
-              mask="99.999.999/9999-99"
-              maskChar=""
+              mask="00.000.000/0000-00"
               {...register('cnpj')}
               error={errors.cnpj?.message}
             />
@@ -217,7 +219,6 @@ export function CustomersPage() {
               label="Telefone"
               optional
               mask={phoneMask}
-              maskChar={null}
               {...register('phone')}
               error={errors.phone?.message}
             />

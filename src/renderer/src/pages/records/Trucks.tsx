@@ -19,7 +19,6 @@ export function TrucksPage() {
   const {
     register,
     handleSubmit,
-    setValue,
     formState: { errors },
     reset,
     control,
@@ -42,7 +41,7 @@ export function TrucksPage() {
       setEditing(null)
       reset(EMPTY)
     }
-  }, [modal])
+  }, [modal, reset])
 
   const onSubmit = async (data: Omit<Truck, 'id'>) => {
     try {
@@ -68,7 +67,9 @@ export function TrucksPage() {
   }
 
   async function handleDelete(row: Truck) {
-    if (!confirm('Excluir este caminhão?')) return
+    if (!confirm('Excluir este caminhão?')) {
+      return
+    }
     await window.api.trucks.delete(row.id)
     show('Caminhão excluído')
     load()
@@ -133,6 +134,7 @@ export function TrucksPage() {
             />
           </div>
           <button
+            type="button"
             onClick={() => setAppliedFilters(filters)}
             className="bg-primary text-on-primary px-4 py-1.5 rounded-md font-bold text-xs hover:brightness-110 active:scale-95 transition-all ml-1 mr-0.5"
           >
@@ -220,12 +222,14 @@ export function TrucksPage() {
                 <td className="px-6 py-4">
                   <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button
+                      type="button"
                       onClick={() => edit(row)}
                       className="p-2 text-outline hover:text-primary hover:bg-primary/10 rounded-lg transition-all"
                     >
                       <span className="material-symbols-outlined text-xl">edit</span>
                     </button>
                     <button
+                      type="button"
                       onClick={() => handleDelete(row)}
                       className="p-2 text-outline hover:text-error hover:bg-error/10 rounded-lg transition-all"
                     >

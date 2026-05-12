@@ -67,6 +67,11 @@ contextBridge.exposeInMainWorld('api', {
   routes: {
     list: () => ipcRenderer.invoke('routes:list'),
     create: (data: any) => ipcRenderer.invoke('routes:create', data),
+    update: (data: any) => ipcRenderer.invoke('routes:update', data),
+    delete: (id: number) => ipcRenderer.invoke('routes:delete', id),
+    getWaypoints: (route_id: number) => ipcRenderer.invoke('routes:getWaypoints', route_id),
+    updateWaypoints: (data: { route_id: number; waypoints: any[] }) =>
+      ipcRenderer.invoke('routes:updateWaypoints', data),
   },
 
   // Trips
