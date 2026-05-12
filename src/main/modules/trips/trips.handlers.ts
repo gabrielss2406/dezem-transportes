@@ -13,7 +13,8 @@ export function registerTripHandlers(): void {
         d.name           as driver_name,
         p.name           as product_name,
         c.name           as customer_name,
-        r.name           as route_name
+        r.name           as route_name,
+        (SELECT COUNT(*) FROM trip_fuel_stops WHERE trip_id = t.id) as fuel_stops_count
       FROM trips t
       JOIN trucks tr ON t.truck_id = tr.id
       JOIN drivers d ON t.driver_id = d.id
@@ -57,7 +58,19 @@ export function registerTripHandlers(): void {
       .all(...params)
   })
 
+  ipcMain.handle('trips:getFuelStops', (_e, tripId: number) => {
+    const sql = `
+      SELECT fs.*, s.name as supplier_name
+      FROM trip_fuel_stops fs
+      JOIN suppliers s ON fs.supplier_id = s.id
+      WHERE fs.trip_id = ?
+      ORDER BY fs.id ASC
+    `
+    return db().prepare(sql).all(tripId)
+  })
+
   createValidatedHandler('trips:create', tripSchema, (data) => {
+    const { fuel_stops, ...tripData } = data
     const r = db().transaction(() => {
       const res = db()
         .prepare(
@@ -67,22 +80,35 @@ export function registerTripHandlers(): void {
       `,
         )
         .run(
-          data.date,
-          data.truck_id,
-          data.driver_id,
-          data.product_id,
-          data.customer_id || null,
-          data.route_id || null,
-          data.supplier_id || null,
-          data.weight_ton,
-          data.price_charged,
-          data.km_driven,
-          data.observation || null,
+          tripData.date,
+          tripData.truck_id,
+          tripData.driver_id,
+          tripData.product_id,
+          tripData.customer_id || null,
+          tripData.route_id || null,
+          tripData.supplier_id || null,
+          tripData.weight_ton,
+          tripData.price_charged,
+          tripData.km_driven,
+          tripData.observation || null,
         )
+
+      const tripId = res.lastInsertRowid
+
+      // Insert fuel stops
+      if (fuel_stops && fuel_stops.length > 0) {
+        const insertStop = db().prepare(
+          'INSERT INTO trip_fuel_stops (trip_id, supplier_id, value, liters, km_driven) VALUES (?, ?, ?, ?, ?)',
+        )
+        for (const stop of fuel_stops) {
+          insertStop.run(tripId, stop.supplier_id, stop.value, stop.liters, stop.km_driven)
+        }
+      }
+
       // Update truck odometer automatically
       db()
         .prepare('UPDATE trucks SET current_odometer = current_odometer + ? WHERE id = ?')
-        .run(data.km_driven, data.truck_id)
+        .run(tripData.km_driven, tripData.truck_id)
       return res
     })()
     return { id: (r as any).lastInsertRowid }

@@ -142,6 +142,17 @@ export function setupDatabase(): void {
       created_at    TEXT DEFAULT (datetime('now'))
     );
 
+    -- Trip Fuel Stops
+    CREATE TABLE IF NOT EXISTS trip_fuel_stops (
+      id            INTEGER PRIMARY KEY AUTOINCREMENT,
+      trip_id       INTEGER NOT NULL REFERENCES trips(id) ON DELETE CASCADE,
+      supplier_id   INTEGER NOT NULL REFERENCES suppliers(id),
+      value         REAL    NOT NULL DEFAULT 0,
+      liters        REAL    NOT NULL DEFAULT 0,
+      km_driven     REAL    NOT NULL DEFAULT 0,
+      created_at    TEXT    DEFAULT (datetime('now'))
+    );
+
     -- Indexes for performance on frequent queries
     CREATE INDEX IF NOT EXISTS idx_trips_date      ON trips(date);
     CREATE INDEX IF NOT EXISTS idx_trips_truck     ON trips(truck_id);
@@ -149,6 +160,7 @@ export function setupDatabase(): void {
     CREATE INDEX IF NOT EXISTS idx_costs_date      ON costs(date);
     CREATE INDEX IF NOT EXISTS idx_costs_category  ON costs(category);
     CREATE INDEX IF NOT EXISTS idx_route_waypoints_route_id ON route_waypoints(route_id);
+    CREATE INDEX IF NOT EXISTS idx_trip_fuel_stops_trip_id  ON trip_fuel_stops(trip_id);
   `)
 
   // Seed: default admin user if none exists
