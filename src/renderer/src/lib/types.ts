@@ -103,8 +103,23 @@ export interface DashboardSummary {
   profit: number
   totalTrips: number
   totalKm: number
-  perTruck: Array<{ license_plate: string; model: string; revenue: number; km: number }>
-  perProduct: Array<{ name: string; tonnage: number; trips: number }>
+  perTruck: Array<{
+    license_plate: string
+    model: string
+    revenue: number
+    km: number
+    cost: number
+    profit: number
+    cpk: number
+  }>
+  monthlyRevenue: Array<{ month: string; revenue: number }>
+  maintenanceAlerts: Array<{
+    license_plate: string
+    current_odometer: number
+    last_maintenance_date: string | null
+    km_since_last_maintenance: number
+  }>
+  perRoute: Array<{ name: string; revenue: number; fuel_cost: number }>
   perCategory: Array<{ category: string; total: number }>
 }
 
