@@ -168,6 +168,7 @@ declare global {
       trips: {
         list(filters?: any): Promise<Trip[]>
         create(data: Omit<Trip, 'id'>): Promise<{ id: number }>
+        update(id: number, data: Omit<Trip, 'id'>): Promise<{ ok: boolean }>
         delete(id: number): Promise<{ ok: boolean }>
         getFuelStops(tripId: number): Promise<FuelStop[]>
       }

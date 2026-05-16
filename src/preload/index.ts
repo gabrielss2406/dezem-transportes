@@ -78,7 +78,9 @@ contextBridge.exposeInMainWorld('api', {
   trips: {
     list: (filters?: any) => ipcRenderer.invoke('trips:list', filters),
     create: (data: any) => ipcRenderer.invoke('trips:create', data),
+    update: (id: number, data: any) => ipcRenderer.invoke('trips:update', id, data),
     delete: (id: number) => ipcRenderer.invoke('trips:delete', id),
+    getFuelStops: (tripId: number) => ipcRenderer.invoke('trips:getFuelStops', tripId),
   },
 
   // Costs

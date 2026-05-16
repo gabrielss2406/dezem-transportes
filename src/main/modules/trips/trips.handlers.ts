@@ -1,7 +1,11 @@
 import { ipcMain } from 'electron'
 import { tripSchema } from '../../../shared/schemas'
 import { getDb } from '../../database'
-import { createIdValidatedHandler, createValidatedHandler } from '../../lib/utils'
+import {
+  createIdValidatedHandler,
+  createValidatedHandler,
+  createValidatedHandlerWithId,
+} from '../../lib/utils'
 
 export function registerTripHandlers(): void {
   const db = () => getDb()
@@ -112,6 +116,56 @@ export function registerTripHandlers(): void {
       return res
     })()
     return { id: (r as any).lastInsertRowid }
+  })
+
+  createValidatedHandlerWithId('trips:update', tripSchema, (id, data) => {
+    const { fuel_stops, ...tripData } = data
+    db().transaction(() => {
+      const oldTrip = db()
+        .prepare('SELECT truck_id, km_driven FROM trips WHERE id = ?')
+        .get(id) as any
+
+      db()
+        .prepare(
+          `UPDATE trips SET date=?, truck_id=?, driver_id=?, product_id=?, customer_id=?,
+            route_id=?, supplier_id=?, weight_ton=?, price_charged=?, km_driven=?, observation=?
+          WHERE id=?`,
+        )
+        .run(
+          tripData.date,
+          tripData.truck_id,
+          tripData.driver_id,
+          tripData.product_id,
+          tripData.customer_id || null,
+          tripData.route_id || null,
+          tripData.supplier_id || null,
+          tripData.weight_ton,
+          tripData.price_charged,
+          tripData.km_driven,
+          tripData.observation || null,
+          id,
+        )
+
+      if (oldTrip) {
+        db()
+          .prepare('UPDATE trucks SET current_odometer = current_odometer - ? WHERE id = ?')
+          .run(oldTrip.km_driven, oldTrip.truck_id)
+      }
+      db()
+        .prepare('UPDATE trucks SET current_odometer = current_odometer + ? WHERE id = ?')
+        .run(tripData.km_driven, tripData.truck_id)
+
+      db().prepare('DELETE FROM trip_fuel_stops WHERE trip_id = ?').run(id)
+      if (fuel_stops && fuel_stops.length > 0) {
+        const insertStop = db().prepare(
+          'INSERT INTO trip_fuel_stops (trip_id, supplier_id, value, liters, km_driven) VALUES (?, ?, ?, ?, ?)',
+        )
+        for (const stop of fuel_stops) {
+          insertStop.run(id, stop.supplier_id, stop.value, stop.liters, stop.km_driven)
+        }
+      }
+    })()
+    return { ok: true }
   })
 
   createIdValidatedHandler('trips:delete', (id) => {

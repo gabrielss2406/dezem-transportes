@@ -25,9 +25,9 @@ const EMPTY = {
   customer_id: '',
   route_id: '',
   supplier_id: '',
-  weight_ton: 0,
+  weight_ton: '' as any,
   price_charged: 0,
-  km_driven: 0,
+  km_driven: '' as any,
   observation: '',
   fuel_stops: [],
 }
@@ -48,6 +48,7 @@ export function TripsPage() {
   const [routes, setRoutes] = useState<Route[]>([])
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [modal, setModal] = useState(false)
+  const [editing, setEditing] = useState<Trip | null>(null)
   const [stopSearchId, setStopSearchId] = useState<string | number>('')
   const [filters, setFilters] = useState({
     startDate: '',
@@ -106,6 +107,7 @@ export function TripsPage() {
   // Limpeza automática ao fechar o modal
   useEffect(() => {
     if (!modal) {
+      setEditing(null)
       reset(EMPTY)
       setStopSearchId('')
     }
@@ -113,12 +115,41 @@ export function TripsPage() {
 
   const onSubmit = async (data: Omit<Trip, 'id'>) => {
     try {
-      await window.api.trips.create(data)
-      show('Viagem registrada!')
+      if (editing) {
+        await window.api.trips.update(editing.id, data)
+        show('Viagem atualizada!')
+      } else {
+        await window.api.trips.create(data)
+        show('Viagem registrada!')
+      }
       setModal(false)
       load()
     } catch (e: any) {
       show(e.message || 'Erro ao salvar', 'error')
+    }
+  }
+
+  async function edit(row: Trip) {
+    try {
+      const fuelStops = await window.api.trips.getFuelStops(row.id)
+      reset({
+        date: row.date,
+        truck_id: row.truck_id,
+        driver_id: row.driver_id,
+        product_id: row.product_id,
+        customer_id: row.customer_id ?? '',
+        route_id: row.route_id ?? '',
+        supplier_id: row.supplier_id ?? '',
+        weight_ton: row.weight_ton,
+        price_charged: row.price_charged,
+        km_driven: row.km_driven,
+        observation: row.observation ?? '',
+        fuel_stops: fuelStops,
+      })
+      setEditing(row)
+      setModal(true)
+    } catch (e: any) {
+      show(e.message || 'Erro ao carregar viagem', 'error')
     }
   }
 
@@ -312,7 +343,14 @@ export function TripsPage() {
                   {row.customer_name ?? '—'}
                 </td>
                 <td className="px-6 py-4">
-                  <div className="flex justify-end opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button
+                      type="button"
+                      onClick={() => edit(row)}
+                      className="p-2 text-on-surface-variant hover:text-primary hover:bg-primary/10 rounded-lg transition-all"
+                    >
+                      <span className="material-symbols-outlined text-xl">edit</span>
+                    </button>
                     <button
                       type="button"
                       onClick={() => handleDelete(row)}
@@ -330,7 +368,7 @@ export function TripsPage() {
 
       {/* Modal: Nova Viagem */}
       {modal && (
-        <Modal title="Nova Viagem" onClose={() => setModal(false)}>
+        <Modal title={editing ? 'Editar Viagem' : 'Nova Viagem'} onClose={() => setModal(false)}>
           <div className="space-y-6">
             <div className="grid grid-cols-2 gap-5">
               <DatePicker label="Data" {...register('date')} error={errors.date?.message} />
@@ -608,7 +646,7 @@ export function TripsPage() {
                 onClick={handleSubmit(onSubmit)}
                 className="flex items-center gap-3 px-8 py-3 bg-primary text-on-primary font-extrabold rounded transition-all hover:brightness-110 active:scale-95 shadow-lg shadow-primary/20"
               >
-                Salvar Viagem
+                {editing ? 'Salvar Alterações' : 'Salvar Viagem'}
                 <span className="material-symbols-outlined">arrow_forward</span>
               </button>
             </div>

@@ -86,10 +86,13 @@ export const supplierSchema = z.object({
 })
 
 export const truckSchema = z.object({
-  license_plate: z
-    .string()
-    .length(7, 'Placa deve ter 7 caracteres')
-    .regex(/^[A-Z]{3}[0-9][A-Z0-9][0-9]{2}$/, 'Placa inválida (use ABC1D23 ou ABC1234)'),
+  license_plate: z.preprocess(
+    (val) => (typeof val === 'string' ? val.toUpperCase().replace(/-/g, '') : val),
+    z
+      .string()
+      .length(7, 'Placa deve ter 7 caracteres')
+      .regex(/^[A-Z]{3}[0-9][A-Z0-9][0-9]{2}$/, 'Placa inválida (use ABC1D23 ou ABC-1234)'),
+  ),
   model: z.string().min(2).max(50),
   year: z.preprocess(
     (val) => (val === '' || val === null ? null : Number(val)),
