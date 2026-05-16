@@ -76,13 +76,13 @@ export function Sidebar({ onLogout }: SidebarProps) {
 
       {/* Bottom */}
       <div className="px-4 py-6 mt-auto space-y-3 border-t border-outline-variant/10">
-        <Link
+        {/* <Link
           to="/design-system"
           className="flex items-center gap-3 px-2 py-2 w-full text-on-surface-variant hover:text-primary transition-colors text-sm"
         >
           <span className="material-symbols-outlined text-xl opacity-70">palette</span>
           <span>Design System</span>
-        </Link>
+        </Link> */}
         <button
           type="button"
           onClick={() => navigate('/trips')}
