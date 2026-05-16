@@ -22,6 +22,7 @@ export function TrucksPage() {
     formState: { errors },
     reset,
     control,
+    setValue,
   } = useForm<Omit<Truck, 'id'>>({
     resolver: zodResolver(truckSchema),
     defaultValues: { ...EMPTY },
@@ -75,10 +76,22 @@ export function TrucksPage() {
     load()
   }
 
+  function formatPlate(raw: string): string {
+    const clean = raw
+      .toUpperCase()
+      .replace(/[^A-Z0-9]/g, '')
+      .slice(0, 7)
+    // Only add dash for old format (ABC-1234): 5th char is a digit
+    if (clean.length >= 5 && /[0-9]/.test(clean[4])) {
+      return `${clean.slice(0, 3)}-${clean.slice(3)}`
+    }
+    return clean
+  }
+
   function edit(row: Truck) {
     setEditing(row)
     reset({
-      license_plate: row.license_plate,
+      license_plate: formatPlate(row.license_plate),
       model: row.model,
       year: row.year,
       capacity_ton: row.capacity_ton,
@@ -257,7 +270,12 @@ export function TrucksPage() {
           <div className="grid grid-cols-2 gap-4">
             <Input
               label="Placa"
-              {...register('license_plate')}
+              {...register('license_plate', {
+                onChange: (e) => {
+                  const formatted = formatPlate(e.target.value)
+                  setValue('license_plate', formatted, { shouldValidate: true })
+                },
+              })}
               error={errors.license_plate?.message}
               placeholder="ABC-1234"
             />

@@ -1,17 +1,17 @@
 import { Link, NavLink, useNavigate } from 'react-router-dom'
 
 const navItems = [
+  { path: '/overview', label: 'Menu', icon: 'menu' },
   { path: '/', label: 'Dashboard', icon: 'analytics' },
-  { path: '/customers', label: 'Clientes', icon: 'group' },
-  { path: '/products', label: 'Produtos', icon: 'inventory_2' },
-  { path: '/suppliers', label: 'Fornecedores', icon: 'handshake' },
   { path: '/trucks', label: 'Caminhões', icon: 'local_shipping' },
   { path: '/drivers', label: 'Motoristas', icon: 'badge' },
+  { path: '/products', label: 'Produtos', icon: 'inventory_2' },
+  { path: '/customers', label: 'Clientes', icon: 'group' },
   { path: '/routes', label: 'Rotas', icon: 'map' },
+  { path: '/suppliers', label: 'Fornecedores', icon: 'handshake' },
   { path: '/trips', label: 'Viagens', icon: 'route' },
   { path: '/costs', label: 'Custos', icon: 'payments' },
   { path: '/settings', label: 'Configurações', icon: 'settings' },
-  { path: '/overview', label: 'Menu', icon: 'menu' },
 ]
 
 interface SidebarProps {
