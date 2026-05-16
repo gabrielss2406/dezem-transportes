@@ -130,27 +130,29 @@ export function DashboardPage() {
             {/* 1. Faturamento Mensal (Chart) */}
             <div className="lg:col-span-2 bg-surface-container rounded-2xl p-8 border border-outline-variant/10">
               <SectionHeader title="Evolução do Faturamento" icon="bar_chart" />
-              <div className="h-64 flex items-end gap-4 mt-8">
-                {summary.monthlyRevenue.map((m) => {
+              <div className="h-64 flex items-stretch gap-4 mt-8 px-2">
+                {(() => {
                   const maxRevenue = Math.max(...summary.monthlyRevenue.map((x) => x.revenue), 1)
-                  const height = (m.revenue / maxRevenue) * 100
-                  return (
-                    <div key={m.month} className="flex-1 flex flex-col items-center gap-3 group">
-                      <div className="relative w-full flex flex-col items-center">
-                        <div
-                          className="w-full max-w-[60px] bg-primary/20 rounded-t-lg transition-all duration-500 group-hover:bg-primary/40"
-                          style={{ height: `${height}%` }}
-                        />
-                        <div className="absolute -top-8 opacity-0 group-hover:opacity-100 transition-opacity bg-surface-container-high px-2 py-1 rounded text-[10px] font-bold text-primary shadow-lg border border-primary/20">
-                          {formatBRL(m.revenue)}
+                  return summary.monthlyRevenue.map((m) => {
+                    const height = (m.revenue / maxRevenue) * 100
+                    return (
+                      <div key={m.month} className="flex-1 flex flex-col items-center gap-3 group">
+                        <div className="relative w-full flex-1 flex flex-col justify-end items-center">
+                          <div
+                            className="w-full max-w-[40px] bg-primary rounded-t-md transition-all duration-500 group-hover:bg-primary-container group-hover:scale-x-110 origin-bottom"
+                            style={{ height: `${Math.max(height, m.revenue > 0 ? 2 : 0)}%` }}
+                          />
+                          <div className="absolute -top-10 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-all bg-surface-container-highest px-3 py-1.5 rounded-lg text-[10px] font-black text-primary shadow-xl border border-primary/20 whitespace-nowrap z-10">
+                            {formatBRL(m.revenue)}
+                          </div>
                         </div>
+                        <span className="text-[10px] font-black text-on-surface-variant uppercase tracking-tighter opacity-70">
+                          {m.month.split('-')[1]}/{m.month.split('-')[0].slice(2)}
+                        </span>
                       </div>
-                      <span className="text-[10px] font-bold text-on-surface-variant uppercase tracking-tighter">
-                        {m.month.split('-')[1]}/{m.month.split('-')[0].slice(2)}
-                      </span>
-                    </div>
-                  )
-                })}
+                    )
+                  })
+                })()}
               </div>
             </div>
 

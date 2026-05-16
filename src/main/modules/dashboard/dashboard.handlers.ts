@@ -15,6 +15,88 @@ export function registerDashboardHandlers(): void {
         )
         .get(startDate, endDate) as any
     ).total
+    const allTrips = db()
+      .prepare(
+        `
+  SELECT
+    tr.id,
+    tr.date,
+    tr.truck_id,
+    tr.route_id,
+    tr.price_charged,
+    tr.km_driven,
+    r.name as route_name
+  FROM trips tr
+  LEFT JOIN routes r ON tr.route_id = r.id
+  WHERE tr.date BETWEEN ? AND ?
+`,
+      )
+      .all(startDate, endDate) as any[]
+
+    const truckCosts = db()
+      .prepare(
+        `
+  SELECT date, truck_id, value
+  FROM costs
+  WHERE date BETWEEN ? AND ? AND truck_id IS NOT NULL
+`,
+      )
+      .all(startDate, endDate) as any[]
+
+    const fuelCostsByTrip = db()
+      .prepare(
+        `
+  SELECT fs.trip_id, SUM(fs.value) as total
+  FROM trip_fuel_stops fs
+  JOIN trips t ON fs.trip_id = t.id
+  WHERE t.date BETWEEN ? AND ?
+  GROUP BY fs.trip_id
+`,
+      )
+      .all(startDate, endDate) as any[]
+
+    const fuelCostPerTrip = new Map<number, number>(
+      fuelCostsByTrip.map((r: any) => [r.trip_id, r.total]),
+    )
+
+    const costsByTruckAndDate = new Map<string, number>()
+    for (const cost of truckCosts) {
+      const key = `${cost.truck_id}-${cost.date}`
+      const currentCost = Number(costsByTruckAndDate.get(key)) || 0
+      costsByTruckAndDate.set(key, currentCost + (Number(cost.value) || 0))
+    }
+
+    const tripsByTruckAndDate = new Map<string, any[]>()
+    const totalKmByTruckAndDate = new Map<string, number>()
+
+    for (const trip of allTrips) {
+      if (!trip.truck_id) {
+        continue
+      }
+      const key = `${trip.truck_id}-${trip.date}`
+
+      const trips = tripsByTruckAndDate.get(key) || []
+      trips.push(trip)
+      tripsByTruckAndDate.set(key, trips)
+
+      const currentKm = totalKmByTruckAndDate.get(key) || 0
+      totalKmByTruckAndDate.set(key, (Number(currentKm) || 0) + (Number(trip.km_driven) || 0))
+    }
+
+    const additionalCostPerTrip = new Map<number, number>()
+
+    for (const [key, trips] of tripsByTruckAndDate.entries()) {
+      const totalCost = costsByTruckAndDate.get(key)
+      const totalKm = totalKmByTruckAndDate.get(key)
+
+      if (totalCost && totalKm > 0) {
+        for (const trip of trips) {
+          const distributedCost =
+            ((Number(trip.km_driven) || 0) / (Number(totalKm) || 1)) * (Number(totalCost) || 0)
+          additionalCostPerTrip.set(trip.id, distributedCost)
+        }
+      }
+    }
 
     // 2. Total Costs (costs table + fuel stops)
     const directCosts = (
@@ -96,7 +178,7 @@ export function registerDashboardHandlers(): void {
     }))
 
     // 4. Monthly Revenue (Last 6 months)
-    const monthlyRevenue = db()
+    const monthlyRevenueRaw = db()
       .prepare(
         `
       SELECT 
@@ -108,7 +190,23 @@ export function registerDashboardHandlers(): void {
       ORDER BY month ASC
     `,
       )
-      .all()
+      .all() as any[]
+
+    // Fill missing months to ensure a continuous 6-month timeline
+    const monthlyRevenue: Array<{ month: string; revenue: number }> = []
+    const now = new Date()
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+      const year = d.getFullYear()
+      const month = String(d.getMonth() + 1).padStart(2, '0')
+      const monthStr = `${year}-${month}`
+
+      const found = monthlyRevenueRaw.find((r) => r.month === monthStr)
+      monthlyRevenue.push({
+        month: monthStr,
+        revenue: Number(found?.revenue) || 0,
+      })
+    }
 
     // 5. Maintenance Alerts
     // Logic: Trucks that haven't had 'maintenance' cost category in the last 10,000km
@@ -139,37 +237,100 @@ export function registerDashboardHandlers(): void {
       km_since_last_maintenance: m.km_since_last_maintenance,
     }))
 
-    // 6. Route Profitability
-    const perRoute = db()
-      .prepare(
-        `
-      SELECT 
-        r.name,
-        COALESCE(SUM(tr.price_charged), 0) as revenue,
-        (
-          SELECT COALESCE(SUM(fs.value), 0)
-          FROM trip_fuel_stops fs
-          JOIN trips tr2 ON fs.trip_id = tr2.id
-          WHERE tr2.route_id = r.id AND tr2.date BETWEEN ? AND ?
-        ) as fuel_cost
-      FROM routes r
-      LEFT JOIN trips tr ON tr.route_id = r.id AND tr.date BETWEEN ? AND ?
-      GROUP BY r.id
-      HAVING revenue > 0
-      ORDER BY revenue DESC
-    `,
-      )
-      .all(startDate, endDate, startDate, endDate)
+    const routeData = new Map<
+      number,
+      {
+        name: string
+        revenue: number
+        fuel_cost: number
+        cost: number
+      }
+    >()
 
-    const perCategory = db()
+    for (const trip of allTrips) {
+      if (!trip.route_id) {
+        continue
+      }
+
+      let data = routeData.get(trip.route_id)
+      if (!data) {
+        data = {
+          name: trip.route_name || 'Rota Desconhecida',
+          revenue: 0,
+          fuel_cost: 0,
+          cost: 0,
+        }
+        routeData.set(trip.route_id, data)
+      }
+
+      data.revenue += Number(trip.price_charged) || 0
+      const fuelCost = Number(fuelCostPerTrip.get(trip.id)) || 0
+      const additionalCost = Number(additionalCostPerTrip.get(trip.id)) || 0
+
+      data.fuel_cost += fuelCost
+      data.cost += fuelCost + additionalCost
+    }
+
+    const perRoute = Array.from(routeData.values()).sort((a, b) => b.revenue - a.revenue)
+
+    const categoryTotals = new Map<string, number>()
+
+    // 1. Costs from 'costs' table
+    const directCategoryCosts = db()
       .prepare(
         `
       SELECT category, COALESCE(SUM(value), 0) as total
       FROM costs WHERE date BETWEEN ? AND ?
-      GROUP BY category ORDER BY total DESC
+      GROUP BY category
     `,
       )
-      .all(startDate, endDate)
+      .all(startDate, endDate) as any[]
+
+    for (const c of directCategoryCosts) {
+      categoryTotals.set(c.category, Number(c.total) || 0)
+    }
+
+    // 2. Costs from 'trip_fuel_stops' (Extra trip costs)
+    const fuelStopCosts = db()
+      .prepare(
+        `
+      SELECT s.type, SUM(fs.value) as total
+      FROM trip_fuel_stops fs
+      JOIN suppliers s ON fs.supplier_id = s.id
+      JOIN trips t ON fs.trip_id = t.id
+      WHERE t.date BETWEEN ? AND ?
+      GROUP BY s.type
+    `,
+      )
+      .all(startDate, endDate) as any[]
+
+    for (const f of fuelStopCosts) {
+      let cat = 'others'
+      if (f.type === 'gas_station') {
+        cat = 'fuel'
+      } else if (f.type === 'workshop') {
+        cat = 'maintenance'
+      }
+
+      const current = categoryTotals.get(cat) || 0
+      categoryTotals.set(cat, current + (Number(f.total) || 0))
+    }
+
+    const categoryLabels: Record<string, string> = {
+      fuel: 'Combustível',
+      oil: 'Óleo',
+      maintenance: 'Manutenção',
+      salary: 'Salário',
+      toll: 'Pedágio',
+      others: 'Outros',
+    }
+
+    const perCategory = Array.from(categoryTotals.entries())
+      .map(([category, total]) => ({
+        category: categoryLabels[category] || category,
+        total,
+      }))
+      .sort((a, b) => b.total - a.total)
 
     return {
       revenue,
