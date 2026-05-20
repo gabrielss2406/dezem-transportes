@@ -6,7 +6,14 @@ import { PageHeader } from '../../components/PageHeader'
 import { Button, Input, Modal, Toast, useToast } from '../../components/ui'
 import type { Truck } from '../../lib/types'
 
-const EMPTY = { license_plate: '', model: '', year: '', capacity_ton: '', current_odometer: '' }
+const EMPTY = {
+  license_plate: '',
+  model: '',
+  year: '',
+  capacity_ton: '',
+  current_odometer: '',
+  customId: undefined,
+}
 
 export function TrucksPage() {
   const [rows, setRows] = useState<Truck[]>([])
@@ -23,6 +30,7 @@ export function TrucksPage() {
     reset,
     control,
     setValue,
+    setError,
   } = useForm<Omit<Truck, 'id'>>({
     resolver: zodResolver(truckSchema),
     defaultValues: { ...EMPTY },
@@ -54,14 +62,26 @@ export function TrucksPage() {
       }
 
       if (res && res.ok === false) {
-        const msg = res.errors ? Object.values(res.errors)[0] : 'Erro ao salvar'
-        show(String(msg), 'error')
+        if (res.errors) {
+          for (const [field, message] of Object.entries(res.errors)) {
+            if (field === 'form') {
+              show(message as string, 'error')
+            } else {
+              setError(field as keyof Omit<Truck, 'id'>, {
+                type: 'manual',
+                message: message as string,
+              })
+            }
+          }
+        } else {
+          show('Ocorreu um erro ao salvar.', 'error')
+        }
         return
       }
 
       show(editing ? 'Caminhão atualizado!' : 'Caminhão cadastrado!')
       setModal(false)
-      load()
+      await load()
     } catch (e: any) {
       show(e.message || 'Erro de conexão', 'error')
     }
@@ -96,6 +116,7 @@ export function TrucksPage() {
       year: row.year,
       capacity_ton: row.capacity_ton,
       current_odometer: row.current_odometer,
+      customId: row.customId ?? undefined,
     })
     setModal(true)
   }
@@ -189,7 +210,7 @@ export function TrucksPage() {
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-surface-container-high">
-              {['Placa', 'Modelo', 'Ano', 'Capacidade', 'Odômetro', ''].map((h) => (
+              {['ID', 'Placa', 'Modelo', 'Ano', 'Capacidade', 'Odômetro', ''].map((h) => (
                 <th
                   key={h}
                   className="px-6 py-5 text-[10px] font-black uppercase tracking-widest text-on-surface-variant"
@@ -202,7 +223,7 @@ export function TrucksPage() {
           <tbody className="divide-y divide-outline-variant/10">
             {rows.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-6 py-12 text-center text-on-surface-variant text-sm">
+                <td colSpan={7} className="px-6 py-12 text-center text-on-surface-variant text-sm">
                   Nenhum caminhão cadastrado
                 </td>
               </tr>
@@ -212,6 +233,9 @@ export function TrucksPage() {
                 key={row.id}
                 className={`hover:bg-surface-bright/5 transition-colors group ${i % 2 === 1 ? 'bg-surface-container-lowest/30' : ''}`}
               >
+                <td className="px-6 py-4 font-mono text-sm text-on-surface-variant">
+                  {row.customId || '—'}
+                </td>
                 <td className="px-6 py-4">
                   <div className="flex items-center gap-3">
                     <div className="w-9 h-9 bg-surface-container-lowest rounded flex items-center justify-center shrink-0">
@@ -268,6 +292,15 @@ export function TrucksPage() {
           onClose={() => setModal(false)}
         >
           <div className="grid grid-cols-2 gap-4">
+            <div className="col-span-2">
+              <Input
+                label="ID Personalizado"
+                type="number"
+                optional
+                {...register('customId')}
+                error={errors.customId?.message}
+              />
+            </div>
             <Input
               label="Placa"
               {...register('license_plate', {

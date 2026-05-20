@@ -32,18 +32,33 @@ export function registerTruckHandlers(): void {
   createValidatedHandler('trucks:create', truckSchema, (data) => {
     const r = db()
       .prepare(
-        'INSERT INTO trucks (license_plate, model, year, capacity_ton, current_odometer) VALUES (?,?,?,?,?)',
+        'INSERT INTO trucks (license_plate, model, year, capacity_ton, current_odometer, customId) VALUES (?,?,?,?,?,?)',
       )
-      .run(data.license_plate, data.model, data.year, data.capacity_ton, data.current_odometer || 0)
+      .run(
+        data.license_plate,
+        data.model,
+        data.year,
+        data.capacity_ton,
+        data.current_odometer || 0,
+        data.customId,
+      )
     return { id: r.lastInsertRowid }
   })
 
   createValidatedHandlerWithId('trucks:update', truckSchema, (id, data) => {
     const result = db()
       .prepare(
-        'UPDATE trucks SET license_plate=?, model=?, year=?, capacity_ton=?, current_odometer=? WHERE id=?',
+        'UPDATE trucks SET license_plate=?, model=?, year=?, capacity_ton=?, current_odometer=?, customId=? WHERE id=?',
       )
-      .run(data.license_plate, data.model, data.year, data.capacity_ton, data.current_odometer, id)
+      .run(
+        data.license_plate,
+        data.model,
+        data.year,
+        data.capacity_ton,
+        data.current_odometer,
+        data.customId,
+        id,
+      )
 
     if (result.changes === 0) {
       throw new Error(`Caminhão com ID ${id} não encontrado.`)

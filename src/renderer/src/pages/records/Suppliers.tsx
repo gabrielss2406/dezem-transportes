@@ -6,7 +6,7 @@ import { PageHeader } from '../../components/PageHeader'
 import { Button, Input, Modal, Select, Toast, useToast } from '../../components/ui'
 import type { Supplier } from '../../lib/types'
 
-const EMPTY = { name: '', type: 'gas_station' as Supplier['type'], phone: '' }
+const EMPTY = { name: '', type: 'gas_station' as Supplier['type'], phone: '', customId: undefined }
 
 const typeIcon: Record<string, string> = {
   gas_station: 'local_gas_station',
@@ -103,6 +103,7 @@ export function SuppliersPage() {
       name: row.name,
       type: row.type,
       phone: row.phone ?? '',
+      customId: row.customId ?? undefined,
     })
     setModal(true)
   }
@@ -190,7 +191,7 @@ export function SuppliersPage() {
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-surface-container-high/50">
-              {['Nome', 'Tipo', 'Telefone', ''].map((h) => (
+              {['ID', 'Nome', 'Tipo', 'Telefone', ''].map((h) => (
                 <th
                   key={h}
                   className="px-8 py-5 text-[10px] font-black uppercase tracking-widest text-on-surface-variant"
@@ -203,7 +204,7 @@ export function SuppliersPage() {
           <tbody className="divide-y divide-outline-variant/10">
             {rows.length === 0 && (
               <tr>
-                <td colSpan={4} className="px-8 py-12 text-center text-on-surface-variant text-sm">
+                <td colSpan={5} className="px-8 py-12 text-center text-on-surface-variant text-sm">
                   Nenhum fornecedor encontrado com os filtros selecionados
                 </td>
               </tr>
@@ -217,6 +218,9 @@ export function SuppliersPage() {
                     i % 2 === 0 ? 'bg-surface-container-lowest' : 'bg-surface-container-low'
                   }`}
                 >
+                  <td className="px-8 py-5 font-mono text-sm text-on-surface-variant">
+                    {row.customId || '—'}
+                  </td>
                   <td className="px-8 py-5">
                     <div className="flex items-center gap-4">
                       <div className="w-10 h-10 rounded bg-primary/10 flex items-center justify-center text-primary font-bold text-lg shrink-0">
@@ -266,6 +270,13 @@ export function SuppliersPage() {
           onClose={() => setModal(false)}
         >
           <div className="flex flex-col gap-4">
+            <Input
+              label="ID Personalizado"
+              type="number"
+              optional
+              {...register('customId')}
+              error={errors.customId?.message}
+            />
             <Input label="Nome" {...register('name')} error={errors.name?.message} />
             <Controller
               name="type"

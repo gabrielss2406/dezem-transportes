@@ -6,7 +6,14 @@ import { PageHeader } from '../../components/PageHeader'
 import { Button, Input, Modal, Toast, useToast } from '../../components/ui'
 import type { Customer } from '../../lib/types'
 
-const EMPTY: Omit<Customer, 'id'> = { name: '', cnpj: '', ie: '', phone: '', address: '' }
+const EMPTY: Omit<Customer, 'id'> = {
+  name: '',
+  cnpj: '',
+  ie: '',
+  phone: '',
+  address: '',
+  customId: undefined, // Changed to undefined
+}
 
 export function CustomersPage() {
   const [rows, setRows] = useState<Customer[]>([])
@@ -87,6 +94,7 @@ export function CustomersPage() {
       ie: row.ie ?? '',
       phone: row.phone ?? '',
       address: row.address ?? '',
+      customId: row.customId ?? undefined, // Changed to undefined
     })
     setModal(true)
   }
@@ -122,7 +130,7 @@ export function CustomersPage() {
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-surface-container-high">
-              {['Nome', 'CNPJ', 'Inscrição Estadual', 'Telefone', ''].map((h) => (
+              {['ID', 'Nome', 'CNPJ', 'Inscrição Estadual', 'Telefone', ''].map((h) => (
                 <th
                   key={h}
                   className="px-8 py-5 text-[10px] font-black uppercase tracking-widest text-on-surface-variant"
@@ -135,7 +143,7 @@ export function CustomersPage() {
           <tbody className="divide-y divide-outline-variant/10">
             {rows.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-8 py-12 text-center text-on-surface-variant text-sm">
+                <td colSpan={6} className="px-8 py-12 text-center text-on-surface-variant text-sm">
                   Nenhum cliente encontrado
                 </td>
               </tr>
@@ -145,6 +153,9 @@ export function CustomersPage() {
                 key={row.id}
                 className={`hover:bg-primary/5 transition-colors group ${i % 2 === 1 ? 'bg-surface-container-low/30' : ''}`}
               >
+                <td className="px-8 py-5 font-mono text-sm text-on-surface-variant">
+                  {row.customId || '—'}
+                </td>
                 <td className="px-8 py-5">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-lg bg-tertiary-container/10 flex items-center justify-center text-tertiary shrink-0">
@@ -228,6 +239,15 @@ export function CustomersPage() {
               {...register('address')}
               error={errors.address?.message}
             />
+            <div className="col-span-2">
+              <Input
+                label="ID Personalizado"
+                type="number"
+                optional
+                {...register('customId')}
+                error={errors.customId?.message}
+              />
+            </div>
           </div>
           <div className="flex justify-end gap-3 mt-6">
             <Button variant="ghost" onClick={() => setModal(false)}>

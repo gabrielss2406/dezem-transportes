@@ -12,7 +12,7 @@ const UNITS = [
   { value: 'un', label: 'Unidade' },
 ]
 
-const EMPTY = { name: '', unit: 'ton' }
+const EMPTY = { name: '', unit: 'ton', customId: undefined }
 
 export function ProductsPage() {
   const [rows, setRows] = useState<Product[]>([])
@@ -79,6 +79,7 @@ export function ProductsPage() {
     reset({
       name: row.name,
       unit: row.unit,
+      customId: row.customId ?? undefined,
     })
     setModal(true)
   }
@@ -155,7 +156,7 @@ export function ProductsPage() {
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-surface-container-high">
-              {['Nome do Produto', 'Unidade', ''].map((h) => (
+              {['ID', 'Nome do Produto', 'Unidade', ''].map((h) => (
                 <th
                   key={h}
                   className="px-8 py-5 text-[10px] font-black uppercase tracking-widest text-on-surface-variant"
@@ -168,7 +169,7 @@ export function ProductsPage() {
           <tbody className="divide-y divide-outline-variant/10">
             {rows.length === 0 && (
               <tr>
-                <td colSpan={3} className="px-8 py-12 text-center text-on-surface-variant text-sm">
+                <td colSpan={4} className="px-8 py-12 text-center text-on-surface-variant text-sm">
                   Nenhum produto encontrado
                 </td>
               </tr>
@@ -180,6 +181,9 @@ export function ProductsPage() {
                   key={row.id}
                   className={`hover:bg-surface-bright/5 transition-colors group ${i % 2 === 1 ? 'bg-surface-container-lowest/30' : ''}`}
                 >
+                  <td className="px-8 py-5 font-mono text-sm text-on-surface-variant">
+                    {row.customId || '—'}
+                  </td>
                   <td className="px-8 py-5">
                     <div className="flex items-center gap-4">
                       <div className="w-10 h-10 rounded bg-surface-container-lowest flex items-center justify-center shrink-0">
@@ -229,6 +233,13 @@ export function ProductsPage() {
       {modal && (
         <Modal title={editing ? 'Editar Produto' : 'Novo Produto'} onClose={() => setModal(false)}>
           <div className="flex flex-col gap-4">
+            <Input
+              label="ID Personalizado"
+              type="number"
+              optional
+              {...register('customId')}
+              error={errors.customId?.message}
+            />
             <Input label="Nome do produto" {...register('name')} error={errors.name?.message} />
             <Controller
               name="unit"

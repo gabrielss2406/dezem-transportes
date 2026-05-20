@@ -41,16 +41,33 @@ export function registerDriverHandlers(): void {
   createValidatedHandler('drivers:create', driverSchema, (data) => {
     const r = db()
       .prepare(
-        'INSERT INTO drivers (name, cpf, phone, monthly_salary, truck_id) VALUES (?,?,?,?,?)',
+        'INSERT INTO drivers (name, cpf, phone, monthly_salary, truck_id, customId) VALUES (?,?,?,?,?,?)',
       )
-      .run(data.name, data.cpf, data.phone, data.monthly_salary, data.truck_id || null)
+      .run(
+        data.name,
+        data.cpf,
+        data.phone,
+        data.monthly_salary,
+        data.truck_id || null,
+        data.customId,
+      )
     return { id: r.lastInsertRowid }
   })
 
   createValidatedHandlerWithId('drivers:update', driverSchema, (id, data) => {
     const result = db()
-      .prepare('UPDATE drivers SET name=?, cpf=?, phone=?, monthly_salary=?, truck_id=? WHERE id=?')
-      .run(data.name, data.cpf, data.phone, data.monthly_salary, data.truck_id || null, id)
+      .prepare(
+        'UPDATE drivers SET name=?, cpf=?, phone=?, monthly_salary=?, truck_id=?, customId=? WHERE id=?',
+      )
+      .run(
+        data.name,
+        data.cpf,
+        data.phone,
+        data.monthly_salary,
+        data.truck_id || null,
+        data.customId,
+        id,
+      )
 
     if (result.changes === 0) {
       throw new Error(`Motorista com ID ${id} não encontrado.`)

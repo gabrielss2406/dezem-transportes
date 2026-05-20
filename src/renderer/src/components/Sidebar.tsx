@@ -85,7 +85,7 @@ export function Sidebar({ onLogout }: SidebarProps) {
         </Link> */}
         <button
           type="button"
-          onClick={() => navigate('/trips')}
+          onClick={() => navigate('/trips', { state: { openModal: true } })}
           className="w-full py-3 bg-primary text-on-primary font-bold rounded text-sm shadow-lg shadow-primary/20 hover:brightness-110 active:scale-95 transition-all"
         >
           Nova Viagem

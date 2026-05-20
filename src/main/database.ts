@@ -29,6 +29,7 @@ export function setupDatabase(): void {
     -- Customers
     CREATE TABLE IF NOT EXISTS customers (
       id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      customId   INTEGER UNIQUE,
       name       TEXT NOT NULL,
       cnpj       TEXT,
       ie         TEXT,
@@ -40,6 +41,7 @@ export function setupDatabase(): void {
     -- Products
     CREATE TABLE IF NOT EXISTS products (
       id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      customId   INTEGER UNIQUE,
       name       TEXT NOT NULL,
       unit       TEXT NOT NULL DEFAULT 'ton',
       created_at TEXT DEFAULT (datetime('now'))
@@ -56,6 +58,7 @@ export function setupDatabase(): void {
     -- Suppliers
     CREATE TABLE IF NOT EXISTS suppliers (
       id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      customId   INTEGER UNIQUE,
       name       TEXT NOT NULL,
       type       TEXT NOT NULL,
       phone      TEXT,
@@ -65,6 +68,7 @@ export function setupDatabase(): void {
     -- Trucks
     CREATE TABLE IF NOT EXISTS trucks (
       id               INTEGER PRIMARY KEY AUTOINCREMENT,
+      customId         INTEGER UNIQUE,
       license_plate    TEXT NOT NULL UNIQUE,
       model            TEXT NOT NULL,
       year             INTEGER,
@@ -76,6 +80,7 @@ export function setupDatabase(): void {
     -- Drivers
     CREATE TABLE IF NOT EXISTS drivers (
       id             INTEGER PRIMARY KEY AUTOINCREMENT,
+      customId       INTEGER UNIQUE,
       name           TEXT NOT NULL,
       cpf            TEXT,
       phone          TEXT,
@@ -186,6 +191,18 @@ export function setupDatabase(): void {
   }
   // This needs to be after the column is guaranteed to exist
   db.exec('CREATE INDEX IF NOT EXISTS idx_routes_customer ON routes(customer_id)')
+
+  // Migrations for customId
+  const tablesWithCustomId = ['customers', 'products', 'suppliers', 'trucks', 'drivers']
+  for (const tableName of tablesWithCustomId) {
+    const tableInfo = db.pragma(`table_info(${tableName})`) as { name: string }[]
+    if (!tableInfo.some((col) => col.name === 'customId')) {
+      db.exec(`ALTER TABLE ${tableName} ADD COLUMN customId INTEGER`)
+      db.exec(
+        `CREATE UNIQUE INDEX IF NOT EXISTS idx_${tableName}_customId ON ${tableName}(customId)`,
+      )
+    }
+  }
 
   // Seed: default supplier types if none exist
   const supplierTypeCount = (db.prepare('SELECT COUNT(*) as c FROM supplier_types').get() as any).c
