@@ -38,7 +38,12 @@ export function registerCustomerPricesHandlers(): void {
     return db()
       .prepare(
         `
-      SELECT c.name as customerName, p.name as productName, cp.*
+      SELECT 
+        c.name as customerName, 
+        p.name as productName, 
+        cp.customer_id as customerId, 
+        cp.product_id as productId, 
+        cp.price
       FROM customer_prices cp
       JOIN customers c ON c.id = cp.customer_id
       JOIN products p ON p.id = cp.product_id

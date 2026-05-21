@@ -12,6 +12,8 @@ export function PriceManagementPage() {
   const [rows, setRows] = useState<CustomerPrice[]>([])
   const [customers, setCustomers] = useState<Customer[]>([])
   const [products, setProducts] = useState<Product[]>([])
+  const [filterCustomer, setFilterCustomer] = useState<string | number>('')
+  const [filterProduct, setFilterProduct] = useState<string | number>('')
   const [modal, setModal] = useState(false)
   const { toast, show } = useToast()
 
@@ -46,6 +48,12 @@ export function PriceManagementPage() {
     }
   }, [modal, reset])
 
+  const filteredRows = rows.filter((row) => {
+    const matchCustomer = filterCustomer ? row.customerId === Number(filterCustomer) : true
+    const matchProduct = filterProduct ? row.productId === Number(filterProduct) : true
+    return matchCustomer && matchProduct
+  })
+
   const onSubmit = async (data: any) => {
     try {
       await window.api.customerPrices.set(data)
@@ -78,8 +86,45 @@ export function PriceManagementPage() {
         onAction={() => setModal(true)}
       />
 
+      {/* Filters */}
+      <div className="bg-surface-container-low p-4 rounded-xl mb-10 border border-outline-variant/10 shadow-sm">
+        <div className="flex flex-wrap items-end gap-4">
+          <div className="w-64">
+            <Select
+              label="Filtrar por Cliente"
+              value={filterCustomer}
+              onChange={setFilterCustomer}
+              options={customers.map((c) => ({ value: c.id, label: c.name }))}
+              optional
+            />
+          </div>
+          <div className="w-64">
+            <Select
+              label="Filtrar por Produto"
+              value={filterProduct}
+              onChange={setFilterProduct}
+              options={products.map((p) => ({ value: p.id, label: p.name }))}
+              optional
+            />
+          </div>
+          {(filterCustomer || filterProduct) && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setFilterCustomer('')
+                setFilterProduct('')
+              }}
+              className="mb-1"
+            >
+              Limpar Filtros
+            </Button>
+          )}
+        </div>
+      </div>
+
       <Table
-        data={rows}
+        data={filteredRows}
         onDelete={handleDelete}
         columns={[
           { key: 'customerName', label: 'Cliente' },
