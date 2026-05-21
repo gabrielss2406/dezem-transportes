@@ -34,15 +34,15 @@ export function registerSupplierHandlers(): void {
 
   createValidatedHandler('suppliers:create', supplierSchema, (data) => {
     const r = db()
-      .prepare('INSERT INTO suppliers (name, type, phone) VALUES (?,?,?)')
-      .run(data.name, data.type, data.phone)
+      .prepare('INSERT INTO suppliers (name, type, phone, customId) VALUES (?,?,?,?)')
+      .run(data.name, data.type, data.phone, data.customId)
     return { id: r.lastInsertRowid }
   })
 
   createValidatedHandlerWithId('suppliers:update', supplierSchema, (id, data) => {
     db()
-      .prepare('UPDATE suppliers SET name=?, type=?, phone=? WHERE id=?')
-      .run(data.name, data.type, data.phone, id)
+      .prepare('UPDATE suppliers SET name=?, type=?, phone=?, customId=? WHERE id=?')
+      .run(data.name, data.type, data.phone, data.customId, id)
     return { ok: true }
   })
 

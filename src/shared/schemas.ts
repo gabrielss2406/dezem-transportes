@@ -58,6 +58,10 @@ export const waypointSchema = z.object({
 export const waypointsSchema = z.array(waypointSchema)
 
 export const customerSchema = z.object({
+  customId: z.preprocess(
+    (val) => (val === '' || val === null || val === undefined ? undefined : Number(val)),
+    z.number().int().positive().optional(),
+  ),
   name: z.string().min(3).max(100),
   cnpj: z
     .string()
@@ -72,11 +76,19 @@ export const customerSchema = z.object({
 })
 
 export const productSchema = z.object({
+  customId: z.preprocess(
+    (val) => (val === '' || val === null || val === undefined ? undefined : Number(val)),
+    z.number().int().positive().optional(),
+  ),
   name: z.string().min(2).max(100),
   unit: z.string().max(10).optional(),
 })
 
 export const supplierSchema = z.object({
+  customId: z.preprocess(
+    (val) => (val === '' || val === null || val === undefined ? undefined : Number(val)),
+    z.number().int().positive().optional(),
+  ),
   name: z.string().min(3).max(100),
   type: z.string().max(50).optional(),
   phone: z
@@ -86,6 +98,10 @@ export const supplierSchema = z.object({
 })
 
 export const truckSchema = z.object({
+  customId: z.preprocess(
+    (val) => (val === '' || val === null || val === undefined ? undefined : Number(val)),
+    z.number().int().positive().optional(),
+  ),
   license_plate: z.preprocess(
     (val) => (typeof val === 'string' ? val.toUpperCase().replace(/-/g, '') : val),
     z
@@ -111,6 +127,10 @@ export const truckSchema = z.object({
 })
 
 export const driverSchema = z.object({
+  customId: z.preprocess(
+    (val) => (val === '' || val === null || val === undefined ? undefined : Number(val)),
+    z.number().int().positive().optional(),
+  ),
   name: z.string().min(3).max(100),
   cpf: z
     .string()

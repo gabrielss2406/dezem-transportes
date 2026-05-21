@@ -7,8 +7,8 @@ import { Button, CurrencyInput, Input, Modal, Select, Toast, useToast } from '..
 import type { Driver, Truck } from '../../lib/types'
 import { formatBRL } from '../../lib/utils'
 
-const EMPTY = { name: '', cpf: '', phone: '', monthly_salary: '', truck_id: '' }
-const FORM_EMPTY = { ...EMPTY, monthly_salary: 0, truck_id: null }
+const EMPTY = { name: '', cpf: '', phone: '', monthly_salary: '', truck_id: '', customId: '' }
+const FORM_EMPTY = { ...EMPTY, monthly_salary: 0, truck_id: null, customId: undefined }
 
 function initials(name: string) {
   return name
@@ -108,6 +108,7 @@ export function DriversPage() {
       phone: row.phone ?? '',
       monthly_salary: row.monthly_salary,
       truck_id: row.truck_id,
+      customId: row.customId ?? undefined,
     })
     setModal(true)
   }
@@ -212,7 +213,7 @@ export function DriversPage() {
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-surface-container-high">
-              {['Nome', 'CPF', 'Telefone', 'Salário', 'Caminhão', ''].map((h) => (
+              {['ID', 'Nome', 'CPF', 'Telefone', 'Salário', 'Caminhão', ''].map((h) => (
                 <th
                   key={h}
                   className="px-6 py-5 text-[10px] font-black uppercase tracking-widest text-on-surface-variant"
@@ -225,7 +226,7 @@ export function DriversPage() {
           <tbody className="divide-y divide-outline-variant/10">
             {rows.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-6 py-12 text-center text-on-surface-variant text-sm">
+                <td colSpan={7} className="px-6 py-12 text-center text-on-surface-variant text-sm">
                   Nenhum motorista cadastrado
                 </td>
               </tr>
@@ -235,6 +236,9 @@ export function DriversPage() {
                 key={row.id}
                 className={`hover:bg-surface-bright/5 transition-colors group ${i % 2 === 1 ? 'bg-surface-container-lowest/30' : ''}`}
               >
+                <td className="px-6 py-4 font-mono text-sm text-on-surface-variant">
+                  {row.customId || '—'}
+                </td>
                 <td className="px-6 py-4">
                   <div className="flex items-center gap-3">
                     <div className="w-9 h-9 rounded bg-surface-container-lowest border border-outline-variant/20 flex items-center justify-center text-[10px] font-bold text-on-surface-variant shrink-0">
@@ -295,6 +299,15 @@ export function DriversPage() {
           onClose={() => setModal(false)}
         >
           <div className="grid grid-cols-2 gap-4">
+            <div className="col-span-2">
+              <Input
+                label="ID Personalizado"
+                type="number"
+                optional
+                {...register('customId')}
+                error={errors.customId?.message}
+              />
+            </div>
             <div className="col-span-2">
               <Input label="Nome" {...register('name')} error={errors.name?.message} />
             </div>

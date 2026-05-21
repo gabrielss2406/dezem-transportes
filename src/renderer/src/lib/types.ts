@@ -1,5 +1,6 @@
 export interface Customer {
   id: number
+  customId?: number
   name: string
   cnpj?: string
   ie?: string
@@ -9,12 +10,14 @@ export interface Customer {
 
 export interface Product {
   id: number
+  customId?: number
   name: string
   unit: string
 }
 
 export interface Supplier {
   id: number
+  customId?: number
   name: string
   type: 'gas_station' | 'workshop' | 'quarry' | 'other'
   phone?: string
@@ -22,6 +25,7 @@ export interface Supplier {
 
 export interface Truck {
   id: number
+  customId?: number
   license_plate: string
   model: string
   year?: number
@@ -31,6 +35,7 @@ export interface Truck {
 
 export interface Driver {
   id: number
+  customId?: number
   name: string
   cpf?: string
   phone?: string
@@ -84,6 +89,7 @@ export interface Trip {
 
 export interface Cost {
   id: number
+  customId?: number
   date: string
   category: 'fuel' | 'oil' | 'maintenance' | 'salary' | 'toll' | 'others'
   value: number

@@ -1,6 +1,15 @@
 import { ipcMain } from 'electron'
 import { ZodError, z } from 'zod'
 
+// Type guard for SqliteError
+interface SqliteError extends Error {
+  code: string
+}
+
+function isSqliteError(error: unknown): error is SqliteError {
+  return error instanceof Error && 'code' in error
+}
+
 // Helper to format Zod errors into a structured object
 function formatZodError(error: ZodError): Record<string, string> {
   return error.issues.reduce(
@@ -15,6 +24,12 @@ function formatZodError(error: ZodError): Record<string, string> {
   )
 }
 
+// Extracts the column name from a UNIQUE constraint error message
+function getUniqueConstraintField(message: string): string | null {
+  const match = message.match(/UNIQUE constraint failed: \w+\.(\w+)/)
+  return match ? match[1] : null
+}
+
 export function createValidatedHandler<T extends z.ZodRawShape>(
   channel: string,
   schema: z.ZodObject<T>,
@@ -23,14 +38,22 @@ export function createValidatedHandler<T extends z.ZodRawShape>(
   ipcMain.handle(channel, async (_event, data) => {
     try {
       const validatedData = await schema.parseAsync(data)
-      return handler(validatedData)
+      return await handler(validatedData)
     } catch (error) {
       if (error instanceof ZodError) {
         return { ok: false, errors: formatZodError(error) }
       }
+      if (isSqliteError(error) && error.code === 'SQLITE_CONSTRAINT_UNIQUE') {
+        const field = getUniqueConstraintField(error.message)
+        if (field) {
+          // Assuming DB column name matches form field name (e.g., customId, license_plate)
+          return { ok: false, errors: { [field]: 'Este valor já está em uso.' } }
+        }
+      }
       // Log the unexpected error for debugging
       console.error(`Unexpected error in ${channel}:`, error)
-      return { ok: false, errors: { form: 'Ocorreu um erro inesperado no servidor.' } }
+      const errorMessage = error instanceof Error ? error.message : 'Ocorreu um erro inesperado.'
+      return { ok: false, errors: { form: errorMessage } }
     }
   })
 }
@@ -44,13 +67,21 @@ export function createValidatedHandlerWithId<T extends z.ZodRawShape>(
     try {
       const validatedId = await z.number().int().positive().parseAsync(id)
       const validatedData = await schema.parseAsync(data)
-      return handler(validatedId, validatedData)
+      return await handler(validatedId, validatedData)
     } catch (error) {
       if (error instanceof ZodError) {
         return { ok: false, errors: formatZodError(error) }
       }
+      if (isSqliteError(error) && error.code === 'SQLITE_CONSTRAINT_UNIQUE') {
+        const field = getUniqueConstraintField(error.message)
+        if (field) {
+          // Assuming DB column name matches form field name (e.g., customId, license_plate)
+          return { ok: false, errors: { [field]: 'Este valor já está em uso.' } }
+        }
+      }
       console.error(`Unexpected error in ${channel}:`, error)
-      return { ok: false, errors: { form: 'Ocorreu um erro inesperado no servidor.' } }
+      const errorMessage = error instanceof Error ? error.message : 'Ocorreu um erro inesperado.'
+      return { ok: false, errors: { form: errorMessage } }
     }
   })
 }
@@ -59,14 +90,22 @@ export function createIdValidatedHandler(channel: string, handler: (id: number) 
   ipcMain.handle(channel, async (_event, id) => {
     try {
       const validatedId = await z.number().int().positive().parseAsync(id)
-      return handler(validatedId)
+      return await handler(validatedId)
     } catch (error) {
       if (error instanceof ZodError) {
         // Since this handler only validates an ID, we can return a simpler error
         return { ok: false, errors: { id: 'ID inválido.' } }
       }
+      if (isSqliteError(error) && error.code === 'SQLITE_CONSTRAINT_UNIQUE') {
+        const field = getUniqueConstraintField(error.message)
+        if (field) {
+          // Assuming DB column name matches form field name (e.g., customId, license_plate)
+          return { ok: false, errors: { [field]: 'Este valor já está em uso.' } }
+        }
+      }
       console.error(`Unexpected error in ${channel}:`, error)
-      return { ok: false, errors: { form: 'Ocorreu um erro inesperado no servidor.' } }
+      const errorMessage = error instanceof Error ? error.message : 'Ocorreu um erro inesperado.'
+      return { ok: false, errors: { form: errorMessage } }
     }
   })
 }
