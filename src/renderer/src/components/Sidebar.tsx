@@ -10,6 +10,7 @@ const navItems = [
   { path: '/routes', label: 'Rotas', icon: 'map' },
   { path: '/suppliers', label: 'Fornecedores', icon: 'handshake' },
   { path: '/trips', label: 'Viagens', icon: 'route' },
+  { path: '/prices', label: 'Tabela de Preços', icon: 'request_quote' },
   { path: '/costs', label: 'Custos', icon: 'payments' },
   { path: '/settings', label: 'Configurações', icon: 'settings' },
 ]

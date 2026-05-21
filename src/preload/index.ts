@@ -17,6 +17,20 @@ contextBridge.exposeInMainWorld('api', {
     delete: (id: number) => ipcRenderer.invoke('customers:delete', id),
   },
 
+  // Customer Prices
+  customerPrices: {
+    listByCustomer: (customerId: number) =>
+      ipcRenderer.invoke('customer-prices:listByCustomer', customerId),
+    listByProduct: (productId: number) =>
+      ipcRenderer.invoke('customer-prices:listByProduct', productId),
+    listAll: () => ipcRenderer.invoke('customer-prices:listAll'),
+    set: (data: any) => ipcRenderer.invoke('customer-prices:set', data),
+    delete: (customerId: number, productId: number) =>
+      ipcRenderer.invoke('customer-prices:delete', customerId, productId),
+    getPrice: (customerId: number, productId: number) =>
+      ipcRenderer.invoke('customer-prices:getPrice', customerId, productId),
+  },
+
   // Products
   products: {
     list: (search?: string) => ipcRenderer.invoke('products:list', search),

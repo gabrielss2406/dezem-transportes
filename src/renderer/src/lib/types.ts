@@ -15,6 +15,14 @@ export interface Product {
   unit: string
 }
 
+export interface CustomerPrice {
+  customerId: number
+  productId: number
+  price: number
+  customerName?: string
+  productName?: string
+}
+
 export interface Supplier {
   id: number
   customId?: number
@@ -142,6 +150,16 @@ declare global {
         create(data: Omit<Customer, 'id'>): Promise<{ id: number }>
         update(id: number, data: Partial<Customer>): Promise<{ ok: boolean }>
         delete(id: number): Promise<{ ok: boolean }>
+      }
+      customerPrices: {
+        listByCustomer(customerId: number): Promise<CustomerPrice[]>
+        listByProduct(productId: number): Promise<CustomerPrice[]>
+        listAll(): Promise<CustomerPrice[]>
+        set(data: { customerId: number; productId: number; price: number }): Promise<{
+          ok: boolean
+        }>
+        delete(customerId: number, productId: number): Promise<{ ok: boolean }>
+        getPrice(customerId: number, productId: number): Promise<{ price: number } | undefined>
       }
       products: {
         list(search?: string): Promise<Product[]>

@@ -158,6 +158,14 @@ export function setupDatabase(): void {
       created_at    TEXT    DEFAULT (datetime('now'))
     );
 
+    -- Customer Prices
+    CREATE TABLE IF NOT EXISTS customer_prices (
+      customer_id INTEGER NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+      product_id  INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+      price       REAL    NOT NULL,
+      PRIMARY KEY (customer_id, product_id)
+    );
+
     -- Indexes for performance on frequent queries
     CREATE INDEX IF NOT EXISTS idx_trips_date      ON trips(date);
     CREATE INDEX IF NOT EXISTS idx_trips_truck     ON trips(truck_id);
@@ -166,6 +174,8 @@ export function setupDatabase(): void {
     CREATE INDEX IF NOT EXISTS idx_costs_category  ON costs(category);
     CREATE INDEX IF NOT EXISTS idx_route_waypoints_route_id ON route_waypoints(route_id);
     CREATE INDEX IF NOT EXISTS idx_trip_fuel_stops_trip_id  ON trip_fuel_stops(trip_id);
+    CREATE INDEX IF NOT EXISTS idx_customer_prices_customer_id ON customer_prices(customer_id);
+    CREATE INDEX IF NOT EXISTS idx_customer_prices_product_id ON customer_prices(product_id);
   `)
 
   // Seed: default admin user if none exists

@@ -79,6 +79,7 @@ export function TripsPage() {
     reset,
     control,
     watch,
+    setValue,
   } = useForm<Omit<Trip, 'id'>>({
     resolver: zodResolver(tripSchema),
     defaultValues: { ...EMPTY },
@@ -91,6 +92,19 @@ export function TripsPage() {
   })
 
   const selectedCustomerId = watch('customer_id')
+  const selectedProductId = watch('product_id')
+
+  useEffect(() => {
+    if (selectedCustomerId && selectedProductId && !editing) {
+      window.api.customerPrices
+        .getPrice(Number(selectedCustomerId), Number(selectedProductId))
+        .then((res) => {
+          if (res?.price) {
+            setValue('price_charged', res.price)
+          }
+        })
+    }
+  }, [selectedCustomerId, selectedProductId, editing, setValue])
 
   const load = useCallback(async () => {
     const [t, tr, d, p, c, r, s] = await Promise.all([

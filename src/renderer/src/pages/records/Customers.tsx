@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { customerSchema } from '../../../../shared/schemas'
 import { PageHeader } from '../../components/PageHeader'
-import { Button, Input, Modal, Toast, useToast } from '../../components/ui'
+import { Button, Input, Modal, Table, Toast, useToast } from '../../components/ui'
 import type { Customer } from '../../lib/types'
 
 const EMPTY: Omit<Customer, 'id'> = {
@@ -18,6 +18,8 @@ const EMPTY: Omit<Customer, 'id'> = {
 export function CustomersPage() {
   const [rows, setRows] = useState<Customer[]>([])
   const [modal, setModal] = useState(false)
+  const [pricesModal, setPricesModal] = useState<Customer | null>(null)
+  const [customerPrices, setCustomerPrices] = useState<any[]>([])
   const [editing, setEditing] = useState<Customer | null>(null)
   const [search, setSearch] = useState('')
   const { toast, show } = useToast()
@@ -53,6 +55,14 @@ export function CustomersPage() {
       reset(EMPTY)
     }
   }, [modal, reset])
+
+  useEffect(() => {
+    if (pricesModal) {
+      window.api.customerPrices.listByCustomer(pricesModal.id).then(setCustomerPrices)
+    } else {
+      setCustomerPrices([])
+    }
+  }, [pricesModal])
 
   const onSubmit = async (data: Omit<Customer, 'id'>) => {
     try {
@@ -179,6 +189,14 @@ export function CustomersPage() {
                   <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button
                       type="button"
+                      onClick={() => setPricesModal(row)}
+                      className="p-2 text-outline hover:text-tertiary hover:bg-tertiary/10 rounded-lg transition-all"
+                      title="Ver Preços"
+                    >
+                      <span className="material-symbols-outlined text-xl">price_check</span>
+                    </button>
+                    <button
+                      type="button"
                       onClick={() => edit(row)}
                       className="p-2 text-outline hover:text-primary hover:bg-primary/10 rounded-lg transition-all"
                     >
@@ -206,6 +224,28 @@ export function CustomersPage() {
           </p>
         </div>
       </div>
+
+      {pricesModal && (
+        <Modal title={`Preços - ${pricesModal.name}`} onClose={() => setPricesModal(null)}>
+          <Table
+            data={customerPrices}
+            columns={[
+              { key: 'productName', label: 'Produto' },
+              {
+                key: 'price',
+                label: 'Preço',
+                render: (row) =>
+                  new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
+                    row.price,
+                  ),
+              },
+            ]}
+          />
+          <div className="flex justify-end mt-6">
+            <Button onClick={() => setPricesModal(null)}>Fechar</Button>
+          </div>
+        </Modal>
+      )}
 
       {modal && (
         <Modal title={editing ? 'Editar Cliente' : 'Novo Cliente'} onClose={() => setModal(false)}>

@@ -185,6 +185,12 @@ export const costSchema = z.object({
   description: z.string().max(255).optional(),
 })
 
+export const customerPriceSchema = z.object({
+  customerId: idSchema,
+  productId: idSchema,
+  price: requiredNumber(10000000, 'Valor máximo de R$ 10.000.000'),
+})
+
 export const loginSchema = z.object({
   password: z.string().min(1, 'Senha é obrigatória'),
 })
