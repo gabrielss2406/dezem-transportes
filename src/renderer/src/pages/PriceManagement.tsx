@@ -1,12 +1,55 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Controller, useForm } from 'react-hook-form'
 import { customerPriceSchema } from '../../../shared/schemas'
 import { PageHeader } from '../components/PageHeader'
-import { Button, CurrencyInput, Modal, Select, Table, Toast, useToast } from '../components/ui'
+import {
+  Button,
+  CurrencyInput,
+  Modal,
+  Select,
+  type SelectRef,
+  Table,
+  Toast,
+  useToast,
+} from '../components/ui'
 import type { Customer, CustomerPrice, Product } from '../lib/types'
 
 const EMPTY = { customerId: 0, productId: 0, price: 0 }
+
+// Modal de confirmação próprio — sem confirm() nativo do Electron
+function ConfirmModal({
+  message,
+  onConfirm,
+  onCancel,
+}: {
+  message: string
+  onConfirm: () => void
+  onCancel: () => void
+}) {
+  const confirmBtnRef = useRef<HTMLButtonElement>(null)
+
+  useEffect(() => {
+    // Foca o botão de confirmar automaticamente para o usuário poder apertar Enter
+    setTimeout(() => confirmBtnRef.current?.focus(), 50)
+  }, [])
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+      <div className="bg-surface-container-low border border-outline-variant/20 rounded-xl shadow-2xl w-full max-w-sm p-6 flex flex-col gap-6">
+        <p className="text-sm text-on-surface">{message}</p>
+        <div className="flex justify-end gap-3">
+          <Button variant="ghost" onClick={onCancel}>
+            Cancelar
+          </Button>
+          <Button ref={confirmBtnRef} onClick={onConfirm}>
+            Confirmar
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 export function PriceManagementPage() {
   const [rows, setRows] = useState<CustomerPrice[]>([])
@@ -15,7 +58,13 @@ export function PriceManagementPage() {
   const [filterCustomer, setFilterCustomer] = useState<string | number>('')
   const [filterProduct, setFilterProduct] = useState<string | number>('')
   const [modal, setModal] = useState(false)
+  const [pendingData, setPendingData] = useState<any>(null)
+  const [deleteTarget, setDeleteTarget] = useState<CustomerPrice | null>(null)
   const { toast, show } = useToast()
+
+  const customerSelectRef = useRef<SelectRef>(null)
+  const productSelectRef = useRef<SelectRef>(null)
+  const priceInputRef = useRef<HTMLInputElement>(null)
 
   const {
     handleSubmit,
@@ -43,7 +92,11 @@ export function PriceManagementPage() {
   }, [load])
 
   useEffect(() => {
-    if (!modal) {
+    if (modal) {
+      setTimeout(() => {
+        customerSelectRef.current?.open()
+      }, 200)
+    } else {
       reset(EMPTY)
     }
   }, [modal, reset])
@@ -54,29 +107,66 @@ export function PriceManagementPage() {
     return matchCustomer && matchProduct
   })
 
-  const onSubmit = async (data: any) => {
+  // Chamado pelo handleSubmit — abre o confirm modal próprio
+  const onSubmit = (data: any) => {
+    setPendingData(data)
+  }
+
+  // Chamado ao confirmar no modal próprio
+  const handleConfirmSave = async () => {
     try {
-      await window.api.customerPrices.set(data)
+      await window.api.customerPrices.set(pendingData)
       show('Preço definido com sucesso!')
+      setPendingData(null)
       setModal(false)
       load()
     } catch (e: any) {
       show(e.message, 'error')
+      setPendingData(null)
     }
   }
 
-  const handleDelete = async (row: CustomerPrice) => {
-    if (!confirm('Excluir este preço personalizado?')) {
+  const handleCancelSave = () => {
+    setPendingData(null)
+    // Devolve foco ao input de preço
+    setTimeout(() => priceInputRef.current?.focus(), 50)
+  }
+
+  const handleDelete = (row: CustomerPrice) => {
+    setDeleteTarget(row)
+  }
+
+  const handleConfirmDelete = async () => {
+    if (!deleteTarget) {
       return
     }
-    await window.api.customerPrices.delete(row.customerId, row.productId)
+    await window.api.customerPrices.delete(deleteTarget.customerId, deleteTarget.productId)
     show('Preço removido')
+    setDeleteTarget(null)
     load()
   }
 
   return (
     <div className="p-12 max-w-7xl mx-auto">
       {toast && <Toast message={toast.message} type={toast.type} />}
+
+      {/* Confirm modal — salvar */}
+      {pendingData && (
+        <ConfirmModal
+          message="Tem certeza que deseja cadastrar este preço personalizado?"
+          onConfirm={handleConfirmSave}
+          onCancel={handleCancelSave}
+        />
+      )}
+
+      {/* Confirm modal — excluir */}
+      {deleteTarget && (
+        <ConfirmModal
+          message="Excluir este preço personalizado?"
+          onConfirm={handleConfirmDelete}
+          onCancel={() => setDeleteTarget(null)}
+        />
+      )}
 
       <PageHeader
         pretitle="Comercial"
@@ -172,9 +262,13 @@ export function PriceManagementPage() {
               control={control}
               render={({ field }) => (
                 <Select
+                  ref={customerSelectRef}
                   label="Cliente"
                   value={field.value}
                   onChange={field.onChange}
+                  onEnterSelect={() => {
+                    setTimeout(() => productSelectRef.current?.open(), 10)
+                  }}
                   error={errors.customerId?.message}
                   options={customers.map((c) => ({
                     value: c.id,
@@ -197,9 +291,13 @@ export function PriceManagementPage() {
               control={control}
               render={({ field }) => (
                 <Select
+                  ref={productSelectRef}
                   label="Produto"
                   value={field.value}
                   onChange={field.onChange}
+                  onEnterSelect={() => {
+                    setTimeout(() => priceInputRef.current?.focus(), 10)
+                  }}
                   error={errors.productId?.message}
                   options={products.map((p) => ({
                     value: p.id,
@@ -222,9 +320,16 @@ export function PriceManagementPage() {
               control={control}
               render={({ field }) => (
                 <CurrencyInput
+                  ref={priceInputRef}
                   label="Preço"
                   value={field.value}
                   onChange={field.onChange}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                      handleSubmit(onSubmit)()
+                    }
+                  }}
                   error={errors.price?.message}
                 />
               )}

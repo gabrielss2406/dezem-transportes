@@ -1,4 +1,4 @@
-import React, { forwardRef, useState, useRef, useEffect } from 'react'
+import React, { forwardRef, useState, useRef, useEffect, useImperativeHandle } from 'react'
 import { createPortal } from 'react-dom'
 import { IMaskInput } from 'react-imask'
 
@@ -118,62 +118,67 @@ interface CurrencyInputProps {
   onChange: (value: number) => void
   placeholder?: string
   className?: string
+  onKeyDown?: React.KeyboardEventHandler<HTMLInputElement>
 }
 
-export function CurrencyInput({
-  label,
-  optional,
-  error,
-  value,
-  onChange,
-  placeholder = '0,00',
-  className = '',
-}: CurrencyInputProps) {
-  const id = React.useId()
-  const format = (val: number | string) => {
-    const n = typeof val === 'number' ? val : Number(val) || 0
-    return new Intl.NumberFormat('pt-BR', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(n)
-  }
+export const CurrencyInput = forwardRef<HTMLInputElement, CurrencyInputProps>(
+  (
+    { label, optional, error, value, onChange, placeholder = '0,00', className = '', onKeyDown },
+    ref,
+  ) => {
+    const id = React.useId()
+    const format = (val: number | string) => {
+      const n = typeof val === 'number' ? val : Number(val) || 0
+      return new Intl.NumberFormat('pt-BR', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }).format(n)
+    }
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const digits = e.target.value.replace(/\D/g, '')
-    const cents = Number(digits) / 100
-    onChange(cents)
-  }
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const digits = e.target.value.replace(/\D/g, '')
+      const cents = Number(digits) / 100
+      onChange(cents)
+    }
 
-  return (
-    <div className="flex flex-col gap-1.5">
-      {label && (
-        <label
-          htmlFor={id}
-          className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant"
-        >
-          {label}{' '}
-          {optional && <span className="text-outline font-normal normal-case">(opcional)</span>}
-        </label>
-      )}
-      <div className="relative">
-        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant/40 text-sm font-bold">
-          R$
-        </span>
-        <input
-          id={id}
-          type="text"
-          value={format(value)}
-          onChange={handleChange}
-          placeholder={placeholder}
-          className={`w-full bg-surface-container-lowest border border-outline-variant/30 rounded-lg pl-10 pr-4 py-3 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all ${error ? 'border-error' : ''} ${className}`}
-        />
+    return (
+      <div className="flex flex-col gap-1.5">
+        {label && (
+          <label
+            htmlFor={id}
+            className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant"
+          >
+            {label}{' '}
+            {optional && <span className="text-outline font-normal normal-case">(opcional)</span>}
+          </label>
+        )}
+        <div className="relative">
+          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant/40 text-sm font-bold">
+            R$
+          </span>
+          <input
+            id={id}
+            ref={ref}
+            type="text"
+            value={format(value)}
+            onChange={handleChange}
+            onKeyDown={onKeyDown}
+            placeholder={placeholder}
+            className={`w-full bg-surface-container-lowest border border-outline-variant/30 rounded-lg pl-10 pr-4 py-3 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all ${error ? 'border-error' : ''} ${className}`}
+          />
+        </div>
+        {error && <span className="text-xs text-error">{error}</span>}
       </div>
-      {error && <span className="text-xs text-error">{error}</span>}
-    </div>
-  )
-}
+    )
+  },
+)
 
 // ── Select ───────────────────────────────────────────────────────────────────
+export interface SelectRef {
+  focus: () => void
+  open: () => void
+}
+
 interface SelectProps {
   label?: string
   optional?: boolean
@@ -186,269 +191,294 @@ interface SelectProps {
   }[]
   value?: string | number
   onChange?: (value: any) => void
+  onEnterSelect?: () => void
   placeholder?: string
   className?: string
   icon?: string
 }
 
-export function Select({
-  label,
-  optional,
-  error,
-  options,
-  value,
-  onChange,
-  placeholder = 'Selecione...',
-  className = '',
-  icon,
-}: SelectProps) {
-  const [isOpen, setIsOpen] = useState(false)
-  const [searchTerm, setSearchTerm] = useState('')
-  const containerRef = useRef<HTMLDivElement>(null)
-  const buttonRef = useRef<HTMLButtonElement>(null)
-  const searchInputRef = useRef<HTMLInputElement>(null)
-  const [coords, setCoords] = useState({ top: 0, left: 0, width: 0 })
-  const uniqueId = useRef(Math.random())
-  const id = React.useId()
+export const Select = forwardRef<SelectRef, SelectProps>(
+  (
+    {
+      label,
+      optional,
+      error,
+      options,
+      value,
+      onChange,
+      onEnterSelect,
+      placeholder = 'Selecione...',
+      className = '',
+      icon,
+    },
+    ref,
+  ) => {
+    const [isOpen, setIsOpen] = useState(false)
+    const [searchTerm, setSearchTerm] = useState('')
+    const containerRef = useRef<HTMLDivElement>(null)
+    const buttonRef = useRef<HTMLButtonElement>(null)
+    const searchInputRef = useRef<HTMLInputElement>(null)
+    const [coords, setCoords] = useState({ top: 0, left: 0, width: 0 })
+    const uniqueId = useRef(Math.random())
+    const id = React.useId()
 
-  useEffect(() => {
-    const handleClose = (e: CustomEvent) => {
-      if (e.detail.id !== uniqueId.current) {
-        setIsOpen(false)
+    useImperativeHandle(ref, () => ({
+      focus: () => buttonRef.current?.focus(),
+      open: () => {
+        setIsOpen(true)
+        document.dispatchEvent(
+          new CustomEvent('close-other-selects', { detail: { id: uniqueId.current } }),
+        )
+      },
+    }))
+
+    useEffect(() => {
+      const handleClose = (e: CustomEvent) => {
+        if (e.detail.id !== uniqueId.current) {
+          setIsOpen(false)
+        }
       }
-    }
-    document.addEventListener('close-other-selects', handleClose as EventListener)
-    return () => {
-      document.removeEventListener('close-other-selects', handleClose as EventListener)
-    }
-  }, [])
-
-  const selectedOption = options.find((o) => String(o.value) === String(value))
-
-  const getSearchableLabel = (option: (typeof options)[0]): string => {
-    if (option.searchableLabel) {
-      return option.searchableLabel
-    }
-    if (option.displayLabel) {
-      return option.displayLabel
-    }
-    if (typeof option.label === 'string') {
-      return option.label
-    }
-    if (typeof option.label === 'number') {
-      return String(option.label)
-    }
-    return ''
-  }
-
-  const filteredOptions = options
-    .filter((option) => getSearchableLabel(option).toLowerCase().includes(searchTerm.toLowerCase()))
-    .sort((a, b) => {
-      const aLabel = getSearchableLabel(a).toLowerCase()
-      const bLabel = getSearchableLabel(b).toLowerCase()
-      const lowerSearchTerm = searchTerm.toLowerCase()
-
-      // 1. Correspondência exata do label inteiro
-      if (aLabel === lowerSearchTerm && bLabel !== lowerSearchTerm) {
-        return -1
+      document.addEventListener('close-other-selects', handleClose as EventListener)
+      return () => {
+        document.removeEventListener('close-other-selects', handleClose as EventListener)
       }
-      if (aLabel !== lowerSearchTerm && bLabel === lowerSearchTerm) {
-        return 1
+    }, [])
+
+    const selectedOption = options.find((o) => String(o.value) === String(value))
+
+    const getSearchableLabel = (option: (typeof options)[0]): string => {
+      if (option.searchableLabel) {
+        return option.searchableLabel
       }
-
-      const aWords = aLabel.split(' ')
-      const bWords = bLabel.split(' ')
-
-      const aMatches = aWords.filter((w) => w.startsWith(lowerSearchTerm))
-      const bMatches = bWords.filter((w) => w.startsWith(lowerSearchTerm))
-
-      // 2. Se alguma palavra começa com o termo
-      if (aMatches.length > 0 && bMatches.length === 0) {
-        return -1
+      if (option.displayLabel) {
+        return option.displayLabel
       }
-      if (aMatches.length === 0 && bMatches.length > 0) {
-        return 1
+      if (typeof option.label === 'string') {
+        return option.label
       }
+      if (typeof option.label === 'number') {
+        return String(option.label)
+      }
+      return ''
+    }
 
-      // 3. Se ambos tem palavras que começam com o termo, prioriza a palavra mais curta
-      if (aMatches.length > 0 && bMatches.length > 0) {
-        const aMin = Math.min(...aMatches.map((w) => w.length))
-        const bMin = Math.min(...bMatches.map((w) => w.length))
+    const filteredOptions = options
+      .filter((option) =>
+        getSearchableLabel(option).toLowerCase().includes(searchTerm.toLowerCase()),
+      )
+      .sort((a, b) => {
+        const aLabel = getSearchableLabel(a).toLowerCase()
+        const bLabel = getSearchableLabel(b).toLowerCase()
+        const lowerSearchTerm = searchTerm.toLowerCase()
 
-        if (aMin < bMin) {
+        // 1. Correspondência exata do label inteiro
+        if (aLabel === lowerSearchTerm && bLabel !== lowerSearchTerm) {
           return -1
         }
-        if (aMin > bMin) {
+        if (aLabel !== lowerSearchTerm && bLabel === lowerSearchTerm) {
           return 1
         }
-      }
 
-      // 4. Ordem alfabética padrão
-      return aLabel.localeCompare(bLabel)
-    })
+        const aWords = aLabel.split(' ')
+        const bWords = bLabel.split(' ')
 
-  const updateCoords = React.useCallback(() => {
-    if (buttonRef.current) {
-      const rect = buttonRef.current.getBoundingClientRect()
-      setCoords({
-        top: rect.bottom + window.scrollY,
-        left: rect.left + window.scrollX,
-        width: rect.width,
-      })
-    }
-  }, [])
+        const aMatches = aWords.filter((w) => w.startsWith(lowerSearchTerm))
+        const bMatches = bWords.filter((w) => w.startsWith(lowerSearchTerm))
 
-  useEffect(() => {
-    if (isOpen) {
-      updateCoords()
-      window.addEventListener('resize', updateCoords)
-      window.addEventListener('scroll', updateCoords, true)
-      setTimeout(() => searchInputRef.current?.focus(), 10)
-      setSearchTerm('')
-    }
-    return () => {
-      window.removeEventListener('resize', updateCoords)
-      window.removeEventListener('scroll', updateCoords, true)
-    }
-  }, [isOpen, updateCoords])
+        // 2. Se alguma palavra começa com o termo
+        if (aMatches.length > 0 && bMatches.length === 0) {
+          return -1
+        }
+        if (aMatches.length === 0 && bMatches.length > 0) {
+          return 1
+        }
 
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
-        setIsOpen(false)
-      }
-    }
-    if (isOpen) {
-      document.addEventListener('click', handleClickOutside)
-    }
-    return () => document.removeEventListener('click', handleClickOutside)
-  }, [isOpen])
+        // 3. Se ambos tem palavras que começam com o termo, prioriza a palavra mais curta
+        if (aMatches.length > 0 && bMatches.length > 0) {
+          const aMin = Math.min(...aMatches.map((w) => w.length))
+          const bMin = Math.min(...bMatches.map((w) => w.length))
 
-  return (
-    <div className={`flex flex-col gap-1.5 relative ${className}`} ref={containerRef}>
-      {label && (
-        <label
-          htmlFor={id}
-          className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant"
-        >
-          {label}{' '}
-          {optional && <span className="text-outline font-normal normal-case">(opcional)</span>}
-        </label>
-      )}
-
-      <button
-        id={id}
-        ref={buttonRef}
-        type="button"
-        onClick={(e) => {
-          e.stopPropagation()
-          const newIsOpen = !isOpen
-          setIsOpen(newIsOpen)
-          if (newIsOpen) {
-            document.dispatchEvent(
-              new CustomEvent('close-other-selects', { detail: { id: uniqueId.current } }),
-            )
+          if (aMin < bMin) {
+            return -1
           }
-        }}
-        className={`flex items-center justify-between bg-surface-container-lowest border border-outline-variant/30 rounded-lg px-4 py-3 text-sm text-on-surface text-left focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all ${error ? 'border-error' : ''}`}
-      >
-        <div className="flex items-center gap-2 overflow-hidden">
-          {icon && (
-            <span className="material-symbols-outlined text-on-surface-variant/60 text-lg">
-              {icon}
-            </span>
-          )}
-          <span className={`truncate ${!selectedOption ? 'text-on-surface-variant/40' : ''}`}>
-            {selectedOption ? selectedOption.displayLabel || selectedOption.label : placeholder}
-          </span>
-        </div>
-        <span
-          className={`material-symbols-outlined text-on-surface-variant transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
-        >
-          expand_more
-        </span>
-      </button>
+          if (aMin > bMin) {
+            return 1
+          }
+        }
 
-      {isOpen &&
-        createPortal(
-          <button
-            type="button"
-            className="fixed z-[9999] bg-surface-container-low border border-outline-variant/20 rounded-xl shadow-2xl overflow-hidden"
-            onMouseDown={(e) => e.stopPropagation()}
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              top: coords.top + 4,
-              left: coords.left,
-              width: coords.width,
-            }}
+        // 4. Ordem alfabética padrão
+        return aLabel.localeCompare(bLabel)
+      })
+
+    const updateCoords = React.useCallback(() => {
+      if (buttonRef.current) {
+        const rect = buttonRef.current.getBoundingClientRect()
+        setCoords({
+          top: rect.bottom + window.scrollY,
+          left: rect.left + window.scrollX,
+          width: rect.width,
+        })
+      }
+    }, [])
+
+    useEffect(() => {
+      if (isOpen) {
+        updateCoords()
+        window.addEventListener('resize', updateCoords)
+        window.addEventListener('scroll', updateCoords, true)
+        setTimeout(() => {
+          if (searchInputRef.current) {
+            searchInputRef.current.focus()
+            searchInputRef.current.select()
+          }
+        }, 50)
+        setSearchTerm('')
+      }
+      return () => {
+        window.removeEventListener('resize', updateCoords)
+        window.removeEventListener('scroll', updateCoords, true)
+      }
+    }, [isOpen, updateCoords])
+
+    useEffect(() => {
+      const handleClickOutside = (event: MouseEvent) => {
+        if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+          setIsOpen(false)
+        }
+      }
+      if (isOpen) {
+        document.addEventListener('click', handleClickOutside)
+      }
+      return () => document.removeEventListener('click', handleClickOutside)
+    }, [isOpen])
+
+    return (
+      <div className={`flex flex-col gap-1.5 relative ${className}`} ref={containerRef}>
+        {label && (
+          <label
+            htmlFor={id}
+            className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant"
           >
-            <div className="p-2">
-              <input
-                ref={searchInputRef}
-                type="text"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && filteredOptions.length > 0) {
-                    e.preventDefault()
-                    onChange?.(filteredOptions[0].value)
-                    setIsOpen(false)
-                    setSearchTerm('')
-                  }
-                }}
-                placeholder="Pesquisar..."
-                className="w-full bg-surface-container border border-outline-variant/30 rounded-md px-3 py-2 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:outline-none focus:ring-1 focus:ring-primary/50"
-              />
-            </div>
-            <div className="max-h-52 overflow-y-auto py-1">
-              {optional && searchTerm.length === 0 && (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.preventDefault()
-                    e.stopPropagation()
-                    onChange?.('')
-                    setIsOpen(false)
+            {label}{' '}
+            {optional && <span className="text-outline font-normal normal-case">(opcional)</span>}
+          </label>
+        )}
+
+        <button
+          id={id}
+          ref={buttonRef}
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation()
+            const newIsOpen = !isOpen
+            setIsOpen(newIsOpen)
+            if (newIsOpen) {
+              document.dispatchEvent(
+                new CustomEvent('close-other-selects', { detail: { id: uniqueId.current } }),
+              )
+            }
+          }}
+          className={`flex items-center justify-between bg-surface-container-lowest border border-outline-variant/30 rounded-lg px-4 py-3 text-sm text-on-surface text-left focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all ${error ? 'border-error' : ''}`}
+        >
+          <div className="flex items-center gap-2 overflow-hidden">
+            {icon && (
+              <span className="material-symbols-outlined text-on-surface-variant/60 text-lg">
+                {icon}
+              </span>
+            )}
+            <span className={`truncate ${!selectedOption ? 'text-on-surface-variant/40' : ''}`}>
+              {selectedOption ? selectedOption.displayLabel || selectedOption.label : placeholder}
+            </span>
+          </div>
+          <span
+            className={`material-symbols-outlined text-on-surface-variant transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
+          >
+            expand_more
+          </span>
+        </button>
+
+        {isOpen &&
+          createPortal(
+            <button
+              type="button"
+              className="fixed z-[9999] bg-surface-container-low border border-outline-variant/20 rounded-xl shadow-2xl overflow-hidden"
+              onMouseDown={(e) => e.stopPropagation()}
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                top: coords.top + 4,
+                left: coords.left,
+                width: coords.width,
+              }}
+            >
+              <div className="p-2">
+                <input
+                  ref={searchInputRef}
+                  type="text"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && filteredOptions.length > 0) {
+                      e.preventDefault()
+                      onChange?.(filteredOptions[0].value)
+                      setIsOpen(false)
+                      setSearchTerm('')
+                      onEnterSelect?.()
+                    }
                   }}
-                  className="w-full text-left px-4 py-2.5 text-sm transition-colors hover:bg-primary/10 text-on-surface-variant italic"
-                >
-                  Nenhum
-                </button>
-              )}
-              {filteredOptions.length === 0 ? (
-                <div className="px-4 py-3 text-xs text-on-surface-variant italic">
-                  Nenhuma opção encontrada
-                </div>
-              ) : (
-                filteredOptions.map((option) => (
+                  placeholder="Pesquisar..."
+                  className="w-full bg-surface-container border border-outline-variant/30 rounded-md px-3 py-2 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:outline-none focus:ring-1 focus:ring-primary/50"
+                />
+              </div>
+              <div className="max-h-52 overflow-y-auto py-1">
+                {optional && searchTerm.length === 0 && (
                   <button
-                    key={option.value}
                     type="button"
                     onClick={(e) => {
                       e.preventDefault()
                       e.stopPropagation()
-                      onChange?.(option.value)
+                      onChange?.('')
                       setIsOpen(false)
                     }}
-                    className={`w-full text-left px-4 py-2.5 text-sm transition-colors hover:bg-primary/10 ${
-                      String(value) === String(option.value)
-                        ? 'bg-primary/20 text-primary font-bold'
-                        : 'text-on-surface'
-                    }`}
+                    className="w-full text-left px-4 py-2.5 text-sm transition-colors hover:bg-primary/10 text-on-surface-variant italic"
                   >
-                    {option.label}
+                    Nenhum
                   </button>
-                ))
-              )}
-            </div>
-          </button>,
-          document.body,
-        )}
+                )}
+                {filteredOptions.length === 0 ? (
+                  <div className="px-4 py-3 text-xs text-on-surface-variant italic">
+                    Nenhuma opção encontrada
+                  </div>
+                ) : (
+                  filteredOptions.map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        onChange?.(option.value)
+                        setIsOpen(false)
+                      }}
+                      className={`w-full text-left px-4 py-2.5 text-sm transition-colors hover:bg-primary/10 ${
+                        String(value) === String(option.value)
+                          ? 'bg-primary/20 text-primary font-bold'
+                          : 'text-on-surface'
+                      }`}
+                    >
+                      {option.label}
+                    </button>
+                  ))
+                )}
+              </div>
+            </button>,
+            document.body,
+          )}
 
-      {error && <span className="text-xs text-error">{error}</span>}
-    </div>
-  )
-}
+        {error && <span className="text-xs text-error">{error}</span>}
+      </div>
+    )
+  },
+)
 
 // ── Badge ────────────────────────────────────────────────────────────────────
 interface BadgeProps {
