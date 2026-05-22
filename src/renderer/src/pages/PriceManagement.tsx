@@ -58,6 +58,7 @@ export function PriceManagementPage() {
   const [filterCustomer, setFilterCustomer] = useState<string | number>('')
   const [filterProduct, setFilterProduct] = useState<string | number>('')
   const [modal, setModal] = useState(false)
+  const [editingRow, setEditingRow] = useState<CustomerPrice | null>(null)
   const [pendingData, setPendingData] = useState<any>(null)
   const [deleteTarget, setDeleteTarget] = useState<CustomerPrice | null>(null)
   const { toast, show } = useToast()
@@ -93,13 +94,27 @@ export function PriceManagementPage() {
 
   useEffect(() => {
     if (modal) {
-      setTimeout(() => {
-        customerSelectRef.current?.open()
-      }, 200)
+      if (editingRow) {
+        reset({
+          customerId: editingRow.customerId,
+          productId: editingRow.productId,
+          price: editingRow.price,
+        })
+        setTimeout(() => {
+          priceInputRef.current?.focus()
+          priceInputRef.current?.select()
+        }, 200)
+      } else {
+        setTimeout(() => {
+          window.focus()
+          customerSelectRef.current?.open()
+        }, 200)
+      }
     } else {
       reset(EMPTY)
+      setEditingRow(null)
     }
-  }, [modal, reset])
+  }, [modal, reset, editingRow])
 
   const filteredRows = rows.filter((row) => {
     const matchCustomer = filterCustomer ? row.customerId === Number(filterCustomer) : true
@@ -107,21 +122,32 @@ export function PriceManagementPage() {
     return matchCustomer && matchProduct
   })
 
-  // Chamado pelo handleSubmit — abre o confirm modal próprio
+  const save = async (data: any) => {
+    try {
+      await window.api.customerPrices.set(data)
+      show(editingRow ? 'Preço atualizado!' : 'Preço definido com sucesso!')
+      setModal(false)
+      setEditingRow(null)
+      load()
+    } catch (e: any) {
+      show(e.message, 'error')
+    }
+  }
+
+  // Chamado pelo handleSubmit — botão salvar salva direto
   const onSubmit = (data: any) => {
+    save(data)
+  }
+
+  // Chamado via Enter — pede confirmação
+  const onEnterSubmit = (data: any) => {
     setPendingData(data)
   }
 
   // Chamado ao confirmar no modal próprio
   const handleConfirmSave = async () => {
-    try {
-      await window.api.customerPrices.set(pendingData)
-      show('Preço definido com sucesso!')
-      setPendingData(null)
-      setModal(false)
-      load()
-    } catch (e: any) {
-      show(e.message, 'error')
+    if (pendingData) {
+      await save(pendingData)
       setPendingData(null)
     }
   }
@@ -130,6 +156,11 @@ export function PriceManagementPage() {
     setPendingData(null)
     // Devolve foco ao input de preço
     setTimeout(() => priceInputRef.current?.focus(), 50)
+  }
+
+  const handleEdit = (row: CustomerPrice) => {
+    setEditingRow(row)
+    setModal(true)
   }
 
   const handleDelete = (row: CustomerPrice) => {
@@ -239,6 +270,7 @@ export function PriceManagementPage() {
 
       <Table
         data={filteredRows}
+        onEdit={handleEdit}
         onDelete={handleDelete}
         columns={[
           { key: 'customerName', label: 'Cliente' },
@@ -255,7 +287,10 @@ export function PriceManagementPage() {
       />
 
       {modal && (
-        <Modal title="Definir Preço Personalizado" onClose={() => setModal(false)}>
+        <Modal
+          title={editingRow ? 'Editar Preço' : 'Definir Preço Personalizado'}
+          onClose={() => setModal(false)}
+        >
           <div className="flex flex-col gap-4">
             <Controller
               name="customerId"
@@ -270,6 +305,7 @@ export function PriceManagementPage() {
                     setTimeout(() => productSelectRef.current?.open(), 10)
                   }}
                   error={errors.customerId?.message}
+                  className={editingRow ? 'opacity-60 pointer-events-none' : ''}
                   options={customers.map((c) => ({
                     value: c.id,
                     label: (
@@ -299,6 +335,7 @@ export function PriceManagementPage() {
                     setTimeout(() => priceInputRef.current?.focus(), 10)
                   }}
                   error={errors.productId?.message}
+                  className={editingRow ? 'opacity-60 pointer-events-none' : ''}
                   options={products.map((p) => ({
                     value: p.id,
                     label: (
@@ -327,7 +364,7 @@ export function PriceManagementPage() {
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') {
                       e.preventDefault()
-                      handleSubmit(onSubmit)()
+                      handleSubmit(onEnterSubmit)()
                     }
                   }}
                   error={errors.price?.message}
@@ -342,6 +379,22 @@ export function PriceManagementPage() {
             <Button onClick={handleSubmit(onSubmit)}>Salvar</Button>
           </div>
         </Modal>
+      )}
+
+      {pendingData && (
+        <ConfirmModal
+          message="Tem certeza que deseja cadastrar este preço personalizado?"
+          onConfirm={handleConfirmSave}
+          onCancel={handleCancelSave}
+        />
+      )}
+
+      {deleteTarget && (
+        <ConfirmModal
+          message="Excluir este preço personalizado?"
+          onConfirm={handleConfirmDelete}
+          onCancel={() => setDeleteTarget(null)}
+        />
       )}
     </div>
   )

@@ -7,10 +7,10 @@ const navItems = [
   { path: '/drivers', label: 'Motoristas', icon: 'badge' },
   { path: '/products', label: 'Produtos', icon: 'inventory_2' },
   { path: '/customers', label: 'Clientes', icon: 'group' },
+  { path: '/prices', label: 'Tabela de Preços', icon: 'request_quote' },
   { path: '/routes', label: 'Rotas', icon: 'map' },
   { path: '/suppliers', label: 'Fornecedores', icon: 'handshake' },
   { path: '/trips', label: 'Viagens', icon: 'route' },
-  { path: '/prices', label: 'Tabela de Preços', icon: 'request_quote' },
   { path: '/costs', label: 'Custos', icon: 'payments' },
   { path: '/settings', label: 'Configurações', icon: 'settings' },
 ]
