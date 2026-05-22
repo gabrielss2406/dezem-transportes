@@ -6,7 +6,16 @@ import { PageHeader } from '../../components/PageHeader'
 import { Button, Input, Modal, Table, Toast, useToast } from '../../components/ui'
 import type { Customer } from '../../lib/types'
 
-const EMPTY_VALUES: Omit<Customer, 'id'> = {
+interface CustomerFormData {
+  name: string
+  cnpj?: string
+  ie?: string
+  phone?: string
+  address?: string
+  customId?: number
+}
+
+const EMPTY_VALUES: CustomerFormData = {
   name: '',
   cnpj: '',
   ie: '',
@@ -76,7 +85,7 @@ export function CustomersPage() {
     control,
     setValue,
     setError,
-  } = useForm<Omit<Customer, 'id'>>({
+  } = useForm<CustomerFormData>({
     resolver: zodResolver(customerSchema),
     defaultValues: EMPTY_VALUES,
     mode: 'all',

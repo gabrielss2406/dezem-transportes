@@ -1,15 +1,17 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Controller, useForm } from 'react-hook-form'
 import { costSchema } from '../../../shared/schemas'
 import { PageHeader } from '../components/PageHeader'
 import {
   Button,
+  ConfirmModal,
   CurrencyInput,
   DatePicker,
   Input,
   Modal,
   Select,
+  type SelectRef,
   Toast,
   useToast,
 } from '../components/ui'
@@ -43,12 +45,24 @@ export function CostsPage() {
   const [drivers, setDrivers] = useState<Driver[]>([])
   const [modal, setModal] = useState(false)
   const [filterCategory, setFilterCategory] = useState('')
+  const [pendingData, setPendingData] = useState<any>(null)
+  const [deleteTarget, setDeleteTarget] = useState<Cost | null>(null)
+  const [showDiscardConfirm, setShowDiscardConfirm] = useState(false)
   const { toast, show } = useToast()
+
+  // Refs para navegação por teclado
+  const categorySelectRef = useRef<SelectRef>(null)
+  const dateRef = useRef<HTMLInputElement>(null)
+  const valueRef = useRef<HTMLInputElement>(null)
+  const truckSelectRef = useRef<SelectRef>(null)
+  const supplierSelectRef = useRef<SelectRef>(null)
+  const driverSelectRef = useRef<SelectRef>(null)
+  const descRef = useRef<HTMLInputElement>(null)
 
   const {
     register,
     handleSubmit,
-    formState: { errors },
+    formState: { errors, isDirty },
     reset,
     control,
   } = useForm<Omit<Cost, 'id'>>({
@@ -76,32 +90,60 @@ export function CostsPage() {
     load()
   }, [load])
 
-  // Limpeza automática ao fechar o modal
+  // Foco inicial e limpeza
   useEffect(() => {
-    if (!modal) {
+    if (modal) {
+      setTimeout(() => {
+        window.focus()
+        categorySelectRef.current?.open()
+      }, 200)
+    } else {
       reset(EMPTY)
     }
   }, [modal, reset])
 
-  const onSubmit = async (data: Omit<Cost, 'id'>) => {
+  const save = async (data: Omit<Cost, 'id'>) => {
     try {
       await window.api.costs.create(data)
       show('Custo lançado!')
       setModal(false)
-      reset(EMPTY)
+      setPendingData(null)
       load()
     } catch (e: any) {
-      show(e.message || 'Erro', 'error')
+      setPendingData(null)
+      show(e.message || 'Erro ao lançar custo', 'error')
     }
   }
 
-  async function handleDelete(row: Cost) {
-    if (!confirm('Excluir este custo?')) {
+  const onSubmit = (data: Omit<Cost, 'id'>) => {
+    save(data)
+  }
+
+  const onEnterSubmit = (data: Omit<Cost, 'id'>) => {
+    setPendingData(data)
+  }
+
+  const handleConfirmDelete = async () => {
+    if (!deleteTarget) {
       return
     }
-    await window.api.costs.delete(row.id)
+    await window.api.costs.delete(deleteTarget.id)
     show('Custo excluído')
+    setDeleteTarget(null)
     load()
+  }
+
+  const handleEscape = () => {
+    if (isDirty) {
+      setShowDiscardConfirm(true)
+    } else {
+      setModal(false)
+    }
+  }
+
+  const handleConfirmDiscard = () => {
+    setShowDiscardConfirm(false)
+    setModal(false)
   }
 
   async function issueSalaries() {
@@ -141,7 +183,7 @@ export function CostsPage() {
             <button
               type="button"
               onClick={() => {
-                reset(EMPTY)
+                window.focus()
                 setModal(true)
               }}
               className="flex items-center gap-2 bg-primary text-on-primary px-5 py-2.5 rounded font-bold text-sm shadow-lg shadow-primary/20 hover:brightness-110 active:scale-95 transition-all"
@@ -247,7 +289,7 @@ export function CostsPage() {
                         <div className="flex justify-end opacity-0 group-hover:opacity-100 transition-opacity">
                           <button
                             type="button"
-                            onClick={() => handleDelete(row)}
+                            onClick={() => setDeleteTarget(row)}
                             className="p-2 text-on-surface-variant hover:text-error hover:bg-error/10 rounded-lg transition-all"
                           >
                             <span className="material-symbols-outlined text-xl">delete</span>
@@ -264,7 +306,7 @@ export function CostsPage() {
       </div>
 
       {modal && (
-        <Modal title="Novo Custo" onClose={() => setModal(false)}>
+        <Modal title="Novo Custo" onClose={() => setModal(false)} onEscape={handleEscape}>
           <div className="grid grid-cols-2 gap-4">
             <div className="col-span-2">
               <Controller
@@ -272,25 +314,52 @@ export function CostsPage() {
                 control={control}
                 render={({ field }) => (
                   <Select
+                    ref={categorySelectRef}
                     label="Categoria"
                     value={field.value}
                     onChange={field.onChange}
+                    onEnterSelect={() => dateRef.current?.focus()}
                     error={errors.category?.message}
                     options={costCategories}
                   />
                 )}
               />
             </div>
-            <DatePicker label="Data" {...register('date')} error={errors.date?.message} />
+            <Controller
+              name="date"
+              control={control}
+              render={({ field }) => (
+                <DatePicker
+                  ref={dateRef}
+                  label="Data"
+                  value={field.value}
+                  onChange={field.onChange}
+                  error={errors.date?.message}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                      valueRef.current?.focus()
+                    }
+                  }}
+                />
+              )}
+            />
             <Controller
               name="value"
               control={control}
               render={({ field }) => (
                 <CurrencyInput
+                  ref={valueRef}
                   label="Valor"
                   value={field.value}
                   onChange={field.onChange}
                   error={errors.value?.message}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                      truckSelectRef.current?.open()
+                    }
+                  }}
                 />
               )}
             />
@@ -299,12 +368,26 @@ export function CostsPage() {
               control={control}
               render={({ field }) => (
                 <Select
+                  ref={truckSelectRef}
                   label="Veículo"
                   optional
                   value={field.value}
                   onChange={field.onChange}
+                  onEnterSelect={() => supplierSelectRef.current?.open()}
                   error={errors.truck_id?.message}
-                  options={trucks.map((t) => ({ value: t.id, label: t.license_plate }))}
+                  options={trucks.map((t) => ({
+                    value: t.id,
+                    label: (
+                      <div className="flex justify-between">
+                        <span>{t.license_plate}</span>
+                        {t.customId && (
+                          <span className="text-on-surface-variant/50">#{t.customId}</span>
+                        )}
+                      </div>
+                    ),
+                    displayLabel: t.license_plate,
+                    searchableLabel: `${t.license_plate} ${t.customId || ''}`,
+                  }))}
                 />
               )}
             />
@@ -313,12 +396,26 @@ export function CostsPage() {
               control={control}
               render={({ field }) => (
                 <Select
+                  ref={supplierSelectRef}
                   label="Fornecedor"
                   optional
                   value={field.value}
                   onChange={field.onChange}
+                  onEnterSelect={() => driverSelectRef.current?.open()}
                   error={errors.supplier_id?.message}
-                  options={suppliers.map((s) => ({ value: s.id, label: s.name }))}
+                  options={suppliers.map((s) => ({
+                    value: s.id,
+                    label: (
+                      <div className="flex justify-between">
+                        <span>{s.name}</span>
+                        {s.customId && (
+                          <span className="text-on-surface-variant/50">#{s.customId}</span>
+                        )}
+                      </div>
+                    ),
+                    displayLabel: s.name,
+                    searchableLabel: `${s.name} ${s.customId || ''}`,
+                  }))}
                 />
               )}
             />
@@ -327,21 +424,42 @@ export function CostsPage() {
               control={control}
               render={({ field }) => (
                 <Select
+                  ref={driverSelectRef}
                   label="Motorista"
                   optional
                   value={field.value}
                   onChange={field.onChange}
+                  onEnterSelect={() => descRef.current?.focus()}
                   error={errors.driver_id?.message}
-                  options={drivers.map((d) => ({ value: d.id, label: d.name }))}
+                  options={drivers.map((d) => ({
+                    value: d.id,
+                    label: (
+                      <div className="flex justify-between">
+                        <span>{d.name}</span>
+                        {d.customId && (
+                          <span className="text-on-surface-variant/50">#{d.customId}</span>
+                        )}
+                      </div>
+                    ),
+                    displayLabel: d.name,
+                    searchableLabel: `${d.name} ${d.customId || ''}`,
+                  }))}
                 />
               )}
             />
             <div className="col-span-2">
               <Input
+                ref={descRef}
                 label="Descrição"
                 optional
                 {...register('description')}
                 error={errors.description?.message}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault()
+                    handleSubmit(onEnterSubmit)()
+                  }
+                }}
               />
             </div>
           </div>
@@ -352,6 +470,30 @@ export function CostsPage() {
             <Button onClick={handleSubmit(onSubmit)}>Salvar Custo</Button>
           </div>
         </Modal>
+      )}
+
+      {pendingData && (
+        <ConfirmModal
+          message="Tem certeza que deseja lançar este custo?"
+          onConfirm={() => save(pendingData)}
+          onCancel={() => setPendingData(null)}
+        />
+      )}
+
+      {deleteTarget && (
+        <ConfirmModal
+          message="Excluir este custo?"
+          onConfirm={handleConfirmDelete}
+          onCancel={() => setDeleteTarget(null)}
+        />
+      )}
+
+      {showDiscardConfirm && (
+        <ConfirmModal
+          message="Existem alterações não salvas. Deseja realmente fechar?"
+          onConfirm={handleConfirmDiscard}
+          onCancel={() => setShowDiscardConfirm(false)}
+        />
       )}
     </div>
   )
