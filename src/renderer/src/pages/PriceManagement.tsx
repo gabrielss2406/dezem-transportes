@@ -94,7 +94,19 @@ export function PriceManagementPage() {
               label="Filtrar por Cliente"
               value={filterCustomer}
               onChange={setFilterCustomer}
-              options={customers.map((c) => ({ value: c.id, label: c.name }))}
+              options={customers.map((c) => ({
+                value: c.id,
+                label: (
+                  <div className="flex justify-between">
+                    <span>{c.name}</span>
+                    {c.customId && (
+                      <span className="text-on-surface-variant/50">#{c.customId}</span>
+                    )}
+                  </div>
+                ),
+                displayLabel: c.name,
+                searchableLabel: `${c.name} ${c.customId || ''}`,
+              }))}
               optional
             />
           </div>
@@ -103,7 +115,19 @@ export function PriceManagementPage() {
               label="Filtrar por Produto"
               value={filterProduct}
               onChange={setFilterProduct}
-              options={products.map((p) => ({ value: p.id, label: p.name }))}
+              options={products.map((p) => ({
+                value: p.id,
+                label: (
+                  <div className="flex justify-between">
+                    <span>{p.name}</span>
+                    {p.customId && (
+                      <span className="text-on-surface-variant/50">#{p.customId}</span>
+                    )}
+                  </div>
+                ),
+                displayLabel: p.name,
+                searchableLabel: `${p.name} ${p.customId || ''}`,
+              }))}
               optional
             />
           </div>
@@ -152,7 +176,19 @@ export function PriceManagementPage() {
                   value={field.value}
                   onChange={field.onChange}
                   error={errors.customerId?.message}
-                  options={customers.map((c) => ({ value: c.id, label: c.name }))}
+                  options={customers.map((c) => ({
+                    value: c.id,
+                    label: (
+                      <div className="flex justify-between">
+                        <span>{c.name}</span>
+                        {c.customId && (
+                          <span className="text-on-surface-variant/50">#{c.customId}</span>
+                        )}
+                      </div>
+                    ),
+                    displayLabel: c.name,
+                    searchableLabel: `${c.name} ${c.customId || ''}`,
+                  }))}
                 />
               )}
             />
@@ -165,7 +201,19 @@ export function PriceManagementPage() {
                   value={field.value}
                   onChange={field.onChange}
                   error={errors.productId?.message}
-                  options={products.map((p) => ({ value: p.id, label: p.name }))}
+                  options={products.map((p) => ({
+                    value: p.id,
+                    label: (
+                      <div className="flex justify-between">
+                        <span>{p.name}</span>
+                        {p.customId && (
+                          <span className="text-on-surface-variant/50">#{p.customId}</span>
+                        )}
+                      </div>
+                    ),
+                    displayLabel: p.name,
+                    searchableLabel: `${p.name} ${p.customId || ''}`,
+                  }))}
                 />
               )}
             />

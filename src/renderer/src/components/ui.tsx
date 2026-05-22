@@ -178,7 +178,12 @@ interface SelectProps {
   label?: string
   optional?: boolean
   error?: string
-  options: { value: string | number; label: React.ReactNode; displayLabel?: string }[]
+  options: {
+    value: string | number
+    label: React.ReactNode
+    displayLabel?: string
+    searchableLabel?: string
+  }[]
   value?: string | number
   onChange?: (value: any) => void
   placeholder?: string
@@ -221,6 +226,9 @@ export function Select({
   const selectedOption = options.find((o) => String(o.value) === String(value))
 
   const getSearchableLabel = (option: (typeof options)[0]): string => {
+    if (option.searchableLabel) {
+      return option.searchableLabel
+    }
     if (option.displayLabel) {
       return option.displayLabel
     }
@@ -233,9 +241,51 @@ export function Select({
     return ''
   }
 
-  const filteredOptions = options.filter((option) =>
-    getSearchableLabel(option).toLowerCase().includes(searchTerm.toLowerCase()),
-  )
+  const filteredOptions = options
+    .filter((option) => getSearchableLabel(option).toLowerCase().includes(searchTerm.toLowerCase()))
+    .sort((a, b) => {
+      const aLabel = getSearchableLabel(a).toLowerCase()
+      const bLabel = getSearchableLabel(b).toLowerCase()
+      const lowerSearchTerm = searchTerm.toLowerCase()
+
+      // 1. Correspondência exata do label inteiro
+      if (aLabel === lowerSearchTerm && bLabel !== lowerSearchTerm) {
+        return -1
+      }
+      if (aLabel !== lowerSearchTerm && bLabel === lowerSearchTerm) {
+        return 1
+      }
+
+      const aWords = aLabel.split(' ')
+      const bWords = bLabel.split(' ')
+
+      const aMatches = aWords.filter((w) => w.startsWith(lowerSearchTerm))
+      const bMatches = bWords.filter((w) => w.startsWith(lowerSearchTerm))
+
+      // 2. Se alguma palavra começa com o termo
+      if (aMatches.length > 0 && bMatches.length === 0) {
+        return -1
+      }
+      if (aMatches.length === 0 && bMatches.length > 0) {
+        return 1
+      }
+
+      // 3. Se ambos tem palavras que começam com o termo, prioriza a palavra mais curta
+      if (aMatches.length > 0 && bMatches.length > 0) {
+        const aMin = Math.min(...aMatches.map((w) => w.length))
+        const bMin = Math.min(...bMatches.map((w) => w.length))
+
+        if (aMin < bMin) {
+          return -1
+        }
+        if (aMin > bMin) {
+          return 1
+        }
+      }
+
+      // 4. Ordem alfabética padrão
+      return aLabel.localeCompare(bLabel)
+    })
 
   const updateCoords = React.useCallback(() => {
     if (buttonRef.current) {
@@ -338,6 +388,14 @@ export function Select({
                 type="text"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && filteredOptions.length > 0) {
+                    e.preventDefault()
+                    onChange?.(filteredOptions[0].value)
+                    setIsOpen(false)
+                    setSearchTerm('')
+                  }
+                }}
                 placeholder="Pesquisar..."
                 className="w-full bg-surface-container border border-outline-variant/30 rounded-md px-3 py-2 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:outline-none focus:ring-1 focus:ring-primary/50"
               />
