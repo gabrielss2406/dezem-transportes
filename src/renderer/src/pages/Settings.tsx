@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { PageHeader } from '../components/PageHeader'
-import { Button, Input, Toast, useToast } from '../components/ui'
+import { Button, ConfirmModal, Input, Toast, useToast } from '../components/ui'
 
 // Generic type for categories/types
 interface DynamicType {
@@ -42,6 +42,7 @@ function DynamicTypeManager({
   }
 }) {
   const [items, setItems] = useState<DynamicType[]>([])
+  const [deleteTarget, setDeleteTarget] = useState<number | null>(null)
   const { toast, show } = useToast()
 
   const {
@@ -84,15 +85,12 @@ function DynamicTypeManager({
     }
   }
 
-  const handleDelete = async (id: number) => {
-    if (!api) {
-      return
-    }
-    if (!confirm('Tem certeza que deseja excluir este item?')) {
+  const handleConfirmDelete = async () => {
+    if (!api || deleteTarget === null) {
       return
     }
     try {
-      const result = await api.delete(id)
+      const result = await api.delete(deleteTarget)
       if (result.ok) {
         show(`${title} excluído(a)!`)
         load()
@@ -101,6 +99,8 @@ function DynamicTypeManager({
       }
     } catch (error: any) {
       show(error.message || 'Erro desconhecido.', 'error')
+    } finally {
+      setDeleteTarget(null)
     }
   }
 
@@ -130,7 +130,7 @@ function DynamicTypeManager({
             </div>
             <button
               type="button"
-              onClick={() => handleDelete(item.id)}
+              onClick={() => setDeleteTarget(item.id)}
               disabled={item.is_deletable === 0}
               className="p-2 text-on-surface-variant rounded-full disabled:text-outline-variant/30 disabled:cursor-not-allowed hover:text-error enabled:hover:bg-error/10"
               title={item.is_deletable === 0 ? 'Este item padrão não pode ser excluído' : 'Excluir'}
@@ -155,6 +155,14 @@ function DynamicTypeManager({
           </Button>
         </form>
       </div>
+
+      {deleteTarget !== null && (
+        <ConfirmModal
+          message={`Tem certeza que deseja excluir este item de ${title.toLowerCase()}?`}
+          onConfirm={handleConfirmDelete}
+          onCancel={() => setDeleteTarget(null)}
+        />
+      )}
     </Section>
   )
 }

@@ -678,6 +678,36 @@ export function Table({ columns, data, onEdit, onDelete }: TableProps) {
   )
 }
 
+// ── ConfirmModal ─────────────────────────────────────────────────────────────
+interface ConfirmModalProps {
+  message: string
+  onConfirm: () => void
+  onCancel: () => void
+}
+export function ConfirmModal({ message, onConfirm, onCancel }: ConfirmModalProps) {
+  const confirmBtnRef = useRef<HTMLButtonElement>(null)
+
+  useEffect(() => {
+    setTimeout(() => confirmBtnRef.current?.focus(), 50)
+  }, [])
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+      <div className="bg-surface-container-low border border-outline-variant/20 rounded-xl shadow-2xl w-full max-w-sm p-6 flex flex-col gap-6">
+        <p className="text-sm text-on-surface">{message}</p>
+        <div className="flex justify-end gap-3">
+          <Button variant="ghost" onClick={onCancel}>
+            Cancelar
+          </Button>
+          <Button ref={confirmBtnRef} onClick={onConfirm}>
+            Confirmar
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Toast ────────────────────────────────────────────────────────────────────
 interface ToastProps {
   message: string
