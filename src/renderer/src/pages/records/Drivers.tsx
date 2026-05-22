@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Controller, useForm } from 'react-hook-form'
 import { driverSchema } from '../../../../shared/schemas'
 import { PageHeader } from '../../components/PageHeader'
@@ -7,8 +7,14 @@ import { Button, CurrencyInput, Input, Modal, Select, Toast, useToast } from '..
 import type { Driver, Truck } from '../../lib/types'
 import { formatBRL } from '../../lib/utils'
 
-const EMPTY = { name: '', cpf: '', phone: '', monthly_salary: '', truck_id: '', customId: '' }
-const FORM_EMPTY = { ...EMPTY, monthly_salary: 0, truck_id: null, customId: undefined }
+const EMPTY_VALUES = {
+  name: '',
+  cpf: '',
+  phone: '',
+  monthly_salary: 0,
+  truck_id: null,
+  customId: undefined,
+}
 
 function initials(name: string) {
   return name
@@ -19,6 +25,39 @@ function initials(name: string) {
     .toUpperCase()
 }
 
+// Modal de confirmação próprio — sem confirm() nativo do Electron
+function ConfirmModal({
+  message,
+  onConfirm,
+  onCancel,
+}: {
+  message: string
+  onConfirm: () => void
+  onCancel: () => void
+}) {
+  const confirmBtnRef = useRef<HTMLButtonElement>(null)
+
+  useEffect(() => {
+    setTimeout(() => confirmBtnRef.current?.focus(), 50)
+  }, [])
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+      <div className="bg-surface-container-low border border-outline-variant/20 rounded-xl shadow-2xl w-full max-w-sm p-6 flex flex-col gap-6">
+        <p className="text-sm text-on-surface">{message}</p>
+        <div className="flex justify-end gap-3">
+          <Button variant="ghost" onClick={onCancel}>
+            Cancelar
+          </Button>
+          <Button ref={confirmBtnRef} onClick={onConfirm}>
+            Confirmar
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export function DriversPage() {
   const [rows, setRows] = useState<Driver[]>([])
   const [trucks, setTrucks] = useState<Truck[]>([])
@@ -26,18 +65,28 @@ export function DriversPage() {
   const [editing, setEditing] = useState<Driver | null>(null)
   const [filters, setFilters] = useState({ name: '', cpf: '', truck_id: '' })
   const [appliedFilters, setAppliedFilters] = useState({ name: '', cpf: '', truck_id: '' })
+  const [pendingData, setPendingData] = useState<any>(null)
+  const [deleteTarget, setDeleteTarget] = useState<Driver | null>(null)
+  const [showDiscardConfirm, setShowDiscardConfirm] = useState(false)
   const { toast, show } = useToast()
 
+  const nameRef = useRef<HTMLInputElement>(null)
+  const cpfRef = useRef<HTMLInputElement>(null)
+  const phoneRef = useRef<HTMLInputElement>(null)
+  const salaryRef = useRef<HTMLInputElement>(null)
+  const truckSelectRef = useRef<any>(null)
+
   const {
-    register,
     handleSubmit,
-    formState: { errors },
+    formState: { errors, isDirty },
     reset,
     watch,
     control,
+    setValue,
+    setError,
   } = useForm<Omit<Driver, 'id'>>({
     resolver: zodResolver(driverSchema),
-    defaultValues: FORM_EMPTY,
+    defaultValues: EMPTY_VALUES,
     mode: 'all',
   })
 
@@ -56,19 +105,41 @@ export function DriversPage() {
     setRows(d)
     setTrucks(t)
   }, [appliedFilters])
+
   useEffect(() => {
     load()
   }, [load])
 
-  // Limpeza automática ao fechar o modal
-  useEffect(() => {
-    if (!modal) {
-      setEditing(null)
-      reset(FORM_EMPTY)
+  const findNextAvailableId = useCallback(() => {
+    const usedIds = new Set(rows.map((r) => r.customId).filter((id): id is number => !!id))
+    let nextId = 1
+    while (usedIds.has(nextId)) {
+      nextId++
     }
-  }, [modal, reset])
+    return nextId
+  }, [rows])
 
-  const onSubmit = async (data: Omit<Driver, 'id'>) => {
+  // Foco inteligente e sugestão de ID
+  useEffect(() => {
+    if (modal) {
+      setTimeout(() => {
+        window.focus()
+        if (!editing) {
+          const nextId = findNextAvailableId()
+          setValue('customId', nextId as any, { shouldValidate: false })
+          nameRef.current?.focus()
+        } else {
+          nameRef.current?.focus()
+          nameRef.current?.select()
+        }
+      }, 200)
+    } else {
+      setEditing(null)
+      reset(EMPTY_VALUES)
+    }
+  }, [modal, editing, reset, setValue, findNextAvailableId])
+
+  const save = async (data: Omit<Driver, 'id'>) => {
     try {
       let res: any
       if (editing) {
@@ -78,25 +149,49 @@ export function DriversPage() {
       }
 
       if (res && res.ok === false) {
-        const msg = res.errors ? Object.values(res.errors)[0] : 'Erro ao salvar dados'
-        show(String(msg), 'error')
+        setPendingData(null)
+        if (res.errors) {
+          for (const [field, message] of Object.entries(res.errors)) {
+            let finalMessage = message as string
+            if (field === 'customId' && finalMessage.toLowerCase().includes('uso')) {
+              finalMessage = `${finalMessage}. Sugestão: ${findNextAvailableId()}`
+            }
+            setError(field as keyof Omit<Driver, 'id'>, {
+              type: 'manual',
+              message: finalMessage,
+            })
+          }
+        } else {
+          show('Ocorreu um erro ao salvar.', 'error')
+        }
         return
       }
 
       show(editing ? 'Motorista atualizado!' : 'Motorista cadastrado!')
       setModal(false)
+      setPendingData(null)
       load()
     } catch (e: any) {
+      setPendingData(null)
       show(e.message || 'Erro de conexão', 'error')
     }
   }
 
-  async function handleDelete(row: Driver) {
-    if (!confirm('Excluir este motorista?')) {
+  const onSubmit = (data: Omit<Driver, 'id'>) => {
+    save(data)
+  }
+
+  const onEnterSubmit = (data: Omit<Driver, 'id'>) => {
+    setPendingData(data)
+  }
+
+  const handleConfirmDelete = async () => {
+    if (!deleteTarget) {
       return
     }
-    await window.api.drivers.delete(row.id)
+    await window.api.drivers.delete(deleteTarget.id)
     show('Motorista excluído')
+    setDeleteTarget(null)
     load()
   }
 
@@ -111,6 +206,19 @@ export function DriversPage() {
       customId: row.customId ?? undefined,
     })
     setModal(true)
+  }
+
+  const handleEscape = () => {
+    if (isDirty) {
+      setShowDiscardConfirm(true)
+    } else {
+      setModal(false)
+    }
+  }
+
+  const handleConfirmDiscard = () => {
+    setShowDiscardConfirm(false)
+    setModal(false)
   }
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -129,7 +237,10 @@ export function DriversPage() {
         title="Motoristas"
         subtitle="Gerencie os motoristas vinculados à frota."
         actionLabel="Novo Motorista"
-        onAction={() => setModal(true)}
+        onAction={() => {
+          window.focus()
+          setModal(true)
+        }}
       >
         <div className="flex items-center bg-surface-container-highest rounded-lg p-1 border border-outline-variant/10 shadow-sm">
           <div className="relative flex items-center h-9">
@@ -165,7 +276,19 @@ export function DriversPage() {
               placeholder="Caminhão"
               value={filters.truck_id}
               onChange={(val) => setFilters((f) => ({ ...f, truck_id: val }))}
-              options={trucks.map((t) => ({ value: t.id, label: t.license_plate }))}
+              options={trucks.map((t) => ({
+                value: t.id,
+                label: (
+                  <div className="flex justify-between">
+                    <span>{t.license_plate}</span>
+                    {t.customId && (
+                      <span className="text-on-surface-variant/50">#{t.customId}</span>
+                    )}
+                  </div>
+                ),
+                displayLabel: t.license_plate,
+                searchableLabel: `${t.license_plate} ${t.customId || ''}`,
+              }))}
               optional
               className="scale-90 origin-left"
             />
@@ -274,7 +397,7 @@ export function DriversPage() {
                     </button>
                     <button
                       type="button"
-                      onClick={() => handleDelete(row)}
+                      onClick={() => setDeleteTarget(row)}
                       className="p-2 text-outline hover:text-error hover:bg-error/10 rounded-lg transition-all"
                     >
                       <span className="material-symbols-outlined text-xl">delete</span>
@@ -297,43 +420,85 @@ export function DriversPage() {
         <Modal
           title={editing ? 'Editar Motorista' : 'Novo Motorista'}
           onClose={() => setModal(false)}
+          onEscape={handleEscape}
         >
           <div className="grid grid-cols-2 gap-4">
             <div className="col-span-2">
-              <Input
-                label="ID Personalizado"
-                type="number"
-                optional
-                {...register('customId')}
-                error={errors.customId?.message}
+              <Controller
+                name="customId"
+                control={control}
+                render={({ field }) => (
+                  <Input
+                    label="ID Personalizado"
+                    type="number"
+                    optional
+                    value={field.value ?? ''}
+                    onChange={field.onChange}
+                    error={errors.customId?.message}
+                    onKeyDown={(e) => e.key === 'Enter' && nameRef.current?.focus()}
+                  />
+                )}
               />
             </div>
             <div className="col-span-2">
-              <Input label="Nome" {...register('name')} error={errors.name?.message} />
+              <Controller
+                name="name"
+                control={control}
+                render={({ field }) => (
+                  <Input
+                    ref={nameRef}
+                    label="Nome"
+                    value={field.value}
+                    onChange={field.onChange}
+                    error={errors.name?.message}
+                    onKeyDown={(e) => e.key === 'Enter' && cpfRef.current?.focus()}
+                  />
+                )}
+              />
             </div>
-            <Input
-              label="CPF"
-              optional
-              mask="000.000.000-00"
-              {...register('cpf')}
-              error={errors.cpf?.message}
+            <Controller
+              name="cpf"
+              control={control}
+              render={({ field }) => (
+                <Input
+                  ref={cpfRef}
+                  label="CPF"
+                  optional
+                  mask="000.000.000-00"
+                  value={field.value}
+                  onChange={field.onChange}
+                  error={errors.cpf?.message}
+                  onKeyDown={(e) => e.key === 'Enter' && phoneRef.current?.focus()}
+                />
+              )}
             />
-            <Input
-              label="Telefone"
-              optional
-              mask={phoneMask}
-              {...register('phone')}
-              error={errors.phone?.message}
+            <Controller
+              name="phone"
+              control={control}
+              render={({ field }) => (
+                <Input
+                  ref={phoneRef}
+                  label="Telefone"
+                  optional
+                  mask={phoneMask}
+                  value={field.value}
+                  onChange={field.onChange}
+                  error={errors.phone?.message}
+                  onKeyDown={(e) => e.key === 'Enter' && salaryRef.current?.focus()}
+                />
+              )}
             />
             <Controller
               name="monthly_salary"
               control={control}
               render={({ field }) => (
                 <CurrencyInput
+                  ref={salaryRef}
                   label="Salário mensal"
                   value={field.value}
                   onChange={field.onChange}
                   error={errors.monthly_salary?.message}
+                  onKeyDown={(e) => e.key === 'Enter' && truckSelectRef.current?.open()}
                 />
               )}
             />
@@ -342,12 +507,26 @@ export function DriversPage() {
               control={control}
               render={({ field }) => (
                 <Select
+                  ref={truckSelectRef}
                   label="Caminhão vinculado"
                   optional
                   value={field.value}
                   onChange={field.onChange}
                   error={errors.truck_id?.message}
-                  options={trucks.map((t) => ({ value: t.id, label: t.license_plate }))}
+                  onEnterSelect={() => handleSubmit(onEnterSubmit)()}
+                  options={trucks.map((t) => ({
+                    value: t.id,
+                    label: (
+                      <div className="flex justify-between">
+                        <span>{t.license_plate}</span>
+                        {t.customId && (
+                          <span className="text-on-surface-variant/50">#{t.customId}</span>
+                        )}
+                      </div>
+                    ),
+                    displayLabel: t.license_plate,
+                    searchableLabel: `${t.license_plate} ${t.customId || ''}`,
+                  }))}
                 />
               )}
             />
@@ -359,6 +538,30 @@ export function DriversPage() {
             <Button onClick={handleSubmit(onSubmit)}>Salvar</Button>
           </div>
         </Modal>
+      )}
+
+      {pendingData && (
+        <ConfirmModal
+          message="Tem certeza que deseja cadastrar este motorista?"
+          onConfirm={() => save(pendingData)}
+          onCancel={() => setPendingData(null)}
+        />
+      )}
+
+      {deleteTarget && (
+        <ConfirmModal
+          message="Excluir este motorista?"
+          onConfirm={handleConfirmDelete}
+          onCancel={() => setDeleteTarget(null)}
+        />
+      )}
+
+      {showDiscardConfirm && (
+        <ConfirmModal
+          message="Existem alterações não salvas. Deseja realmente fechar?"
+          onConfirm={handleConfirmDiscard}
+          onCancel={() => setShowDiscardConfirm(false)}
+        />
       )}
     </div>
   )

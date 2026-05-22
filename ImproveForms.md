@@ -77,8 +77,10 @@ Passe as refs para os respectivos componentes e use os eventos para "pular" para
 />
 ```
 
-### Passo C: Submissão no último campo e Workaround do Electron
-No último campo do formulário, intercepte o `onKeyDown` para detectar a tecla `Enter`. Se precisar exibir um `confirm()` nativo, é obrigatório aplicar o workaround abaixo para evitar que o Electron trave o foco do sistema operacional:
+### Passo C: Submissão no último campo e Modais de Confirmação
+Evite o uso do `confirm()` nativo do navegador, pois ele trava o foco do Electron. Em vez disso, use o componente `ConfirmModal` em conjunto com um estado (ex: `pendingData` para salvamento ou `deleteTarget` para exclusão).
+
+No último campo do formulário, intercepte o `onKeyDown` para detectar a tecla `Enter` e definir os dados pendentes:
 
 ```tsx
 <CurrencyInput
@@ -86,29 +88,56 @@ No último campo do formulário, intercepte o `onKeyDown` para detectar a tecla 
   onKeyDown={(e) => {
     if (e.key === 'Enter') {
       e.preventDefault()
-      const target = e.currentTarget
-      
-      // 1. Tira o foco do input ANTES de abrir o confirm()
-      target.blur()
-
-      setTimeout(() => {
-        const isConfirmed = confirm('Tem certeza que deseja cadastrar?')
-        
-        // 2. FORÇA a janela a retomar o foco do S.O. (Bug do Electron)
-        window.focus()
-        
-        if (isConfirmed) {
-          // 3. Submete o form
-          handleSubmit(onSubmit)()
-        } else {
-          // 4. Se cancelou, devolve o foco para o input poder ser editado novamente
-          setTimeout(() => target.focus(), 10)
-        }
-      }, 50)
+      // Gatilha a validação e, se OK, define os dados para abrir o ConfirmModal
+      handleSubmit((data) => setPendingData(data))()
     }
   }}
-  // ...
 />
+
+// No JSX:
+{pendingData && (
+  <ConfirmModal
+    message="Tem certeza que deseja cadastrar?"
+    onConfirm={() => save(pendingData)}
+    onCancel={() => setPendingData(null)}
+  />
+)}
+```
+
+## 3. Fechamento Seguro via ESC
+
+O componente `<Modal>` foi atualizado para suportar a propriedade `onEscape`. Use o estado `isDirty` do `react-hook-form` para avisar o usuário se ele tentar fechar um formulário com dados preenchidos.
+
+```tsx
+const [showDiscardConfirm, setShowDiscardConfirm] = useState(false)
+
+const handleEscape = () => {
+  if (isDirty) {
+    setShowDiscardConfirm(true) // Abre o ConfirmModal de descarte
+  } else {
+    setModal(false) // Fecha direto se estiver vazio
+  }
+}
+
+// No JSX:
+<Modal 
+  title="..." 
+  onClose={() => setModal(false)} 
+  onEscape={handleEscape}
+>
+  ...
+</Modal>
+
+{showDiscardConfirm && (
+  <ConfirmModal
+    message="Existem alterações não salvas. Deseja realmente fechar?"
+    onConfirm={() => {
+      setShowDiscardConfirm(false)
+      setModal(false)
+    }}
+    onCancel={() => setShowDiscardConfirm(false)}
+  />
+)}
 ```
 
 ### Opcional: Abrir o primeiro campo ao carregar

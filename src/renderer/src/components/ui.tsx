@@ -558,9 +558,24 @@ export function KpiCard({ label, value, sub, accent }: KpiCardProps) {
 interface ModalProps {
   title: string
   onClose: () => void
+  onEscape?: () => void
   children: React.ReactNode
 }
-export function Modal({ title, onClose, children }: ModalProps) {
+export function Modal({ title, onClose, onEscape, children }: ModalProps) {
+  useEffect(() => {
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (onEscape) {
+          onEscape()
+        } else {
+          onClose()
+        }
+      }
+    }
+    window.addEventListener('keydown', handleEsc)
+    return () => window.removeEventListener('keydown', handleEsc)
+  }, [onClose, onEscape])
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
       <div className="bg-surface-container-low border border-outline-variant/20 rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">

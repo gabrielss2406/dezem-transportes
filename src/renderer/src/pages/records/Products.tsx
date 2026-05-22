@@ -56,6 +56,7 @@ export function ProductsPage() {
   const [appliedSearch, setAppliedSearch] = useState('')
   const [pendingData, setPendingData] = useState<any>(null)
   const [deleteTarget, setDeleteTarget] = useState<Product | null>(null)
+  const [showDiscardConfirm, setShowDiscardConfirm] = useState(false)
   const { toast, show } = useToast()
 
   const customIdRef = useRef<HTMLInputElement>(null)
@@ -64,7 +65,7 @@ export function ProductsPage() {
 
   const {
     handleSubmit,
-    formState: { errors },
+    formState: { errors, isDirty },
     reset,
     control,
     setValue,
@@ -190,6 +191,19 @@ export function ProductsPage() {
       customId: row.customId ?? undefined,
     })
     setModal(true)
+  }
+
+  const handleEscape = () => {
+    if (isDirty) {
+      setShowDiscardConfirm(true)
+    } else {
+      closeModal()
+    }
+  }
+
+  const handleConfirmDiscard = () => {
+    setShowDiscardConfirm(false)
+    closeModal()
   }
 
   return (
@@ -351,6 +365,15 @@ export function ProductsPage() {
           <Table
             data={productPrices}
             columns={[
+              {
+                key: 'customerCustomId',
+                label: 'ID',
+                render: (row) => (
+                  <span className="font-mono text-xs text-on-surface-variant">
+                    {row.customerCustomId || '—'}
+                  </span>
+                ),
+              },
               { key: 'customerName', label: 'Cliente' },
               {
                 key: 'price',
@@ -369,7 +392,11 @@ export function ProductsPage() {
       )}
 
       {modal && (
-        <Modal title={editing ? 'Editar Produto' : 'Novo Produto'} onClose={closeModal}>
+        <Modal
+          title={editing ? 'Editar Produto' : 'Novo Produto'}
+          onClose={closeModal}
+          onEscape={handleEscape}
+        >
           <div className="flex flex-col gap-4">
             <Controller
               name="customId"
@@ -439,6 +466,14 @@ export function ProductsPage() {
           message="Excluir este produto?"
           onConfirm={handleConfirmDelete}
           onCancel={() => setDeleteTarget(null)}
+        />
+      )}
+
+      {showDiscardConfirm && (
+        <ConfirmModal
+          message="Existem alterações não salvas. Deseja realmente fechar?"
+          onConfirm={handleConfirmDiscard}
+          onCancel={() => setShowDiscardConfirm(false)}
         />
       )}
     </div>

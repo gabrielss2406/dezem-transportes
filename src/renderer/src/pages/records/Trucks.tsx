@@ -55,6 +55,7 @@ export function TrucksPage() {
   const [appliedFilters, setAppliedFilters] = useState({ license_plate: '', capacity_ton: '' })
   const [pendingData, setPendingData] = useState<any>(null)
   const [deleteTarget, setDeleteTarget] = useState<Truck | null>(null)
+  const [showDiscardConfirm, setShowDiscardConfirm] = useState(false)
   const { toast, show } = useToast()
 
   const customIdRef = useRef<HTMLInputElement>(null)
@@ -66,7 +67,7 @@ export function TrucksPage() {
 
   const {
     handleSubmit,
-    formState: { errors },
+    formState: { errors, isDirty },
     reset,
     control,
     setValue,
@@ -191,6 +192,19 @@ export function TrucksPage() {
       customId: row.customId ?? undefined,
     })
     setModal(true)
+  }
+
+  const handleEscape = () => {
+    if (isDirty) {
+      setShowDiscardConfirm(true)
+    } else {
+      setModal(false)
+    }
+  }
+
+  const handleConfirmDiscard = () => {
+    setShowDiscardConfirm(false)
+    setModal(false)
   }
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -362,6 +376,7 @@ export function TrucksPage() {
         <Modal
           title={editing ? 'Editar Caminhão' : 'Novo Caminhão'}
           onClose={() => setModal(false)}
+          onEscape={handleEscape}
         >
           <div className="grid grid-cols-2 gap-4">
             <div className="col-span-2">
@@ -491,6 +506,14 @@ export function TrucksPage() {
           message="Excluir este caminhão?"
           onConfirm={handleConfirmDelete}
           onCancel={() => setDeleteTarget(null)}
+        />
+      )}
+
+      {showDiscardConfirm && (
+        <ConfirmModal
+          message="Existem alterações não salvas. Deseja realmente fechar?"
+          onConfirm={handleConfirmDiscard}
+          onCancel={() => setShowDiscardConfirm(false)}
         />
       )}
     </div>

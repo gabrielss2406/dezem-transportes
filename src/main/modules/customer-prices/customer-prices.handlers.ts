@@ -10,11 +10,16 @@ export function registerCustomerPricesHandlers(): void {
     return db()
       .prepare(
         `
-      SELECT cp.price, p.name as productName, cp.product_id as productId, cp.customer_id as customerId
-      FROM customer_prices cp
-      JOIN products p ON p.id = cp.product_id
-      WHERE cp.customer_id = ?
-      ORDER BY p.name
+      SELECT 
+        customer_prices.price, 
+        products.name as productName, 
+        products.customId as productCustomId, 
+        customer_prices.product_id as productId, 
+        customer_prices.customer_id as customerId
+      FROM customer_prices
+      JOIN products ON products.id = customer_prices.product_id
+      WHERE customer_prices.customer_id = ?
+      ORDER BY products.name
     `,
       )
       .all(customerId)
@@ -24,11 +29,16 @@ export function registerCustomerPricesHandlers(): void {
     return db()
       .prepare(
         `
-      SELECT cp.price, c.name as customerName, cp.product_id as productId, cp.customer_id as customerId
-      FROM customer_prices cp
-      JOIN customers c ON c.id = cp.customer_id
-      WHERE cp.product_id = ?
-      ORDER BY c.name
+      SELECT 
+        customer_prices.price, 
+        customers.name as customerName, 
+        customers.customId as customerCustomId, 
+        customer_prices.product_id as productId, 
+        customer_prices.customer_id as customerId
+      FROM customer_prices
+      JOIN customers ON customers.id = customer_prices.customer_id
+      WHERE customer_prices.product_id = ?
+      ORDER BY customers.name
     `,
       )
       .all(productId)
@@ -39,15 +49,17 @@ export function registerCustomerPricesHandlers(): void {
       .prepare(
         `
       SELECT 
-        c.name as customerName, 
-        p.name as productName, 
-        cp.customer_id as customerId, 
-        cp.product_id as productId, 
-        cp.price
-      FROM customer_prices cp
-      JOIN customers c ON c.id = cp.customer_id
-      JOIN products p ON p.id = cp.product_id
-      ORDER BY c.name, p.name
+        customers.name as customerName, 
+        customers.customId as customerCustomId,
+        products.name as productName, 
+        products.customId as productCustomId,
+        customer_prices.customer_id as customerId, 
+        customer_prices.product_id as productId, 
+        customer_prices.price
+      FROM customer_prices
+      JOIN customers ON customers.id = customer_prices.customer_id
+      JOIN products ON products.id = customer_prices.product_id
+      ORDER BY customers.name, products.name
     `,
       )
       .all()

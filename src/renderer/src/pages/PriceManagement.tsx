@@ -61,6 +61,7 @@ export function PriceManagementPage() {
   const [editingRow, setEditingRow] = useState<CustomerPrice | null>(null)
   const [pendingData, setPendingData] = useState<any>(null)
   const [deleteTarget, setDeleteTarget] = useState<CustomerPrice | null>(null)
+  const [showDiscardConfirm, setShowDiscardConfirm] = useState(false)
   const { toast, show } = useToast()
 
   const customerSelectRef = useRef<SelectRef>(null)
@@ -69,7 +70,7 @@ export function PriceManagementPage() {
 
   const {
     handleSubmit,
-    formState: { errors },
+    formState: { errors, isDirty },
     reset,
     control,
   } = useForm({
@@ -162,6 +163,19 @@ export function PriceManagementPage() {
   const handleEdit = (row: CustomerPrice) => {
     setEditingRow(row)
     setModal(true)
+  }
+
+  const handleEscape = () => {
+    if (isDirty) {
+      setShowDiscardConfirm(true)
+    } else {
+      setModal(false)
+    }
+  }
+
+  const handleConfirmDiscard = () => {
+    setShowDiscardConfirm(false)
+    setModal(false)
   }
 
   const handleDelete = (row: CustomerPrice) => {
@@ -291,6 +305,7 @@ export function PriceManagementPage() {
         <Modal
           title={editingRow ? 'Editar Preço' : 'Definir Preço Personalizado'}
           onClose={() => setModal(false)}
+          onEscape={handleEscape}
         >
           <div className="flex flex-col gap-4">
             <Controller
@@ -395,6 +410,14 @@ export function PriceManagementPage() {
           message="Excluir este preço personalizado?"
           onConfirm={handleConfirmDelete}
           onCancel={() => setDeleteTarget(null)}
+        />
+      )}
+
+      {showDiscardConfirm && (
+        <ConfirmModal
+          message="Existem alterações não salvas. Deseja realmente fechar?"
+          onConfirm={handleConfirmDiscard}
+          onCancel={() => setShowDiscardConfirm(false)}
         />
       )}
     </div>
