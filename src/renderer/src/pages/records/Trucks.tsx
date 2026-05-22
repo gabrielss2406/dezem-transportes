@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Controller, useForm } from 'react-hook-form'
 import { truckSchema } from '../../../../shared/schemas'
 import { PageHeader } from '../../components/PageHeader'
@@ -15,16 +15,56 @@ const EMPTY = {
   customId: undefined,
 }
 
+function ConfirmModal({
+  message,
+  onConfirm,
+  onCancel,
+}: {
+  message: string
+  onConfirm: () => void
+  onCancel: () => void
+}) {
+  const confirmBtnRef = useRef<HTMLButtonElement>(null)
+
+  useEffect(() => {
+    setTimeout(() => confirmBtnRef.current?.focus(), 50)
+  }, [])
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+      <div className="bg-surface-container-low border border-outline-variant/20 rounded-xl shadow-2xl w-full max-w-sm p-6 flex flex-col gap-6">
+        <p className="text-sm text-on-surface">{message}</p>
+        <div className="flex justify-end gap-3">
+          <Button variant="ghost" onClick={onCancel}>
+            Cancelar
+          </Button>
+          <Button ref={confirmBtnRef} onClick={onConfirm}>
+            Confirmar
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export function TrucksPage() {
   const [rows, setRows] = useState<Truck[]>([])
   const [modal, setModal] = useState(false)
   const [editing, setEditing] = useState<Truck | null>(null)
   const [filters, setFilters] = useState({ license_plate: '', capacity_ton: '' })
   const [appliedFilters, setAppliedFilters] = useState({ license_plate: '', capacity_ton: '' })
+  const [pendingData, setPendingData] = useState<any>(null)
+  const [deleteTarget, setDeleteTarget] = useState<Truck | null>(null)
   const { toast, show } = useToast()
 
+  const customIdRef = useRef<HTMLInputElement>(null)
+  const plateRef = useRef<HTMLInputElement>(null)
+  const modelRef = useRef<HTMLInputElement>(null)
+  const yearRef = useRef<HTMLInputElement>(null)
+  const capacityRef = useRef<HTMLInputElement>(null)
+  const odometerRef = useRef<HTMLInputElement>(null)
+
   const {
-    register,
     handleSubmit,
     formState: { errors },
     reset,
@@ -40,19 +80,39 @@ export function TrucksPage() {
   const load = useCallback(() => {
     return window.api.trucks.list(appliedFilters).then(setRows)
   }, [appliedFilters])
+
   useEffect(() => {
     load()
   }, [load])
 
-  // Limpeza automática ao fechar o modal
+  const findNextAvailableId = useCallback(() => {
+    const usedIds = new Set(rows.map((r) => r.customId).filter((id): id is number => !!id))
+    let nextId = 1
+    while (usedIds.has(nextId)) {
+      nextId++
+    }
+    return nextId
+  }, [rows])
+
   useEffect(() => {
-    if (!modal) {
+    if (modal) {
+      setTimeout(() => {
+        window.focus()
+        if (!editing) {
+          const nextId = findNextAvailableId()
+          setValue('customId', nextId as any, { shouldValidate: false })
+          plateRef.current?.focus()
+        } else {
+          customIdRef.current?.focus()
+        }
+      }, 200)
+    } else {
       setEditing(null)
       reset(EMPTY)
     }
-  }, [modal, reset])
+  }, [modal, editing, reset, setValue, findNextAvailableId])
 
-  const onSubmit = async (data: Omit<Truck, 'id'>) => {
+  const save = async (data: Omit<Truck, 'id'>) => {
     try {
       let res: any
       if (editing) {
@@ -62,16 +122,18 @@ export function TrucksPage() {
       }
 
       if (res && res.ok === false) {
+        setPendingData(null)
         if (res.errors) {
           for (const [field, message] of Object.entries(res.errors)) {
-            if (field === 'form') {
-              show(message as string, 'error')
-            } else {
-              setError(field as keyof Omit<Truck, 'id'>, {
-                type: 'manual',
-                message: message as string,
-              })
+            let finalMessage = message as string
+            if (field === 'customId' && finalMessage.toLowerCase().includes('uso')) {
+              const suggestion = findNextAvailableId()
+              finalMessage = `${finalMessage}. Sugestão: ${suggestion}`
             }
+            setError(field as keyof Omit<Truck, 'id'>, {
+              type: 'manual',
+              message: finalMessage,
+            })
           }
         } else {
           show('Ocorreu um erro ao salvar.', 'error')
@@ -81,18 +143,29 @@ export function TrucksPage() {
 
       show(editing ? 'Caminhão atualizado!' : 'Caminhão cadastrado!')
       setModal(false)
+      setPendingData(null)
       await load()
     } catch (e: any) {
+      setPendingData(null)
       show(e.message || 'Erro de conexão', 'error')
     }
   }
 
-  async function handleDelete(row: Truck) {
-    if (!confirm('Excluir este caminhão?')) {
+  const onSubmit = (data: Omit<Truck, 'id'>) => {
+    save(data)
+  }
+
+  const onEnterSubmit = (data: Omit<Truck, 'id'>) => {
+    setPendingData(data)
+  }
+
+  const handleConfirmDelete = async () => {
+    if (!deleteTarget) {
       return
     }
-    await window.api.trucks.delete(row.id)
+    await window.api.trucks.delete(deleteTarget.id)
     show('Caminhão excluído')
+    setDeleteTarget(null)
     load()
   }
 
@@ -101,7 +174,6 @@ export function TrucksPage() {
       .toUpperCase()
       .replace(/[^A-Z0-9]/g, '')
       .slice(0, 7)
-    // Only add dash for old format (ABC-1234): 5th char is a digit
     if (clean.length >= 5 && /[0-9]/.test(clean[4])) {
       return `${clean.slice(0, 3)}-${clean.slice(3)}`
     }
@@ -131,13 +203,15 @@ export function TrucksPage() {
     <div className="p-12 max-w-7xl mx-auto">
       {toast && <Toast message={toast.message} type={toast.type} />}
 
-      {/* Header */}
       <PageHeader
         pretitle="Gestão de Frota"
         title="Caminhões"
         subtitle="Gerencie os veículos da sua frota."
         actionLabel="Novo Caminhão"
-        onAction={() => setModal(true)}
+        onAction={() => {
+          window.focus()
+          setModal(true)
+        }}
       >
         <div className="flex items-center bg-surface-container-highest rounded-lg p-1 border border-outline-variant/10 shadow-sm">
           <div className="relative flex items-center h-9">
@@ -177,7 +251,6 @@ export function TrucksPage() {
         </div>
       </PageHeader>
 
-      {/* Stats */}
       <div className="grid grid-cols-3 gap-6 mb-10">
         {[
           { label: 'Total de Caminhões', value: rows.length, icon: 'local_shipping' },
@@ -205,7 +278,6 @@ export function TrucksPage() {
         ))}
       </div>
 
-      {/* Table */}
       <div className="bg-surface-container rounded-xl overflow-hidden border border-outline-variant/10">
         <table className="w-full text-left border-collapse">
           <thead>
@@ -267,7 +339,7 @@ export function TrucksPage() {
                     </button>
                     <button
                       type="button"
-                      onClick={() => handleDelete(row)}
+                      onClick={() => setDeleteTarget(row)}
                       className="p-2 text-outline hover:text-error hover:bg-error/10 rounded-lg transition-all"
                     >
                       <span className="material-symbols-outlined text-xl">delete</span>
@@ -293,37 +365,68 @@ export function TrucksPage() {
         >
           <div className="grid grid-cols-2 gap-4">
             <div className="col-span-2">
-              <Input
-                label="ID Personalizado"
-                type="number"
-                optional
-                {...register('customId')}
-                error={errors.customId?.message}
+              <Controller
+                name="customId"
+                control={control}
+                render={({ field }) => (
+                  <Input
+                    ref={customIdRef}
+                    label="ID Personalizado"
+                    type="number"
+                    optional
+                    value={field.value ?? ''}
+                    onChange={field.onChange}
+                    error={errors.customId?.message}
+                    onKeyDown={(e) => e.key === 'Enter' && plateRef.current?.focus()}
+                  />
+                )}
               />
             </div>
-            <Input
-              label="Placa"
-              {...register('license_plate', {
-                onChange: (e) => {
-                  const formatted = formatPlate(e.target.value)
-                  setValue('license_plate', formatted, { shouldValidate: true })
-                },
-              })}
-              error={errors.license_plate?.message}
-              placeholder="ABC-1234"
+            <Controller
+              name="license_plate"
+              control={control}
+              render={({ field }) => (
+                <Input
+                  ref={plateRef}
+                  label="Placa"
+                  value={field.value}
+                  onChange={(e) => {
+                    const formatted = formatPlate(e.target.value)
+                    setValue('license_plate', formatted, { shouldValidate: true })
+                  }}
+                  error={errors.license_plate?.message}
+                  placeholder="ABC-1234"
+                  onKeyDown={(e) => e.key === 'Enter' && modelRef.current?.focus()}
+                />
+              )}
             />
-            <Input label="Modelo" {...register('model')} error={errors.model?.message} />
+            <Controller
+              name="model"
+              control={control}
+              render={({ field }) => (
+                <Input
+                  ref={modelRef}
+                  label="Modelo"
+                  value={field.value}
+                  onChange={field.onChange}
+                  error={errors.model?.message}
+                  onKeyDown={(e) => e.key === 'Enter' && yearRef.current?.focus()}
+                />
+              )}
+            />
             <Controller
               name="year"
               control={control}
               render={({ field }) => (
                 <Input
+                  ref={yearRef}
                   label="Ano"
                   type="number"
                   optional
                   value={field.value ?? ''}
                   onChange={field.onChange}
                   error={errors.year?.message}
+                  onKeyDown={(e) => e.key === 'Enter' && capacityRef.current?.focus()}
                 />
               )}
             />
@@ -332,12 +435,14 @@ export function TrucksPage() {
               control={control}
               render={({ field }) => (
                 <Input
+                  ref={capacityRef}
                   label="Capacidade (ton)"
                   type="number"
                   optional
                   value={field.value ?? ''}
                   onChange={field.onChange}
                   error={errors.capacity_ton?.message}
+                  onKeyDown={(e) => e.key === 'Enter' && odometerRef.current?.focus()}
                 />
               )}
             />
@@ -347,11 +452,18 @@ export function TrucksPage() {
                 control={control}
                 render={({ field }) => (
                   <Input
+                    ref={odometerRef}
                     label="Odômetro (km)"
                     type="number"
                     value={field.value ?? ''}
                     onChange={field.onChange}
                     error={errors.current_odometer?.message}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault()
+                        handleSubmit(onEnterSubmit)()
+                      }
+                    }}
                   />
                 )}
               />
@@ -364,6 +476,22 @@ export function TrucksPage() {
             <Button onClick={handleSubmit(onSubmit)}>Salvar</Button>
           </div>
         </Modal>
+      )}
+
+      {pendingData && (
+        <ConfirmModal
+          message="Tem certeza que deseja cadastrar este caminhão?"
+          onConfirm={() => save(pendingData)}
+          onCancel={() => setPendingData(null)}
+        />
+      )}
+
+      {deleteTarget && (
+        <ConfirmModal
+          message="Excluir este caminhão?"
+          onConfirm={handleConfirmDelete}
+          onCancel={() => setDeleteTarget(null)}
+        />
       )}
     </div>
   )

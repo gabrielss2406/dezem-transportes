@@ -130,6 +130,7 @@ export function PriceManagementPage() {
       setEditingRow(null)
       load()
     } catch (e: any) {
+      setPendingData(null)
       show(e.message, 'error')
     }
   }
