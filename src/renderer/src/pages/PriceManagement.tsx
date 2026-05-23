@@ -15,7 +15,13 @@ import {
 } from '../components/ui'
 import type { Customer, CustomerPrice, Product } from '../lib/types'
 
-const EMPTY = { customerId: 0, productId: 0, price: 0 }
+interface PriceFormData {
+  customerId: number
+  productId: number
+  price: number
+}
+
+const EMPTY: PriceFormData = { customerId: 0, productId: 0, price: 0 }
 
 // Modal de confirmação próprio — sem confirm() nativo do Electron
 function ConfirmModal({
@@ -73,8 +79,8 @@ export function PriceManagementPage() {
     formState: { errors, isDirty },
     reset,
     control,
-  } = useForm({
-    resolver: zodResolver(customerPriceSchema),
+  } = useForm<PriceFormData>({
+    resolver: zodResolver(customerPriceSchema) as any,
     defaultValues: { ...EMPTY },
   })
 
@@ -123,7 +129,7 @@ export function PriceManagementPage() {
     return matchCustomer && matchProduct
   })
 
-  const save = async (data: any) => {
+  const save = async (data: PriceFormData) => {
     try {
       await window.api.customerPrices.set(data)
       show(editingRow ? 'Preço atualizado!' : 'Preço definido com sucesso!')
@@ -131,18 +137,18 @@ export function PriceManagementPage() {
       setEditingRow(null)
       load()
     } catch (e: any) {
-      setPendingData(null)
+      setPendingData(null) // Fecha o modal de confirmação em caso de erro
       show(e.message, 'error')
     }
   }
 
   // Chamado pelo handleSubmit — botão salvar salva direto
-  const onSubmit = (data: any) => {
+  const onSubmit = (data: PriceFormData) => {
     save(data)
   }
 
   // Chamado via Enter — pede confirmação
-  const onEnterSubmit = (data: any) => {
+  const onEnterSubmit = (data: PriceFormData) => {
     setPendingData(data)
   }
 
@@ -380,7 +386,7 @@ export function PriceManagementPage() {
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') {
                       e.preventDefault()
-                      handleSubmit(onEnterSubmit)()
+                      handleSubmit(onEnterSubmit as any)()
                     }
                   }}
                   error={errors.price?.message}
@@ -392,7 +398,7 @@ export function PriceManagementPage() {
             <Button variant="ghost" onClick={() => setModal(false)}>
               Cancelar
             </Button>
-            <Button onClick={handleSubmit(onSubmit)}>Salvar</Button>
+            <Button onClick={handleSubmit(onSubmit as any)}>Salvar</Button>
           </div>
         </Modal>
       )}

@@ -86,7 +86,7 @@ export function CustomersPage() {
     setValue,
     setError,
   } = useForm<CustomerFormData>({
-    resolver: zodResolver(customerSchema),
+    resolver: zodResolver(customerSchema) as any,
     defaultValues: EMPTY_VALUES,
     mode: 'all',
   })
@@ -143,13 +143,13 @@ export function CustomersPage() {
     }
   }, [pricesModal])
 
-  const save = async (data: Omit<Customer, 'id'>) => {
+  const save = async (data: CustomerFormData) => {
     try {
       let res: any
       if (editing) {
-        res = await window.api.customers.update(editing.id, data)
+        res = await window.api.customers.update(editing.id, data as any)
       } else {
-        res = await window.api.customers.create(data)
+        res = await window.api.customers.create(data as any)
       }
 
       if (res && res.ok === false) {
@@ -161,7 +161,7 @@ export function CustomersPage() {
               const suggestion = findNextAvailableId()
               finalMessage = `${finalMessage}. Sugestão: ${suggestion}`
             }
-            setError(field as keyof Omit<Customer, 'id'>, {
+            setError(field as any, {
               type: 'manual',
               message: finalMessage,
             })
@@ -182,11 +182,11 @@ export function CustomersPage() {
     }
   }
 
-  const onSubmit = (data: Omit<Customer, 'id'>) => {
+  const onSubmit = (data: CustomerFormData) => {
     save(data)
   }
 
-  const onEnterSubmit = (data: Omit<Customer, 'id'>) => {
+  const onEnterSubmit = (data: CustomerFormData) => {
     setPendingData(data)
   }
 
@@ -491,7 +491,7 @@ export function CustomersPage() {
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') {
                       e.preventDefault()
-                      handleSubmit(onEnterSubmit)()
+                      handleSubmit(onEnterSubmit as any)()
                     }
                   }}
                 />
@@ -502,7 +502,7 @@ export function CustomersPage() {
             <Button variant="ghost" onClick={() => setModal(false)}>
               Cancelar
             </Button>
-            <Button onClick={handleSubmit(onSubmit)}>Salvar</Button>
+            <Button onClick={handleSubmit(onSubmit as any)}>Salvar</Button>
           </div>
         </Modal>
       )}

@@ -14,11 +14,21 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Controller, useForm } from 'react-hook-form'
 import { routeSchema } from '../../../shared/schemas'
 import { PageHeader } from '../components/PageHeader'
-import { Badge, Button, Input, Modal, Select, Toast, useToast } from '../components/ui'
+import {
+  Badge,
+  Button,
+  ConfirmModal,
+  Input,
+  Modal,
+  Select,
+  type SelectRef,
+  Toast,
+  useToast,
+} from '../components/ui'
 import type { Customer, Route } from '../lib/types'
 
 type Waypoint = {
@@ -28,7 +38,13 @@ type Waypoint = {
   sequence: number
 }
 
-const EMPTY = {
+interface RouteFormData {
+  name: string
+  distance_km: number
+  customer_id: number | null
+}
+
+const EMPTY: RouteFormData = {
   name: '',
   distance_km: 0,
   customer_id: null,
@@ -87,18 +103,25 @@ export function RoutesPage() {
   const [search, setSearch] = useState('')
   const [waypoints, setWaypoints] = useState<Waypoint[]>([])
   const [newWaypointName, setNewWaypointName] = useState('')
+  const [pendingData, setPendingData] = useState<RouteFormData | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<Route | null>(null)
+  const [showDiscardConfirm, setShowDiscardConfirm] = useState(false)
 
   const { toast, show } = useToast()
   const sensors = useSensors(useSensor(MouseSensor), useSensor(TouchSensor))
 
+  // Refs para navegação por teclado
+  const nameRef = useRef<HTMLInputElement>(null)
+  const customerSelectRef = useRef<SelectRef>(null)
+  const distanceRef = useRef<HTMLInputElement>(null)
+
   const {
-    register,
     handleSubmit,
-    formState: { errors },
+    formState: { errors, isDirty },
     reset,
     control,
-  } = useForm<Omit<Route, 'id'>>({
-    resolver: zodResolver(routeSchema),
+  } = useForm<RouteFormData>({
+    resolver: zodResolver(routeSchema) as any,
     defaultValues: { ...EMPTY },
     mode: 'all',
   })
@@ -141,8 +164,14 @@ export function RoutesPage() {
     load()
   }, [load])
 
+  // Foco inicial e limpeza
   useEffect(() => {
-    if (!modal) {
+    if (modal) {
+      setTimeout(() => {
+        window.focus()
+        nameRef.current?.focus()
+      }, 200)
+    } else {
       setEditing(null)
       reset({ ...EMPTY })
       setWaypoints([])
@@ -150,7 +179,7 @@ export function RoutesPage() {
     }
   }, [modal, reset])
 
-  const onSubmit = async (data: Omit<Route, 'id'>) => {
+  const save = async (data: RouteFormData) => {
     try {
       let routeId: number
       if (editing) {
@@ -169,19 +198,43 @@ export function RoutesPage() {
 
       show(editing ? 'Rota atualizada!' : 'Rota cadastrada!')
       setModal(false)
+      setPendingData(null)
       load()
     } catch (e: any) {
+      setPendingData(null)
       show(e.message || 'Erro ao salvar', 'error')
     }
   }
 
-  async function handleDelete(row: Route) {
-    if (!confirm('Excluir esta rota?')) {
+  const onSubmit = (data: RouteFormData) => {
+    save(data)
+  }
+
+  const onEnterSubmit = (data: RouteFormData) => {
+    setPendingData(data)
+  }
+
+  const handleConfirmDelete = async () => {
+    if (!deleteTarget) {
       return
     }
-    await (window as any).api.routes.delete(row.id)
+    await (window as any).api.routes.delete(deleteTarget.id)
     show('Rota excluída')
+    setDeleteTarget(null)
     load()
+  }
+
+  const handleEscape = () => {
+    if (isDirty) {
+      setShowDiscardConfirm(true)
+    } else {
+      setModal(false)
+    }
+  }
+
+  const handleConfirmDiscard = () => {
+    setShowDiscardConfirm(false)
+    setModal(false)
   }
 
   function edit(row: Route) {
@@ -197,7 +250,7 @@ export function RoutesPage() {
 
   const handleDragEnd = useCallback((event: any) => {
     const { active, over } = event
-    if (active.id !== over.id) {
+    if (over && active.id !== over.id) {
       setWaypoints((items) => {
         const oldIndex = items.findIndex((wp) => wp.id === active.id)
         const newIndex = items.findIndex((wp) => wp.id === over.id)
@@ -233,7 +286,10 @@ export function RoutesPage() {
         title="Rotas"
         subtitle="Gerencie trajetos recorrentes e seus pontos de parada."
         actionLabel="Nova Rota"
-        onAction={() => setModal(true)}
+        onAction={() => {
+          window.focus()
+          setModal(true)
+        }}
       >
         <div className="relative">
           <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-outline text-sm">
@@ -244,6 +300,11 @@ export function RoutesPage() {
             placeholder="Buscar rota..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                load()
+              }
+            }}
             className="pl-11 pr-4 py-3 bg-surface-container-highest border-none rounded-lg w-64 focus:ring-2 focus:ring-primary/20 focus:bg-surface-container-lowest transition-all placeholder:text-outline/60 text-sm outline-none text-on-surface"
           />
         </div>
@@ -311,7 +372,7 @@ export function RoutesPage() {
                     </button>
                     <button
                       type="button"
-                      onClick={() => handleDelete(row)}
+                      onClick={() => setDeleteTarget(row)}
                       className="p-2 text-outline hover:text-error hover:bg-error/10 rounded-lg transition-all"
                     >
                       <span className="material-symbols-outlined text-xl">delete</span>
@@ -325,11 +386,28 @@ export function RoutesPage() {
       </div>
 
       {modal && (
-        <Modal title={editing ? 'Editar Rota' : 'Nova Rota'} onClose={() => setModal(false)}>
+        <Modal
+          title={editing ? 'Editar Rota' : 'Nova Rota'}
+          onClose={() => setModal(false)}
+          onEscape={handleEscape}
+        >
           <div className="space-y-6">
             <div className="grid grid-cols-2 gap-4">
               <div className="col-span-2">
-                <Input label="Nome da Rota" {...register('name')} error={errors.name?.message} />
+                <Controller
+                  name="name"
+                  control={control}
+                  render={({ field }) => (
+                    <Input
+                      ref={nameRef}
+                      label="Nome da Rota"
+                      value={field.value}
+                      onChange={field.onChange}
+                      error={errors.name?.message}
+                      onKeyDown={(e) => e.key === 'Enter' && customerSelectRef.current?.open()}
+                    />
+                  )}
+                />
               </div>
 
               <Controller
@@ -337,22 +415,50 @@ export function RoutesPage() {
                 control={control}
                 render={({ field }) => (
                   <Select
+                    ref={customerSelectRef}
                     label="Cliente"
                     optional
                     icon="business"
                     value={field.value}
                     onChange={field.onChange}
+                    onEnterSelect={() => distanceRef.current?.focus()}
                     error={errors.customer_id?.message}
-                    options={customers.map((c) => ({ value: c.id, label: c.name }))}
+                    options={customers.map((c) => ({
+                      value: c.id,
+                      label: (
+                        <div className="flex justify-between">
+                          <span>{c.name}</span>
+                          {c.customId && (
+                            <span className="text-on-surface-variant/50">#{c.customId}</span>
+                          )}
+                        </div>
+                      ),
+                      displayLabel: c.name,
+                      searchableLabel: `${c.name} ${c.customId || ''}`,
+                    }))}
                   />
                 )}
               />
 
-              <Input
-                label="Distância (km)"
-                type="number"
-                {...register('distance_km')}
-                error={errors.distance_km?.message}
+              <Controller
+                name="distance_km"
+                control={control}
+                render={({ field }) => (
+                  <Input
+                    ref={distanceRef}
+                    label="Distância (km)"
+                    type="number"
+                    value={field.value}
+                    onChange={field.onChange}
+                    error={errors.distance_km?.message}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault()
+                        handleSubmit(onEnterSubmit as any)()
+                      }
+                    }}
+                  />
+                )}
               />
             </div>
 
@@ -410,10 +516,34 @@ export function RoutesPage() {
               <Button variant="ghost" onClick={() => setModal(false)}>
                 Cancelar
               </Button>
-              <Button onClick={handleSubmit(onSubmit)}>Salvar Rota</Button>
+              <Button onClick={handleSubmit(onSubmit as any)}>Salvar Rota</Button>
             </div>
           </div>
         </Modal>
+      )}
+
+      {pendingData && (
+        <ConfirmModal
+          message="Tem certeza que deseja cadastrar esta rota?"
+          onConfirm={() => save(pendingData)}
+          onCancel={() => setPendingData(null)}
+        />
+      )}
+
+      {deleteTarget && (
+        <ConfirmModal
+          message="Excluir esta rota?"
+          onConfirm={handleConfirmDelete}
+          onCancel={() => setDeleteTarget(null)}
+        />
+      )}
+
+      {showDiscardConfirm && (
+        <ConfirmModal
+          message="Existem alterações não salvas. Deseja realmente fechar?"
+          onConfirm={handleConfirmDiscard}
+          onCancel={() => setShowDiscardConfirm(false)}
+        />
       )}
     </div>
   )

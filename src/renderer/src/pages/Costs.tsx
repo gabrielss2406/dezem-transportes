@@ -18,13 +18,23 @@ import {
 import type { Cost, Driver, Supplier, Truck } from '../lib/types'
 import { currentMonthKey, formatBRL, formatDate } from '../lib/utils'
 
-const EMPTY = {
+interface CostFormData {
+  date: string
+  category: string
+  value: number
+  truck_id: number | null
+  supplier_id: number | null
+  driver_id: number | null
+  description?: string
+}
+
+const EMPTY: CostFormData = {
   date: '',
   category: '',
   value: 0,
-  truck_id: '',
-  supplier_id: '',
-  driver_id: '',
+  truck_id: null,
+  supplier_id: null,
+  driver_id: null,
   description: '',
 }
 
@@ -60,20 +70,19 @@ export function CostsPage() {
   const descRef = useRef<HTMLInputElement>(null)
 
   const {
-    register,
     handleSubmit,
     formState: { errors, isDirty },
     reset,
     control,
-  } = useForm<Omit<Cost, 'id'>>({
-    resolver: zodResolver(costSchema),
+  } = useForm<CostFormData>({
+    resolver: zodResolver(costSchema) as any,
     defaultValues: { ...EMPTY },
     mode: 'all',
   })
 
   const load = useCallback(async () => {
     const [c, cc, tr, s, d] = await Promise.all([
-      window.api.costs.list(),
+      window.api.costs.list({}),
       window.api['cost-categories'].list(),
       window.api.trucks.list(),
       window.api.suppliers.list(),
@@ -102,9 +111,9 @@ export function CostsPage() {
     }
   }, [modal, reset])
 
-  const save = async (data: Omit<Cost, 'id'>) => {
+  const save = async (data: CostFormData) => {
     try {
-      await window.api.costs.create(data)
+      await window.api.costs.create(data as any)
       show('Custo lançado!')
       setModal(false)
       setPendingData(null)
@@ -115,11 +124,11 @@ export function CostsPage() {
     }
   }
 
-  const onSubmit = (data: Omit<Cost, 'id'>) => {
+  const onSubmit = (data: CostFormData) => {
     save(data)
   }
 
-  const onEnterSubmit = (data: Omit<Cost, 'id'>) => {
+  const onEnterSubmit = (data: CostFormData) => {
     setPendingData(data)
   }
 
@@ -448,18 +457,25 @@ export function CostsPage() {
               )}
             />
             <div className="col-span-2">
-              <Input
-                ref={descRef}
-                label="Descrição"
-                optional
-                {...register('description')}
-                error={errors.description?.message}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault()
-                    handleSubmit(onEnterSubmit)()
-                  }
-                }}
+              <Controller
+                name="description"
+                control={control}
+                render={({ field }) => (
+                  <Input
+                    ref={descRef}
+                    label="Descrição"
+                    optional
+                    value={field.value ?? ''}
+                    onChange={field.onChange}
+                    error={errors.description?.message}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault()
+                        handleSubmit(onEnterSubmit as any)()
+                      }
+                    }}
+                  />
+                )}
               />
             </div>
           </div>
@@ -467,7 +483,7 @@ export function CostsPage() {
             <Button variant="ghost" onClick={() => setModal(false)}>
               Cancelar
             </Button>
-            <Button onClick={handleSubmit(onSubmit)}>Salvar Custo</Button>
+            <Button onClick={handleSubmit(onSubmit as any)}>Salvar Custo</Button>
           </div>
         </Modal>
       )}

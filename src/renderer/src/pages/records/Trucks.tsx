@@ -6,12 +6,21 @@ import { PageHeader } from '../../components/PageHeader'
 import { Button, Input, Modal, Toast, useToast } from '../../components/ui'
 import type { Truck } from '../../lib/types'
 
-const EMPTY = {
+interface TruckFormData {
+  license_plate: string
+  model: string
+  year: number | null
+  capacity_ton: number | null
+  current_odometer: number
+  customId?: number
+}
+
+const EMPTY: TruckFormData = {
   license_plate: '',
   model: '',
-  year: '',
-  capacity_ton: '',
-  current_odometer: '',
+  year: null,
+  capacity_ton: null,
+  current_odometer: 0,
   customId: undefined,
 }
 
@@ -72,8 +81,8 @@ export function TrucksPage() {
     control,
     setValue,
     setError,
-  } = useForm<Omit<Truck, 'id'>>({
-    resolver: zodResolver(truckSchema),
+  } = useForm<TruckFormData>({
+    resolver: zodResolver(truckSchema) as any,
     defaultValues: { ...EMPTY },
     mode: 'all',
   })
@@ -113,28 +122,32 @@ export function TrucksPage() {
     }
   }, [modal, editing, reset, setValue, findNextAvailableId])
 
-  const save = async (data: Omit<Truck, 'id'>) => {
+  const save = async (data: TruckFormData) => {
     try {
       let res: any
       if (editing) {
-        res = await window.api.trucks.update(editing.id, data)
+        res = await window.api.trucks.update(editing.id, data as any)
       } else {
-        res = await window.api.trucks.create(data)
+        res = await window.api.trucks.create(data as any)
       }
 
       if (res && res.ok === false) {
         setPendingData(null)
         if (res.errors) {
           for (const [field, message] of Object.entries(res.errors)) {
-            let finalMessage = message as string
-            if (field === 'customId' && finalMessage.toLowerCase().includes('uso')) {
-              const suggestion = findNextAvailableId()
-              finalMessage = `${finalMessage}. Sugestão: ${suggestion}`
+            if (field === 'form') {
+              show(message as string, 'error')
+            } else {
+              let finalMessage = message as string
+              if (field === 'customId' && finalMessage.toLowerCase().includes('uso')) {
+                const suggestion = findNextAvailableId()
+                finalMessage = `${finalMessage}. Sugestão: ${suggestion}`
+              }
+              setError(field as any, {
+                type: 'manual',
+                message: finalMessage,
+              })
             }
-            setError(field as keyof Omit<Truck, 'id'>, {
-              type: 'manual',
-              message: finalMessage,
-            })
           }
         } else {
           show('Ocorreu um erro ao salvar.', 'error')
@@ -152,11 +165,11 @@ export function TrucksPage() {
     }
   }
 
-  const onSubmit = (data: Omit<Truck, 'id'>) => {
+  const onSubmit = (data: TruckFormData) => {
     save(data)
   }
 
-  const onEnterSubmit = (data: Omit<Truck, 'id'>) => {
+  const onEnterSubmit = (data: TruckFormData) => {
     setPendingData(data)
   }
 
@@ -476,7 +489,7 @@ export function TrucksPage() {
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
                         e.preventDefault()
-                        handleSubmit(onEnterSubmit)()
+                        handleSubmit(onEnterSubmit as any)()
                       }
                     }}
                   />
@@ -488,7 +501,7 @@ export function TrucksPage() {
             <Button variant="ghost" onClick={() => setModal(false)}>
               Cancelar
             </Button>
-            <Button onClick={handleSubmit(onSubmit)}>Salvar</Button>
+            <Button onClick={handleSubmit(onSubmit as any)}>Salvar</Button>
           </div>
         </Modal>
       )}

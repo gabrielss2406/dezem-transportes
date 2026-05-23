@@ -147,8 +147,8 @@ declare global {
       }
       customers: {
         list(search?: string): Promise<Customer[]>
-        create(data: Omit<Customer, 'id'>): Promise<{ id: number }>
-        update(id: number, data: Partial<Customer>): Promise<{ ok: boolean }>
+        create(data: any): Promise<{ id: number; ok?: boolean; errors?: any }>
+        update(id: number, data: any): Promise<{ ok: boolean; errors?: any }>
         delete(id: number): Promise<{ ok: boolean }>
       }
       customerPrices: {
@@ -163,42 +163,56 @@ declare global {
       }
       products: {
         list(search?: string): Promise<Product[]>
-        create(data: Omit<Product, 'id'>): Promise<{ id: number }>
-        update(id: number, data: Partial<Product>): Promise<{ ok: boolean }>
+        create(data: any): Promise<{ id: number; ok?: boolean; errors?: any }>
+        update(id: number, data: any): Promise<{ ok: boolean; errors?: any }>
         delete(id: number): Promise<{ ok: boolean }>
       }
       suppliers: {
-        list(search?: string): Promise<Supplier[]>
-        create(data: Omit<Supplier, 'id'>): Promise<{ id: number }>
-        update(id: number, data: Partial<Supplier>): Promise<{ ok: boolean }>
+        list(filters?: any): Promise<Supplier[]>
+        create(data: any): Promise<{ id: number; ok?: boolean; errors?: any }>
+        update(id: number, data: any): Promise<{ ok: boolean; errors?: any }>
         delete(id: number): Promise<{ ok: boolean }>
       }
+      'supplier-types': {
+        list(): Promise<{ value: string; label: string }[]>
+        create(data: any): Promise<{ id: number }>
+        delete(id: number): Promise<{ ok: boolean; error?: string }>
+      }
+      'cost-categories': {
+        list(): Promise<{ value: string; label: string }[]>
+        create(data: any): Promise<{ id: number }>
+        delete(id: number): Promise<{ ok: boolean; error?: string }>
+      }
       trucks: {
-        list(): Promise<Truck[]>
-        create(data: Omit<Truck, 'id'>): Promise<{ id: number }>
-        update(id: number, data: Partial<Truck>): Promise<{ ok: boolean }>
+        list(filters?: any): Promise<Truck[]>
+        create(data: any): Promise<{ id: number; ok?: boolean; errors?: any }>
+        update(id: number, data: any): Promise<{ ok: boolean; errors?: any }>
         delete(id: number): Promise<{ ok: boolean }>
       }
       drivers: {
-        list(): Promise<Driver[]>
-        create(data: Omit<Driver, 'id'>): Promise<{ id: number }>
-        update(id: number, data: Partial<Driver>): Promise<{ ok: boolean }>
+        list(filters?: any): Promise<Driver[]>
+        create(data: any): Promise<{ id: number; ok?: boolean; errors?: any }>
+        update(id: number, data: any): Promise<{ ok: boolean; errors?: any }>
         delete(id: number): Promise<{ ok: boolean }>
       }
       routes: {
-        list(): Promise<Route[]>
-        create(data: Omit<Route, 'id'>): Promise<{ id: number }>
+        list(search?: string): Promise<Route[]>
+        create(data: any): Promise<{ id: number }>
+        update(data: any): Promise<{ ok: boolean }>
+        delete(id: number): Promise<{ ok: boolean }>
+        getWaypoints(route_id: number): Promise<any[]>
+        updateWaypoints(data: { route_id: number; waypoints: any[] }): Promise<{ ok: boolean }>
       }
       trips: {
         list(filters?: any): Promise<Trip[]>
-        create(data: Omit<Trip, 'id'>): Promise<{ id: number }>
-        update(id: number, data: Omit<Trip, 'id'>): Promise<{ ok: boolean }>
+        create(data: any): Promise<{ id: number }>
+        update(id: number, data: any): Promise<{ ok: boolean }>
         delete(id: number): Promise<{ ok: boolean }>
         getFuelStops(tripId: number): Promise<FuelStop[]>
       }
       costs: {
         list(filters?: any): Promise<Cost[]>
-        create(data: Omit<Cost, 'id'>): Promise<{ id: number }>
+        create(data: any): Promise<{ id: number }>
         delete(id: number): Promise<{ ok: boolean }>
         issueMonthlySalaries(monthYear: string): Promise<{ ok: boolean; issued: number }>
       }

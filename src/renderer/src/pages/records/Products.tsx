@@ -12,7 +12,13 @@ const UNITS = [
   { value: 'un', label: 'Unidade' },
 ]
 
-const EMPTY = { name: '', unit: 'ton', customId: undefined }
+interface ProductFormData {
+  name: string
+  unit?: string
+  customId?: number
+}
+
+const EMPTY: ProductFormData = { name: '', unit: 'ton', customId: undefined }
 
 function ConfirmModal({
   message,
@@ -70,8 +76,8 @@ export function ProductsPage() {
     control,
     setValue,
     setError,
-  } = useForm<Omit<Product, 'id'>>({
-    resolver: zodResolver(productSchema),
+  } = useForm<ProductFormData>({
+    resolver: zodResolver(productSchema) as any,
     defaultValues: { ...EMPTY },
     mode: 'all',
   })
@@ -127,13 +133,13 @@ export function ProductsPage() {
     reset(EMPTY)
   }, [reset])
 
-  const save = async (data: Omit<Product, 'id'>) => {
+  const save = async (data: ProductFormData) => {
     try {
       let res: any
       if (editing) {
-        res = await window.api.products.update(editing.id, data)
+        res = await window.api.products.update(editing.id, data as any)
       } else {
-        res = await window.api.products.create(data)
+        res = await window.api.products.create(data as any)
       }
 
       if (res && res.ok === false) {
@@ -144,7 +150,7 @@ export function ProductsPage() {
             if (field === 'customId' && finalMessage.toLowerCase().includes('uso')) {
               finalMessage = `${finalMessage}. Sugestão: ${findNextAvailableId()}`
             }
-            setError(field as keyof Omit<Product, 'id'>, {
+            setError(field as any, {
               type: 'manual',
               message: finalMessage,
             })
@@ -165,11 +171,11 @@ export function ProductsPage() {
     }
   }
 
-  const onSubmit = (data: Omit<Product, 'id'>) => {
+  const onSubmit = (data: ProductFormData) => {
     save(data)
   }
 
-  const onEnterSubmit = (data: Omit<Product, 'id'>) => {
+  const onEnterSubmit = (data: ProductFormData) => {
     setPendingData(data)
   }
 
@@ -437,7 +443,7 @@ export function ProductsPage() {
                   label="Unidade"
                   value={field.value}
                   onChange={field.onChange}
-                  onEnterSelect={() => handleSubmit(onEnterSubmit)()}
+                  onEnterSelect={() => handleSubmit(onEnterSubmit as any)()}
                   error={errors.unit?.message}
                   options={UNITS}
                 />
@@ -448,7 +454,7 @@ export function ProductsPage() {
             <Button variant="ghost" onClick={closeModal}>
               Cancelar
             </Button>
-            <Button onClick={handleSubmit(onSubmit)}>Salvar</Button>
+            <Button onClick={handleSubmit(onSubmit as any)}>Salvar</Button>
           </div>
         </Modal>
       )}

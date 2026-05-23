@@ -5,15 +5,7 @@ import { z } from 'zod'
 import { PageHeader } from '../components/PageHeader'
 import { Button, ConfirmModal, Input, Toast, useToast } from '../components/ui'
 
-// Generic type for categories/types
-interface DynamicType {
-  id: number
-  value: string
-  label: string
-  is_deletable: number
-}
-
-// Zod schema for the form
+// Section component for styling
 const formSchema = z.object({
   label: z.string().min(1, 'O rótulo é obrigatório'),
 })
@@ -36,12 +28,12 @@ function DynamicTypeManager({
 }: {
   title: string
   api: {
-    list: () => Promise<DynamicType[]>
+    list: () => Promise<any[]>
     create: (data: { value: string; label: string }) => Promise<{ id?: number }>
     delete: (id: number) => Promise<{ ok: boolean; error?: string }>
   }
 }) {
-  const [items, setItems] = useState<DynamicType[]>([])
+  const [items, setItems] = useState<any[]>([])
   const [deleteTarget, setDeleteTarget] = useState<number | null>(null)
   const { toast, show } = useToast()
 

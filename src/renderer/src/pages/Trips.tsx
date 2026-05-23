@@ -3,7 +3,6 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Controller, useFieldArray, useForm } from 'react-hook-form'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { tripSchema } from '../../../shared/schemas'
-import type { Customer, Driver, Product, Route, Supplier, Trip, Truck } from '../../lib/types'
 import { PageHeader } from '../components/PageHeader'
 import {
   Badge,
@@ -17,19 +16,35 @@ import {
   Toast,
   useToast,
 } from '../components/ui'
+import type { Customer, Driver, Product, Route, Supplier, Trip, Truck } from '../lib/types'
 import { formatBRL, formatDate } from '../lib/utils'
 
-const EMPTY = {
+interface TripFormData {
+  date: string
+  truck_id: number
+  driver_id: number
+  product_id: number
+  customer_id: number | null
+  route_id: number | null
+  supplier_id: number | null
+  weight_ton: number
+  price_charged: number
+  km_driven: number
+  observation?: string
+  fuel_stops?: any[]
+}
+
+const EMPTY: TripFormData = {
   date: '',
-  truck_id: '',
-  driver_id: '',
-  product_id: '',
-  customer_id: '',
-  route_id: '',
-  supplier_id: '',
-  weight_ton: '' as any,
+  truck_id: 0,
+  driver_id: 0,
+  product_id: 0,
+  customer_id: null,
+  route_id: null,
+  supplier_id: null,
+  weight_ton: 0,
   price_charged: 0,
-  km_driven: '' as any,
+  km_driven: 0,
   observation: '',
   fuel_stops: [],
 }
@@ -128,8 +143,8 @@ export function TripsPage() {
     control,
     watch,
     setValue,
-  } = useForm<Omit<Trip, 'id'>>({
-    resolver: zodResolver(tripSchema),
+  } = useForm<TripFormData>({
+    resolver: zodResolver(tripSchema) as any,
     defaultValues: { ...EMPTY },
     mode: 'all',
   })
@@ -198,13 +213,13 @@ export function TripsPage() {
     }
   }, [modal, editing, reset])
 
-  const save = async (data: Omit<Trip, 'id'>) => {
+  const save = async (data: TripFormData) => {
     try {
       if (editing) {
-        await window.api.trips.update(editing.id, data)
+        await window.api.trips.update(editing.id, data as any)
         show('Viagem atualizada!')
       } else {
-        await window.api.trips.create(data)
+        await window.api.trips.create(data as any)
         show('Viagem registrada!')
       }
       setModal(false)
@@ -216,11 +231,11 @@ export function TripsPage() {
     }
   }
 
-  const onSubmit = (data: Omit<Trip, 'id'>) => {
+  const onSubmit = (data: TripFormData) => {
     save(data)
   }
 
-  const onEnterSubmit = (data: Omit<Trip, 'id'>) => {
+  const onEnterSubmit = (data: TripFormData) => {
     setPendingData(data)
   }
 
@@ -242,9 +257,9 @@ export function TripsPage() {
         truck_id: row.truck_id,
         driver_id: row.driver_id,
         product_id: row.product_id,
-        customer_id: row.customer_id ?? '',
-        route_id: row.route_id ?? '',
-        supplier_id: row.supplier_id ?? '',
+        customer_id: row.customer_id ?? null,
+        route_id: row.route_id ?? null,
+        supplier_id: row.supplier_id ?? null,
         weight_ton: row.weight_ton,
         price_charged: row.price_charged,
         km_driven: row.km_driven,
@@ -752,7 +767,7 @@ export function TripsPage() {
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
                         e.preventDefault()
-                        handleSubmit(onEnterSubmit)()
+                        handleSubmit(onEnterSubmit as any)()
                       }
                     }}
                   />
@@ -903,7 +918,7 @@ export function TripsPage() {
               </Button>
               <button
                 type="button"
-                onClick={handleSubmit(onSubmit)}
+                onClick={handleSubmit(onSubmit as any)}
                 className="flex items-center gap-3 px-8 py-3 bg-primary text-on-primary font-extrabold rounded transition-all hover:brightness-110 active:scale-95 shadow-lg shadow-primary/20"
               >
                 {editing ? 'Salvar Alterações' : 'Salvar Viagem'}

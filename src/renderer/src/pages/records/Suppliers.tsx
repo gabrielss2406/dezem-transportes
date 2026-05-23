@@ -6,9 +6,16 @@ import { PageHeader } from '../../components/PageHeader'
 import { Button, Input, Modal, Select, Toast, useToast } from '../../components/ui'
 import type { Supplier } from '../../lib/types'
 
-const EMPTY_VALUES = {
+interface SupplierFormData {
+  name: string
+  type?: string
+  phone?: string
+  customId?: number
+}
+
+const EMPTY_VALUES: SupplierFormData = {
   name: '',
-  type: 'gas_station' as Supplier['type'],
+  type: 'gas_station',
   phone: '',
   customId: undefined,
 }
@@ -78,8 +85,8 @@ export function SuppliersPage() {
     watch,
     setValue,
     setError,
-  } = useForm<Omit<Supplier, 'id'>>({
-    resolver: zodResolver(supplierSchema),
+  } = useForm<SupplierFormData>({
+    resolver: zodResolver(supplierSchema) as any,
     defaultValues: EMPTY_VALUES,
     mode: 'all',
   })
@@ -93,7 +100,7 @@ export function SuppliersPage() {
 
   const load = useCallback(async () => {
     const [s, st] = await Promise.all([
-      window.api.suppliers.list(appliedFilters),
+      window.api.suppliers.list(appliedFilters as any),
       window.api['supplier-types'].list(),
     ])
     setRows(s)
@@ -132,13 +139,13 @@ export function SuppliersPage() {
     }
   }, [modal, editing, reset, setValue, findNextAvailableId])
 
-  const save = async (data: Omit<Supplier, 'id'>) => {
+  const save = async (data: SupplierFormData) => {
     try {
       let res: any
       if (editing) {
-        res = await window.api.suppliers.update(editing.id, data)
+        res = await window.api.suppliers.update(editing.id, data as any)
       } else {
-        res = await window.api.suppliers.create(data)
+        res = await window.api.suppliers.create(data as any)
       }
 
       if (res && res.ok === false) {
@@ -150,7 +157,7 @@ export function SuppliersPage() {
               const suggestion = findNextAvailableId()
               finalMessage = `${finalMessage}. Sugestão: ${suggestion}`
             }
-            setError(field as keyof Omit<Supplier, 'id'>, {
+            setError(field as any, {
               type: 'manual',
               message: finalMessage,
             })
@@ -171,11 +178,11 @@ export function SuppliersPage() {
     }
   }
 
-  const onSubmit = (data: Omit<Supplier, 'id'>) => {
+  const onSubmit = (data: SupplierFormData) => {
     save(data)
   }
 
-  const onEnterSubmit = (data: Omit<Supplier, 'id'>) => {
+  const onEnterSubmit = (data: SupplierFormData) => {
     setPendingData(data)
   }
 

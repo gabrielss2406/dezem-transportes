@@ -7,7 +7,16 @@ import { Button, CurrencyInput, Input, Modal, Select, Toast, useToast } from '..
 import type { Driver, Truck } from '../../lib/types'
 import { formatBRL } from '../../lib/utils'
 
-const EMPTY_VALUES = {
+interface DriverFormData {
+  name: string
+  cpf?: string
+  phone?: string
+  monthly_salary: number
+  truck_id: number | null
+  customId?: number
+}
+
+const EMPTY_VALUES: DriverFormData = {
   name: '',
   cpf: '',
   phone: '',
@@ -84,8 +93,8 @@ export function DriversPage() {
     control,
     setValue,
     setError,
-  } = useForm<Omit<Driver, 'id'>>({
-    resolver: zodResolver(driverSchema),
+  } = useForm<DriverFormData>({
+    resolver: zodResolver(driverSchema) as any,
     defaultValues: EMPTY_VALUES,
     mode: 'all',
   })
@@ -139,13 +148,13 @@ export function DriversPage() {
     }
   }, [modal, editing, reset, setValue, findNextAvailableId])
 
-  const save = async (data: Omit<Driver, 'id'>) => {
+  const save = async (data: DriverFormData) => {
     try {
       let res: any
       if (editing) {
-        res = await window.api.drivers.update(editing.id, data)
+        res = await window.api.drivers.update(editing.id, data as any)
       } else {
-        res = await window.api.drivers.create(data)
+        res = await window.api.drivers.create(data as any)
       }
 
       if (res && res.ok === false) {
@@ -156,7 +165,7 @@ export function DriversPage() {
             if (field === 'customId' && finalMessage.toLowerCase().includes('uso')) {
               finalMessage = `${finalMessage}. Sugestão: ${findNextAvailableId()}`
             }
-            setError(field as keyof Omit<Driver, 'id'>, {
+            setError(field as any, {
               type: 'manual',
               message: finalMessage,
             })
@@ -177,11 +186,11 @@ export function DriversPage() {
     }
   }
 
-  const onSubmit = (data: Omit<Driver, 'id'>) => {
+  const onSubmit = (data: DriverFormData) => {
     save(data)
   }
 
-  const onEnterSubmit = (data: Omit<Driver, 'id'>) => {
+  const onEnterSubmit = (data: DriverFormData) => {
     setPendingData(data)
   }
 
@@ -513,7 +522,7 @@ export function DriversPage() {
                   value={field.value}
                   onChange={field.onChange}
                   error={errors.truck_id?.message}
-                  onEnterSelect={() => handleSubmit(onEnterSubmit)()}
+                  onEnterSelect={() => handleSubmit(onEnterSubmit as any)()}
                   options={trucks.map((t) => ({
                     value: t.id,
                     label: (
@@ -535,7 +544,7 @@ export function DriversPage() {
             <Button variant="ghost" onClick={() => setModal(false)}>
               Cancelar
             </Button>
-            <Button onClick={handleSubmit(onSubmit)}>Salvar</Button>
+            <Button onClick={handleSubmit(onSubmit as any)}>Salvar</Button>
           </div>
         </Modal>
       )}

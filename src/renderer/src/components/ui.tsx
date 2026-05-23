@@ -7,28 +7,28 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: 'primary' | 'ghost' | 'danger'
   size?: 'sm' | 'md'
 }
-export function Button({
-  variant = 'primary',
-  size = 'md',
-  className = '',
-  children,
-  ...props
-}: ButtonProps) {
-  const base =
-    'inline-flex items-center justify-center font-bold rounded transition-all focus:outline-none disabled:opacity-50 active:scale-95'
-  const variants = {
-    primary: 'bg-primary text-on-primary hover:brightness-110 shadow-lg shadow-primary/20',
-    ghost:
-      'border border-outline-variant text-on-surface-variant hover:text-on-surface hover:border-primary/60 bg-transparent',
-    danger: 'bg-error-container text-on-error-container hover:brightness-110',
-  }
-  const sizes = { sm: 'px-3 py-1.5 text-xs', md: 'px-6 py-2.5 text-sm' }
-  return (
-    <button className={`${base} ${variants[variant]} ${sizes[size]} ${className}`} {...props}>
-      {children}
-    </button>
-  )
-}
+export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
+  ({ variant = 'primary', size = 'md', className = '', children, ...props }, ref) => {
+    const base =
+      'inline-flex items-center justify-center font-bold rounded transition-all focus:outline-none disabled:opacity-50 active:scale-95'
+    const variants = {
+      primary: 'bg-primary text-on-primary hover:brightness-110 shadow-lg shadow-primary/20',
+      ghost:
+        'border border-outline-variant text-on-surface-variant hover:text-on-surface hover:border-primary/60 bg-transparent',
+      danger: 'bg-error-container text-on-error-container hover:brightness-110',
+    }
+    const sizes = { sm: 'px-3 py-1.5 text-xs', md: 'px-6 py-2.5 text-sm' }
+    return (
+      <button
+        className={`${base} ${variants[variant]} ${sizes[size]} ${className}`}
+        ref={ref}
+        {...props}
+      >
+        {children}
+      </button>
+    )
+  },
+)
 
 // ── Input ────────────────────────────────────────────────────────────────────
 interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
@@ -60,7 +60,12 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
           </label>
         )}
         {mask ? (
-          <IMaskInput {...commonProps} mask={mask} inputRef={ref as any} />
+          <IMaskInput
+            {...commonProps}
+            value={String(props.value ?? '')}
+            mask={mask}
+            inputRef={ref as any}
+          />
         ) : (
           <input {...commonProps} ref={ref} />
         )}
@@ -189,7 +194,7 @@ interface SelectProps {
     displayLabel?: string
     searchableLabel?: string
   }[]
-  value?: string | number
+  value?: string | number | null
   onChange?: (value: any) => void
   onEnterSelect?: () => void
   placeholder?: string
