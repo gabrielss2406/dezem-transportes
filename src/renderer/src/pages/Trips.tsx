@@ -330,9 +330,9 @@ export function TripsPage() {
           ]
           const data = trips.map((trip) => [
             formatDate(trip.date),
-            trip.truck_license_plate,
-            trip.driver_name,
-            trip.product_name,
+            trip.truck_license_plate ?? '—',
+            trip.driver_name ?? '—',
+            trip.product_name ?? '—',
             `${trip.weight_ton} ton`,
             `${trip.km_driven} km`,
             formatBRL(trip.price_charged),
