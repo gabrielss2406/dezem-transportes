@@ -6,6 +6,8 @@ interface PageHeaderProps {
   subtitle?: string
   actionLabel?: string
   onAction?: () => void
+  secondaryActionLabel?: string
+  onSecondaryAction?: () => void
   children?: React.ReactNode
 }
 
@@ -15,6 +17,8 @@ export function PageHeader({
   subtitle,
   actionLabel,
   onAction,
+  secondaryActionLabel,
+  onSecondaryAction,
   children,
 }: PageHeaderProps) {
   return (
@@ -32,6 +36,15 @@ export function PageHeader({
       </div>
       <div className="flex gap-3 items-center">
         {children}
+        {secondaryActionLabel && onSecondaryAction && (
+          <button
+            type="button"
+            onClick={onSecondaryAction}
+            className="flex items-center gap-2 bg-surface-container-highest text-on-surface px-6 py-3 rounded font-bold text-sm shadow-lg shadow-surface-container-highest/20 hover:brightness-90 active:scale-95 transition-all"
+          >
+            {secondaryActionLabel}
+          </button>
+        )}
         {actionLabel && onAction && (
           <button
             type="button"

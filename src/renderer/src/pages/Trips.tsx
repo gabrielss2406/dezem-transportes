@@ -16,6 +16,7 @@ import {
   Toast,
   useToast,
 } from '../components/ui'
+import { generatePdf } from '../lib/pdfGenerator'
 import type { Customer, Driver, Product, Route, Supplier, Trip, Truck } from '../lib/types'
 import { formatBRL, formatDate } from '../lib/utils'
 
@@ -314,6 +315,92 @@ export function TripsPage() {
         onAction={() => {
           window.focus()
           setModal(true)
+        }}
+        secondaryActionLabel="Exportar para PDF"
+        onSecondaryAction={() => {
+          const headers = [
+            'Data',
+            'Caminhão',
+            'Motorista',
+            'Produto',
+            'Peso',
+            'Km',
+            'Valor',
+            'Cliente',
+          ]
+          const data = trips.map((trip) => [
+            formatDate(trip.date),
+            trip.truck_license_plate,
+            trip.driver_name,
+            trip.product_name,
+            `${trip.weight_ton} ton`,
+            `${trip.km_driven} km`,
+            formatBRL(trip.price_charged),
+            trip.customer_name ?? '—',
+          ])
+
+          // Resolver nomes dos filtros
+          const filterParts: string[] = []
+          const subtitleParts: string[] = []
+
+          if (filters.startDate || filters.endDate) {
+            const start = filters.startDate ? formatDate(filters.startDate) : 'Início'
+            const end = filters.endDate ? formatDate(filters.endDate) : 'Fim'
+            filterParts.push(`${start}_a_${end}`)
+            subtitleParts.push(`Período: ${start} a ${end}`)
+          }
+
+          if (filters.truck_id) {
+            const truck = trucks.find((t) => String(t.id) === String(filters.truck_id))
+            if (truck) {
+              filterParts.push(truck.license_plate)
+              subtitleParts.push(`Caminhão: ${truck.license_plate}`)
+            }
+          }
+
+          if (filters.driver_id) {
+            const driver = drivers.find((d) => String(d.id) === String(filters.driver_id))
+            if (driver) {
+              filterParts.push(driver.name)
+              subtitleParts.push(`Motorista: ${driver.name}`)
+            }
+          }
+
+          if (filters.customer_id) {
+            const customer = customers.find((c) => String(c.id) === String(filters.customer_id))
+            if (customer) {
+              filterParts.push(customer.name)
+              subtitleParts.push(`Cliente: ${customer.name}`)
+            }
+          }
+
+          if (filters.product_id) {
+            const product = products.find((p) => String(p.id) === String(filters.product_id))
+            if (product) {
+              filterParts.push(product.name)
+              subtitleParts.push(`Produto: ${product.name}`)
+            }
+          }
+
+          const safeFilterName = filterParts
+            .join('_')
+            .normalize('NFD')
+            .replace(/\p{Diacritic}/gu, '') // Remover acentos (Unicode Property Escape)
+            .replace(/\s+/g, '_')
+            .replace(/[^\w-]/g, '')
+
+          const fileName = safeFilterName
+            ? `relatorio_viagens_${safeFilterName}`
+            : 'relatorio_viagens'
+          const subtitle = subtitleParts.join(' | ')
+
+          generatePdf({
+            title: 'Relatório de Viagens',
+            subtitle,
+            headers,
+            data,
+            fileName,
+          })
         }}
       />
 
