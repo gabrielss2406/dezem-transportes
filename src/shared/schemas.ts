@@ -2,38 +2,6 @@ import { z } from 'zod'
 export { z }
 import { isValidCNPJ, isValidCPF, isValidPhone } from './validation'
 
-// Configuração global de mensagens em Português
-z.setErrorMap((issue, ctx) => {
-  if (issue.code === z.ZodIssueCode.invalid_type) {
-    if (issue.received === 'undefined') {
-      return { message: 'Obrigatório' }
-    }
-    return { message: 'Valor inválido' }
-  }
-  if (issue.code === z.ZodIssueCode.too_small) {
-    if (issue.type === 'string') {
-      return { message: `Mínimo de ${issue.minimum} caracteres` }
-    }
-    return { message: `Valor mínimo é ${issue.minimum}` }
-  }
-  if (issue.code === z.ZodIssueCode.too_big) {
-    if (issue.type === 'string') {
-      return { message: `Máximo de ${issue.maximum} caracteres` }
-    }
-    return { message: `Valor máximo permitido é ${issue.maximum}` }
-  }
-  if (issue.code === z.ZodIssueCode.invalid_string) {
-    if (issue.validation === 'email') {
-      return { message: 'E-mail inválido' }
-    }
-    return { message: 'Formato inválido' }
-  }
-  if (issue.code === z.ZodIssueCode.custom) {
-    return { message: issue.message || 'Valor inválido' }
-  }
-  return { message: ctx.defaultError }
-})
-
 // Auxiliar para campos numéricos opcionais vindo de inputs de texto
 const optionalNumber = (max: number, maxMsg: string) =>
   z.preprocess(
@@ -44,7 +12,7 @@ const optionalNumber = (max: number, maxMsg: string) =>
 const requiredNumber = (max: number, maxMsg: string) =>
   z.preprocess(
     (val) => (val === '' || val === null || val === undefined ? undefined : Number(val)),
-    z.number({ required_error: 'Obrigatório' }).positive('Deve ser positivo').max(max, maxMsg),
+    z.number().positive('Deve ser positivo').max(max, maxMsg),
   )
 
 export const idSchema = z.number().int().positive()
@@ -183,6 +151,12 @@ export const costSchema = z.object({
   supplier_id: optionalNumber(999999999, 'ID inválido'),
   driver_id: optionalNumber(999999999, 'ID inválido'),
   description: z.string().max(255).optional(),
+})
+
+export const customerPriceSchema = z.object({
+  customerId: idSchema,
+  productId: idSchema,
+  price: requiredNumber(10000000, 'Valor máximo de R$ 10.000.000'),
 })
 
 export const loginSchema = z.object({

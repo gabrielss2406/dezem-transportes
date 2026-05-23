@@ -1,18 +1,63 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Controller, useForm } from 'react-hook-form'
 import { supplierSchema } from '../../../../shared/schemas'
 import { PageHeader } from '../../components/PageHeader'
 import { Button, Input, Modal, Select, Toast, useToast } from '../../components/ui'
 import type { Supplier } from '../../lib/types'
 
-const EMPTY = { name: '', type: 'gas_station' as Supplier['type'], phone: '', customId: undefined }
+interface SupplierFormData {
+  name: string
+  type?: string
+  phone?: string
+  customId?: number
+}
+
+const EMPTY_VALUES: SupplierFormData = {
+  name: '',
+  type: 'gas_station',
+  phone: '',
+  customId: undefined,
+}
 
 const typeIcon: Record<string, string> = {
   gas_station: 'local_gas_station',
   workshop: 'build',
   quarry: 'foundation',
   other: 'handshake',
+}
+
+// Modal de confirmação próprio — sem confirm() nativo do Electron
+function ConfirmModal({
+  message,
+  onConfirm,
+  onCancel,
+}: {
+  message: string
+  onConfirm: () => void
+  onCancel: () => void
+}) {
+  const confirmBtnRef = useRef<HTMLButtonElement>(null)
+
+  useEffect(() => {
+    setTimeout(() => confirmBtnRef.current?.focus(), 50)
+  }, [])
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+      <div className="bg-surface-container-low border border-outline-variant/20 rounded-xl shadow-2xl w-full max-w-sm p-6 flex flex-col gap-6">
+        <p className="text-sm text-on-surface">{message}</p>
+        <div className="flex justify-end gap-3">
+          <Button variant="ghost" onClick={onCancel}>
+            Cancelar
+          </Button>
+          <Button ref={confirmBtnRef} onClick={onConfirm}>
+            Confirmar
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 export function SuppliersPage() {
@@ -22,18 +67,27 @@ export function SuppliersPage() {
   const [editing, setEditing] = useState<Supplier | null>(null)
   const [filters, setFilters] = useState({ name: '', type: '' })
   const [appliedFilters, setAppliedFilters] = useState({ name: '', type: '' })
+  const [pendingData, setPendingData] = useState<any>(null)
+  const [deleteTarget, setDeleteTarget] = useState<Supplier | null>(null)
+  const [showDiscardConfirm, setShowDiscardConfirm] = useState(false)
   const { toast, show } = useToast()
 
+  const customIdRef = useRef<HTMLInputElement>(null)
+  const nameRef = useRef<HTMLInputElement>(null)
+  const typeSelectRef = useRef<any>(null)
+  const phoneRef = useRef<HTMLInputElement>(null)
+
   const {
-    register,
     handleSubmit,
-    formState: { errors },
+    formState: { errors, isDirty },
     reset,
     control,
     watch,
-  } = useForm<Omit<Supplier, 'id'>>({
-    resolver: zodResolver(supplierSchema),
-    defaultValues: { ...EMPTY },
+    setValue,
+    setError,
+  } = useForm<SupplierFormData>({
+    resolver: zodResolver(supplierSchema) as any,
+    defaultValues: EMPTY_VALUES,
     mode: 'all',
   })
 
@@ -46,7 +100,7 @@ export function SuppliersPage() {
 
   const load = useCallback(async () => {
     const [s, st] = await Promise.all([
-      window.api.suppliers.list(appliedFilters),
+      window.api.suppliers.list(appliedFilters as any),
       window.api['supplier-types'].list(),
     ])
     setRows(s)
@@ -57,43 +111,88 @@ export function SuppliersPage() {
     load()
   }, [load])
 
-  // Limpeza automática ao fechar o modal
-  useEffect(() => {
-    if (!modal) {
-      setEditing(null)
-      reset(EMPTY)
+  const findNextAvailableId = useCallback(() => {
+    const usedIds = new Set(rows.map((r) => r.customId).filter((id): id is number => !!id))
+    let nextId = 1
+    while (usedIds.has(nextId)) {
+      nextId++
     }
-  }, [modal, reset])
+    return nextId
+  }, [rows])
 
-  const onSubmit = async (data: Omit<Supplier, 'id'>) => {
+  // Foco inteligente e sugestão de ID
+  useEffect(() => {
+    if (modal) {
+      setTimeout(() => {
+        window.focus()
+        if (!editing) {
+          const nextId = findNextAvailableId()
+          setValue('customId', nextId as any, { shouldValidate: false })
+          nameRef.current?.focus()
+        } else {
+          customIdRef.current?.focus()
+        }
+      }, 200)
+    } else {
+      setEditing(null)
+      reset(EMPTY_VALUES)
+    }
+  }, [modal, editing, reset, setValue, findNextAvailableId])
+
+  const save = async (data: SupplierFormData) => {
     try {
       let res: any
       if (editing) {
-        res = await window.api.suppliers.update(editing.id, data)
+        res = await window.api.suppliers.update(editing.id, data as any)
       } else {
-        res = await window.api.suppliers.create(data)
+        res = await window.api.suppliers.create(data as any)
       }
 
       if (res && res.ok === false) {
-        const msg = res.errors ? Object.values(res.errors)[0] : 'Erro ao salvar dados'
-        show(String(msg), 'error')
+        setPendingData(null)
+        if (res.errors) {
+          for (const [field, message] of Object.entries(res.errors)) {
+            let finalMessage = message as string
+            if (field === 'customId' && finalMessage.toLowerCase().includes('uso')) {
+              const suggestion = findNextAvailableId()
+              finalMessage = `${finalMessage}. Sugestão: ${suggestion}`
+            }
+            setError(field as any, {
+              type: 'manual',
+              message: finalMessage,
+            })
+          }
+        } else {
+          show('Ocorreu um erro ao salvar.', 'error')
+        }
         return
       }
 
       show(editing ? 'Fornecedor atualizado!' : 'Fornecedor cadastrado!')
       setModal(false)
+      setPendingData(null)
       load()
     } catch (e: any) {
+      setPendingData(null)
       show(e.message || 'Erro de conexão', 'error')
     }
   }
 
-  async function handleDelete(row: Supplier) {
-    if (!confirm('Excluir este fornecedor?')) {
+  const onSubmit = (data: SupplierFormData) => {
+    save(data)
+  }
+
+  const onEnterSubmit = (data: SupplierFormData) => {
+    setPendingData(data)
+  }
+
+  const handleConfirmDelete = async () => {
+    if (!deleteTarget) {
       return
     }
-    await window.api.suppliers.delete(row.id)
+    await window.api.suppliers.delete(deleteTarget.id)
     show('Fornecedor excluído')
+    setDeleteTarget(null)
     load()
   }
 
@@ -108,6 +207,25 @@ export function SuppliersPage() {
     setModal(true)
   }
 
+  const handleEscape = () => {
+    if (isDirty) {
+      setShowDiscardConfirm(true)
+    } else {
+      setModal(false)
+    }
+  }
+
+  const handleConfirmDiscard = () => {
+    setShowDiscardConfirm(false)
+    setModal(false)
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      setAppliedFilters(filters)
+    }
+  }
+
   return (
     <div className="p-12 max-w-7xl mx-auto">
       {toast && <Toast message={toast.message} type={toast.type} />}
@@ -117,7 +235,10 @@ export function SuppliersPage() {
         pretitle="Gestão Operacional"
         title="Fornecedores"
         actionLabel="Novo Fornecedor"
-        onAction={() => setModal(true)}
+        onAction={() => {
+          window.focus()
+          setModal(true)
+        }}
       >
         <div className="flex items-center bg-surface-container-highest rounded-lg p-1 border border-outline-variant/10 shadow-sm">
           <div className="relative flex items-center h-9">
@@ -129,11 +250,7 @@ export function SuppliersPage() {
               placeholder="Buscar por nome..."
               value={filters.name}
               onChange={(e) => setFilters((f) => ({ ...f, name: e.target.value }))}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  setAppliedFilters(filters)
-                }
-              }}
+              onKeyDown={handleKeyDown}
               className="pl-10 pr-3 py-2 bg-transparent border-none w-48 focus:ring-0 transition-all placeholder:text-outline/50 text-sm outline-none text-on-surface"
             />
           </div>
@@ -250,7 +367,7 @@ export function SuppliersPage() {
                       </button>
                       <button
                         type="button"
-                        onClick={() => handleDelete(row)}
+                        onClick={() => setDeleteTarget(row)}
                         className="p-2 text-on-surface-variant hover:text-error transition-colors"
                       >
                         <span className="material-symbols-outlined text-xl">delete</span>
@@ -268,35 +385,74 @@ export function SuppliersPage() {
         <Modal
           title={editing ? 'Editar Fornecedor' : 'Novo Fornecedor'}
           onClose={() => setModal(false)}
+          onEscape={handleEscape}
         >
           <div className="flex flex-col gap-4">
-            <Input
-              label="ID Personalizado"
-              type="number"
-              optional
-              {...register('customId')}
-              error={errors.customId?.message}
+            <Controller
+              name="customId"
+              control={control}
+              render={({ field }) => (
+                <Input
+                  ref={customIdRef}
+                  label="ID Personalizado"
+                  type="number"
+                  optional
+                  value={field.value ?? ''}
+                  onChange={field.onChange}
+                  error={errors.customId?.message}
+                  onKeyDown={(e) => e.key === 'Enter' && nameRef.current?.focus()}
+                />
+              )}
             />
-            <Input label="Nome" {...register('name')} error={errors.name?.message} />
+            <Controller
+              name="name"
+              control={control}
+              render={({ field }) => (
+                <Input
+                  ref={nameRef}
+                  label="Nome"
+                  value={field.value}
+                  onChange={field.onChange}
+                  error={errors.name?.message}
+                  onKeyDown={(e) => e.key === 'Enter' && typeSelectRef.current?.open()}
+                />
+              )}
+            />
             <Controller
               name="type"
               control={control}
               render={({ field }) => (
                 <Select
+                  ref={typeSelectRef}
                   label="Tipo"
                   value={field.value}
                   onChange={field.onChange}
+                  onEnterSelect={() => phoneRef.current?.focus()}
                   error={errors.type?.message}
                   options={supplierTypes}
                 />
               )}
             />
-            <Input
-              label="Telefone"
-              optional
-              mask={phoneMask}
-              {...register('phone')}
-              error={errors.phone?.message}
+            <Controller
+              name="phone"
+              control={control}
+              render={({ field }) => (
+                <Input
+                  ref={phoneRef}
+                  label="Telefone"
+                  optional
+                  mask={phoneMask}
+                  value={field.value}
+                  onChange={field.onChange}
+                  error={errors.phone?.message}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                      handleSubmit(onEnterSubmit)()
+                    }
+                  }}
+                />
+              )}
             />
           </div>
           <div className="flex justify-end gap-3 mt-6">
@@ -306,6 +462,30 @@ export function SuppliersPage() {
             <Button onClick={handleSubmit(onSubmit)}>Salvar</Button>
           </div>
         </Modal>
+      )}
+
+      {pendingData && (
+        <ConfirmModal
+          message="Tem certeza que deseja cadastrar este fornecedor?"
+          onConfirm={() => save(pendingData)}
+          onCancel={() => setPendingData(null)}
+        />
+      )}
+
+      {deleteTarget && (
+        <ConfirmModal
+          message="Excluir este fornecedor?"
+          onConfirm={handleConfirmDelete}
+          onCancel={() => setDeleteTarget(null)}
+        />
+      )}
+
+      {showDiscardConfirm && (
+        <ConfirmModal
+          message="Existem alterações não salvas. Deseja realmente fechar?"
+          onConfirm={handleConfirmDiscard}
+          onCancel={() => setShowDiscardConfirm(false)}
+        />
       )}
     </div>
   )

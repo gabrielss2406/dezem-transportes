@@ -1,9 +1,8 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Controller, useFieldArray, useForm } from 'react-hook-form'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { tripSchema } from '../../../shared/schemas'
-import type { Customer, Driver, Product, Route, Supplier, Trip, Truck } from '../../lib/types'
 import { PageHeader } from '../components/PageHeader'
 import {
   Badge,
@@ -13,22 +12,39 @@ import {
   Input,
   Modal,
   Select,
+  type SelectRef,
   Toast,
   useToast,
 } from '../components/ui'
+import type { Customer, Driver, Product, Route, Supplier, Trip, Truck } from '../lib/types'
 import { formatBRL, formatDate } from '../lib/utils'
 
-const EMPTY = {
+interface TripFormData {
+  date: string
+  truck_id: number
+  driver_id: number
+  product_id: number
+  customer_id: number | null
+  route_id: number | null
+  supplier_id: number | null
+  weight_ton: number
+  price_charged: number
+  km_driven: number
+  observation?: string
+  fuel_stops?: any[]
+}
+
+const EMPTY: TripFormData = {
   date: '',
-  truck_id: '',
-  driver_id: '',
-  product_id: '',
-  customer_id: '',
-  route_id: '',
-  supplier_id: '',
-  weight_ton: '' as any,
+  truck_id: 0,
+  driver_id: 0,
+  product_id: 0,
+  customer_id: null,
+  route_id: null,
+  supplier_id: null,
+  weight_ton: 0,
   price_charged: 0,
-  km_driven: '' as any,
+  km_driven: 0,
   observation: '',
   fuel_stops: [],
 }
@@ -38,6 +54,39 @@ const typeIcon: Record<string, string> = {
   workshop: 'build',
   quarry: 'foundation',
   other: 'handshake',
+}
+
+// Modal de confirmação próprio — sem confirm() nativo do Electron
+function ConfirmModal({
+  message,
+  onConfirm,
+  onCancel,
+}: {
+  message: string
+  onConfirm: () => void
+  onCancel: () => void
+}) {
+  const confirmBtnRef = useRef<HTMLButtonElement>(null)
+
+  useEffect(() => {
+    setTimeout(() => confirmBtnRef.current?.focus(), 50)
+  }, [])
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+      <div className="bg-surface-container-low border border-outline-variant/20 rounded-xl shadow-2xl w-full max-w-sm p-6 flex flex-col gap-6">
+        <p className="text-sm text-on-surface">{message}</p>
+        <div className="flex justify-end gap-3">
+          <Button variant="ghost" onClick={onCancel}>
+            Cancelar
+          </Button>
+          <Button ref={confirmBtnRef} onClick={onConfirm}>
+            Confirmar
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 export function TripsPage() {
@@ -51,6 +100,9 @@ export function TripsPage() {
   const [modal, setModal] = useState(false)
   const [editing, setEditing] = useState<Trip | null>(null)
   const [stopSearchId, setStopSearchId] = useState<string | number>('')
+  const [pendingData, setPendingData] = useState<any>(null)
+  const [deleteTarget, setDeleteTarget] = useState<Trip | null>(null)
+  const [showDiscardConfirm, setShowDiscardConfirm] = useState(false)
   const [filters, setFilters] = useState({
     startDate: '',
     endDate: '',
@@ -65,6 +117,17 @@ export function TripsPage() {
   const location = useLocation()
   const navigate = useNavigate()
 
+  // Refs para navegação por teclado
+  const dateRef = useRef<HTMLInputElement>(null)
+  const truckSelectRef = useRef<SelectRef>(null)
+  const driverSelectRef = useRef<SelectRef>(null)
+  const productSelectRef = useRef<SelectRef>(null)
+  const customerSelectRef = useRef<SelectRef>(null)
+  const routeSelectRef = useRef<SelectRef>(null)
+  const weightInputRef = useRef<HTMLInputElement>(null)
+  const priceInputRef = useRef<HTMLInputElement>(null)
+  const kmInputRef = useRef<HTMLInputElement>(null)
+
   useEffect(() => {
     if (location.state?.openModal) {
       setModal(true)
@@ -75,12 +138,13 @@ export function TripsPage() {
   const {
     register,
     handleSubmit,
-    formState: { errors },
+    formState: { errors, isDirty },
     reset,
     control,
     watch,
-  } = useForm<Omit<Trip, 'id'>>({
-    resolver: zodResolver(tripSchema),
+    setValue,
+  } = useForm<TripFormData>({
+    resolver: zodResolver(tripSchema) as any,
     defaultValues: { ...EMPTY },
     mode: 'all',
   })
@@ -91,6 +155,21 @@ export function TripsPage() {
   })
 
   const selectedCustomerId = watch('customer_id')
+  const selectedProductId = watch('product_id')
+  const currentWeight = watch('weight_ton')
+
+  useEffect(() => {
+    if (selectedCustomerId && selectedProductId && !editing) {
+      window.api.customerPrices
+        .getPrice(Number(selectedCustomerId), Number(selectedProductId))
+        .then((res) => {
+          if (res?.price) {
+            const weight = Number(currentWeight) || 0
+            setValue('price_charged', res.price * weight)
+          }
+        })
+    }
+  }, [selectedCustomerId, selectedProductId, currentWeight, editing, setValue])
 
   const load = useCallback(async () => {
     const [t, tr, d, p, c, r, s] = await Promise.all([
@@ -115,29 +194,59 @@ export function TripsPage() {
     load()
   }, [load])
 
-  // Limpeza automática ao fechar o modal
+  // Foco inicial e abertura automática
   useEffect(() => {
-    if (!modal) {
+    if (modal) {
+      setTimeout(() => {
+        window.focus()
+        if (!editing) {
+          dateRef.current?.focus()
+        } else {
+          // Se estiver editando, foca no primeiro campo também
+          dateRef.current?.focus()
+        }
+      }, 200)
+    } else {
       setEditing(null)
       reset(EMPTY)
       setStopSearchId('')
     }
-  }, [modal, reset])
+  }, [modal, editing, reset])
 
-  const onSubmit = async (data: Omit<Trip, 'id'>) => {
+  const save = async (data: TripFormData) => {
     try {
       if (editing) {
-        await window.api.trips.update(editing.id, data)
+        await window.api.trips.update(editing.id, data as any)
         show('Viagem atualizada!')
       } else {
-        await window.api.trips.create(data)
+        await window.api.trips.create(data as any)
         show('Viagem registrada!')
       }
       setModal(false)
+      setPendingData(null)
       load()
     } catch (e: any) {
+      setPendingData(null)
       show(e.message || 'Erro ao salvar', 'error')
     }
+  }
+
+  const onSubmit = (data: TripFormData) => {
+    save(data)
+  }
+
+  const onEnterSubmit = (data: TripFormData) => {
+    setPendingData(data)
+  }
+
+  const handleConfirmDelete = async () => {
+    if (!deleteTarget) {
+      return
+    }
+    await window.api.trips.delete(deleteTarget.id)
+    show('Viagem excluída', 'success')
+    setDeleteTarget(null)
+    load()
   }
 
   async function edit(row: Trip) {
@@ -148,9 +257,9 @@ export function TripsPage() {
         truck_id: row.truck_id,
         driver_id: row.driver_id,
         product_id: row.product_id,
-        customer_id: row.customer_id ?? '',
-        route_id: row.route_id ?? '',
-        supplier_id: row.supplier_id ?? '',
+        customer_id: row.customer_id ?? null,
+        route_id: row.route_id ?? null,
+        supplier_id: row.supplier_id ?? null,
         weight_ton: row.weight_ton,
         price_charged: row.price_charged,
         km_driven: row.km_driven,
@@ -164,13 +273,17 @@ export function TripsPage() {
     }
   }
 
-  async function handleDelete(row: Trip) {
-    if (!confirm('Excluir esta viagem?')) {
-      return
+  const handleEscape = () => {
+    if (isDirty) {
+      setShowDiscardConfirm(true)
+    } else {
+      setModal(false)
     }
-    await window.api.trips.delete(row.id)
-    show('Viagem excluída', 'success')
-    load()
+  }
+
+  const handleConfirmDiscard = () => {
+    setShowDiscardConfirm(false)
+    setModal(false)
   }
 
   const handleAddStop = (supplierId: string | number) => {
@@ -198,7 +311,10 @@ export function TripsPage() {
         title="Viagens"
         subtitle="Gerencie os manifestos de transporte e histórico de fretes."
         actionLabel="Nova Viagem"
-        onAction={() => setModal(true)}
+        onAction={() => {
+          window.focus()
+          setModal(true)
+        }}
       />
 
       {/* Filters */}
@@ -223,7 +339,19 @@ export function TripsPage() {
               label="Caminhão"
               value={filters.truck_id}
               onChange={(v) => setFilters((f) => ({ ...f, truck_id: v }))}
-              options={trucks.map((t) => ({ value: t.id, label: t.license_plate }))}
+              options={trucks.map((t) => ({
+                value: t.id,
+                label: (
+                  <div className="flex justify-between">
+                    <span>{t.license_plate}</span>
+                    {t.customId && (
+                      <span className="text-on-surface-variant/50">#{t.customId}</span>
+                    )}
+                  </div>
+                ),
+                displayLabel: t.license_plate,
+                searchableLabel: `${t.license_plate} ${t.customId || ''}`,
+              }))}
               optional
             />
           </div>
@@ -232,7 +360,19 @@ export function TripsPage() {
               label="Motorista"
               value={filters.driver_id}
               onChange={(v) => setFilters((f) => ({ ...f, driver_id: v }))}
-              options={drivers.map((d) => ({ value: d.id, label: d.name }))}
+              options={drivers.map((d) => ({
+                value: d.id,
+                label: (
+                  <div className="flex justify-between">
+                    <span>{d.name}</span>
+                    {d.customId && (
+                      <span className="text-on-surface-variant/50">#{d.customId}</span>
+                    )}
+                  </div>
+                ),
+                displayLabel: d.name,
+                searchableLabel: `${d.name} ${d.customId || ''}`,
+              }))}
               optional
             />
           </div>
@@ -241,7 +381,19 @@ export function TripsPage() {
               label="Produto"
               value={filters.product_id}
               onChange={(v) => setFilters((f) => ({ ...f, product_id: v }))}
-              options={products.map((p) => ({ value: p.id, label: p.name }))}
+              options={products.map((p) => ({
+                value: p.id,
+                label: (
+                  <div className="flex justify-between">
+                    <span>{p.name}</span>
+                    {p.customId && (
+                      <span className="text-on-surface-variant/50">#{p.customId}</span>
+                    )}
+                  </div>
+                ),
+                displayLabel: p.name,
+                searchableLabel: `${p.name} ${p.customId || ''}`,
+              }))}
               optional
             />
           </div>
@@ -250,7 +402,19 @@ export function TripsPage() {
               label="Cliente"
               value={filters.customer_id}
               onChange={(v) => setFilters((f) => ({ ...f, customer_id: v }))}
-              options={customers.map((c) => ({ value: c.id, label: c.name }))}
+              options={customers.map((c) => ({
+                value: c.id,
+                label: (
+                  <div className="flex justify-between">
+                    <span>{c.name}</span>
+                    {c.customId && (
+                      <span className="text-on-surface-variant/50">#{c.customId}</span>
+                    )}
+                  </div>
+                ),
+                displayLabel: c.name,
+                searchableLabel: `${c.name} ${c.customId || ''}`,
+              }))}
               optional
             />
           </div>
@@ -364,7 +528,7 @@ export function TripsPage() {
                     </button>
                     <button
                       type="button"
-                      onClick={() => handleDelete(row)}
+                      onClick={() => setDeleteTarget(row)}
                       className="p-2 text-on-surface-variant hover:text-error hover:bg-error/10 rounded-lg transition-all"
                     >
                       <span className="material-symbols-outlined text-xl">delete</span>
@@ -379,24 +543,57 @@ export function TripsPage() {
 
       {/* Modal: Nova Viagem */}
       {modal && (
-        <Modal title={editing ? 'Editar Viagem' : 'Nova Viagem'} onClose={() => setModal(false)}>
+        <Modal
+          title={editing ? 'Editar Viagem' : 'Nova Viagem'}
+          onClose={() => setModal(false)}
+          onEscape={handleEscape}
+        >
           <div className="space-y-6">
             <div className="grid grid-cols-2 gap-5">
-              <DatePicker label="Data" {...register('date')} error={errors.date?.message} />
+              <Controller
+                name="date"
+                control={control}
+                render={({ field }) => (
+                  <DatePicker
+                    ref={dateRef}
+                    label="Data"
+                    value={field.value}
+                    onChange={field.onChange}
+                    error={errors.date?.message}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault()
+                        truckSelectRef.current?.open()
+                      }
+                    }}
+                  />
+                )}
+              />
 
               <Controller
                 name="truck_id"
                 control={control}
                 render={({ field }) => (
                   <Select
+                    ref={truckSelectRef}
                     label="Caminhão"
                     icon="local_shipping"
                     value={field.value}
                     onChange={field.onChange}
+                    onEnterSelect={() => driverSelectRef.current?.open()}
                     error={errors.truck_id?.message}
                     options={trucks.map((t) => ({
                       value: t.id,
-                      label: `${t.license_plate} — ${t.model}`,
+                      label: (
+                        <div className="flex justify-between">
+                          <span>{t.license_plate}</span>
+                          {t.customId && (
+                            <span className="text-on-surface-variant/50">#{t.customId}</span>
+                          )}
+                        </div>
+                      ),
+                      displayLabel: t.license_plate,
+                      searchableLabel: `${t.license_plate} ${t.customId || ''}`,
                     }))}
                   />
                 )}
@@ -407,12 +604,26 @@ export function TripsPage() {
                 control={control}
                 render={({ field }) => (
                   <Select
+                    ref={driverSelectRef}
                     label="Motorista"
                     icon="person"
                     value={field.value}
                     onChange={field.onChange}
+                    onEnterSelect={() => productSelectRef.current?.open()}
                     error={errors.driver_id?.message}
-                    options={drivers.map((d) => ({ value: d.id, label: d.name }))}
+                    options={drivers.map((d) => ({
+                      value: d.id,
+                      label: (
+                        <div className="flex justify-between">
+                          <span>{d.name}</span>
+                          {d.customId && (
+                            <span className="text-on-surface-variant/50">#{d.customId}</span>
+                          )}
+                        </div>
+                      ),
+                      displayLabel: d.name,
+                      searchableLabel: `${d.name} ${d.customId || ''}`,
+                    }))}
                   />
                 )}
               />
@@ -422,12 +633,26 @@ export function TripsPage() {
                 control={control}
                 render={({ field }) => (
                   <Select
+                    ref={productSelectRef}
                     label="Produto"
                     icon="inventory_2"
                     value={field.value}
                     onChange={field.onChange}
+                    onEnterSelect={() => customerSelectRef.current?.open()}
                     error={errors.product_id?.message}
-                    options={products.map((p) => ({ value: p.id, label: p.name }))}
+                    options={products.map((p) => ({
+                      value: p.id,
+                      label: (
+                        <div className="flex justify-between">
+                          <span>{p.name}</span>
+                          {p.customId && (
+                            <span className="text-on-surface-variant/50">#{p.customId}</span>
+                          )}
+                        </div>
+                      ),
+                      displayLabel: p.name,
+                      searchableLabel: `${p.name} ${p.customId || ''}`,
+                    }))}
                   />
                 )}
               />
@@ -437,13 +662,27 @@ export function TripsPage() {
                 control={control}
                 render={({ field }) => (
                   <Select
+                    ref={customerSelectRef}
                     label="Cliente"
                     optional
                     icon="business"
                     value={field.value}
                     onChange={field.onChange}
+                    onEnterSelect={() => routeSelectRef.current?.open()}
                     error={errors.customer_id?.message}
-                    options={customers.map((c) => ({ value: c.id, label: c.name }))}
+                    options={customers.map((c) => ({
+                      value: c.id,
+                      label: (
+                        <div className="flex justify-between">
+                          <span>{c.name}</span>
+                          {c.customId && (
+                            <span className="text-on-surface-variant/50">#{c.customId}</span>
+                          )}
+                        </div>
+                      ),
+                      displayLabel: c.name,
+                      searchableLabel: `${c.name} ${c.customId || ''}`,
+                    }))}
                   />
                 )}
               />
@@ -453,41 +692,49 @@ export function TripsPage() {
                 control={control}
                 render={({ field }) => (
                   <Select
+                    ref={routeSelectRef}
                     label="Rota"
                     optional
                     value={field.value}
                     onChange={field.onChange}
+                    onEnterSelect={() => weightInputRef.current?.focus()}
                     error={errors.route_id?.message}
                     options={routes.map((r) => {
                       const isSelectedCustomer =
                         r.customer_id && r.customer_id === Number(selectedCustomerId)
 
-                      if (isSelectedCustomer) {
-                        return {
-                          value: r.id,
-                          displayLabel: r.name,
-                          label: (
-                            <div className="flex items-center justify-between w-full">
-                              <span>{r.name}</span>
-                              <Badge label="Cliente" color="blue" />
-                            </div>
-                          ),
-                        }
+                      const baseOption = {
+                        value: r.id,
+                        displayLabel: r.name,
+                        label: (
+                          <div className="flex items-center justify-between w-full">
+                            <span>{r.name}</span>
+                            {isSelectedCustomer && <Badge label="Cliente" color="blue" />}
+                          </div>
+                        ),
                       }
-
-                      return { value: r.id, label: r.name }
+                      return baseOption
                     })}
                   />
                 )}
               />
 
-              <Input
-                label="Peso (ton)"
-                type="number"
-                step="0.01"
-                placeholder="0,00"
-                {...register('weight_ton')}
-                error={errors.weight_ton?.message}
+              <Controller
+                name="weight_ton"
+                control={control}
+                render={({ field }) => (
+                  <Input
+                    ref={weightInputRef}
+                    label="Peso (ton)"
+                    type="number"
+                    step="0.01"
+                    placeholder="0,00"
+                    value={field.value}
+                    onChange={field.onChange}
+                    error={errors.weight_ton?.message}
+                    onKeyDown={(e) => e.key === 'Enter' && priceInputRef.current?.focus()}
+                  />
+                )}
               />
 
               <Controller
@@ -495,20 +742,36 @@ export function TripsPage() {
                 control={control}
                 render={({ field }) => (
                   <CurrencyInput
+                    ref={priceInputRef}
                     label="Valor cobrado"
                     value={field.value}
                     onChange={field.onChange}
                     error={errors.price_charged?.message}
+                    onKeyDown={(e) => e.key === 'Enter' && kmInputRef.current?.focus()}
                   />
                 )}
               />
 
-              <Input
-                label="Km total da viagem"
-                type="number"
-                placeholder="0"
-                {...register('km_driven')}
-                error={errors.km_driven?.message}
+              <Controller
+                name="km_driven"
+                control={control}
+                render={({ field }) => (
+                  <Input
+                    ref={kmInputRef}
+                    label="Km total da viagem"
+                    type="number"
+                    placeholder="0"
+                    value={field.value}
+                    onChange={field.onChange}
+                    error={errors.km_driven?.message}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault()
+                        handleSubmit(onEnterSubmit as any)()
+                      }
+                    }}
+                  />
+                )}
               />
 
               <div className="col-span-2">
@@ -546,6 +809,7 @@ export function TripsPage() {
                       </div>
                     ),
                     displayLabel: s.name,
+                    searchableLabel: `${s.name} ${s.customId || ''}`,
                   }))}
                 />
               </div>
@@ -654,7 +918,7 @@ export function TripsPage() {
               </Button>
               <button
                 type="button"
-                onClick={handleSubmit(onSubmit)}
+                onClick={handleSubmit(onSubmit as any)}
                 className="flex items-center gap-3 px-8 py-3 bg-primary text-on-primary font-extrabold rounded transition-all hover:brightness-110 active:scale-95 shadow-lg shadow-primary/20"
               >
                 {editing ? 'Salvar Alterações' : 'Salvar Viagem'}
@@ -663,6 +927,30 @@ export function TripsPage() {
             </div>
           </div>
         </Modal>
+      )}
+
+      {pendingData && (
+        <ConfirmModal
+          message="Tem certeza que deseja cadastrar esta viagem?"
+          onConfirm={() => save(pendingData)}
+          onCancel={() => setPendingData(null)}
+        />
+      )}
+
+      {deleteTarget && (
+        <ConfirmModal
+          message="Excluir esta viagem?"
+          onConfirm={handleConfirmDelete}
+          onCancel={() => setDeleteTarget(null)}
+        />
+      )}
+
+      {showDiscardConfirm && (
+        <ConfirmModal
+          message="Existem alterações não salvas. Deseja realmente fechar?"
+          onConfirm={handleConfirmDiscard}
+          onCancel={() => setShowDiscardConfirm(false)}
+        />
       )}
     </div>
   )

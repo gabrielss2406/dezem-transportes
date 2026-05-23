@@ -4,6 +4,7 @@ import { setupDatabase } from './database'
 import { registerAuthHandlers } from './modules/auth/auth.handlers'
 import { registerCostCategoryHandlers } from './modules/cost-categories/cost-categories.handlers'
 import { registerCostHandlers } from './modules/costs/costs.handlers'
+import { registerCustomerPricesHandlers } from './modules/customer-prices/customer-prices.handlers'
 import { registerCustomerHandlers } from './modules/customers/customers.handlers'
 import { registerDashboardHandlers } from './modules/dashboard/dashboard.handlers'
 import { registerDriverHandlers } from './modules/drivers/drivers.handlers'
@@ -52,6 +53,7 @@ app.whenReady().then(() => {
   registerCostCategoryHandlers()
   registerCostHandlers()
   registerCustomerHandlers()
+  registerCustomerPricesHandlers()
   registerDashboardHandlers()
   registerDriverHandlers()
   registerProductHandlers()

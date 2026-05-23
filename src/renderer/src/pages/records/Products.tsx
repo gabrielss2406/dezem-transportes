@@ -1,9 +1,9 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Controller, useForm } from 'react-hook-form'
 import { productSchema } from '../../../../shared/schemas'
 import { PageHeader } from '../../components/PageHeader'
-import { Button, Input, Modal, Select, Toast, useToast } from '../../components/ui'
+import { Button, Input, Modal, Select, Table, Toast, useToast } from '../../components/ui'
 import type { Product } from '../../lib/types'
 
 const UNITS = [
@@ -12,24 +12,72 @@ const UNITS = [
   { value: 'un', label: 'Unidade' },
 ]
 
-const EMPTY = { name: '', unit: 'ton', customId: undefined }
+interface ProductFormData {
+  name: string
+  unit?: string
+  customId?: number
+}
+
+const EMPTY: ProductFormData = { name: '', unit: 'ton', customId: undefined }
+
+function ConfirmModal({
+  message,
+  onConfirm,
+  onCancel,
+}: {
+  message: string
+  onConfirm: () => void
+  onCancel: () => void
+}) {
+  const confirmBtnRef = useRef<HTMLButtonElement>(null)
+
+  useEffect(() => {
+    setTimeout(() => confirmBtnRef.current?.focus(), 50)
+  }, [])
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+      <div className="bg-surface-container-low border border-outline-variant/20 rounded-xl shadow-2xl w-full max-w-sm p-6 flex flex-col gap-6">
+        <p className="text-sm text-on-surface">{message}</p>
+        <div className="flex justify-end gap-3">
+          <Button variant="ghost" onClick={onCancel}>
+            Cancelar
+          </Button>
+          <Button ref={confirmBtnRef} onClick={onConfirm}>
+            Confirmar
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 export function ProductsPage() {
   const [rows, setRows] = useState<Product[]>([])
   const [modal, setModal] = useState(false)
+  const [pricesModal, setPricesModal] = useState<Product | null>(null)
+  const [productPrices, setProductPrices] = useState<any[]>([])
   const [editing, setEditing] = useState<Product | null>(null)
   const [search, setSearch] = useState('')
   const [appliedSearch, setAppliedSearch] = useState('')
+  const [pendingData, setPendingData] = useState<any>(null)
+  const [deleteTarget, setDeleteTarget] = useState<Product | null>(null)
+  const [showDiscardConfirm, setShowDiscardConfirm] = useState(false)
   const { toast, show } = useToast()
 
+  const customIdRef = useRef<HTMLInputElement>(null)
+  const nameRef = useRef<HTMLInputElement>(null)
+  const unitSelectRef = useRef<any>(null)
+
   const {
-    register,
     handleSubmit,
-    formState: { errors },
+    formState: { errors, isDirty },
     reset,
     control,
-  } = useForm<Omit<Product, 'id'>>({
-    resolver: zodResolver(productSchema),
+    setValue,
+    setError,
+  } = useForm<ProductFormData>({
+    resolver: zodResolver(productSchema) as any,
     defaultValues: { ...EMPTY },
     mode: 'all',
   })
@@ -38,39 +86,106 @@ export function ProductsPage() {
     () => window.api.products.list(appliedSearch).then(setRows),
     [appliedSearch],
   )
+
   useEffect(() => {
     load()
   }, [load])
 
-  // Limpeza automática ao fechar o modal
+  const findNextAvailableId = useCallback(() => {
+    const usedIds = new Set(rows.map((r) => r.customId).filter((id): id is number => !!id))
+    let nextId = 1
+    while (usedIds.has(nextId)) {
+      nextId++
+    }
+    return nextId
+  }, [rows])
+
   useEffect(() => {
-    if (!modal) {
+    if (modal) {
+      setTimeout(() => {
+        window.focus()
+        if (!editing) {
+          const nextId = findNextAvailableId()
+          setValue('customId', nextId as any, { shouldValidate: false })
+          nameRef.current?.focus()
+        } else {
+          nameRef.current?.focus()
+          nameRef.current?.select()
+        }
+      }, 200)
+    } else {
       setEditing(null)
       reset(EMPTY)
     }
-  }, [modal, reset])
+  }, [modal, editing, reset, setValue, findNextAvailableId])
 
-  const onSubmit = async (data: Omit<Product, 'id'>) => {
+  useEffect(() => {
+    if (pricesModal) {
+      window.api.customerPrices.listByProduct(pricesModal.id).then(setProductPrices)
+    } else {
+      setProductPrices([])
+    }
+  }, [pricesModal])
+
+  const closeModal = useCallback(() => {
+    setModal(false)
+    setEditing(null)
+    reset(EMPTY)
+  }, [reset])
+
+  const save = async (data: ProductFormData) => {
     try {
+      let res: any
       if (editing) {
-        await window.api.products.update(editing.id, data)
+        res = await window.api.products.update(editing.id, data as any)
       } else {
-        await window.api.products.create(data)
+        res = await window.api.products.create(data as any)
       }
+
+      if (res && res.ok === false) {
+        setPendingData(null)
+        if (res.errors) {
+          for (const [field, message] of Object.entries(res.errors)) {
+            let finalMessage = message as string
+            if (field === 'customId' && finalMessage.toLowerCase().includes('uso')) {
+              finalMessage = `${finalMessage}. Sugestão: ${findNextAvailableId()}`
+            }
+            setError(field as any, {
+              type: 'manual',
+              message: finalMessage,
+            })
+          }
+        } else {
+          show('Ocorreu um erro ao salvar.', 'error')
+        }
+        return
+      }
+
       show(editing ? 'Produto atualizado!' : 'Produto cadastrado!')
-      setModal(false)
+      setPendingData(null)
+      closeModal()
       load()
     } catch (e: any) {
+      setPendingData(null)
       show(e.message, 'error')
     }
   }
 
-  async function handleDelete(row: Product) {
-    if (!confirm('Excluir este produto?')) {
+  const onSubmit = (data: ProductFormData) => {
+    save(data)
+  }
+
+  const onEnterSubmit = (data: ProductFormData) => {
+    setPendingData(data)
+  }
+
+  const handleConfirmDelete = async () => {
+    if (!deleteTarget) {
       return
     }
-    await window.api.products.delete(row.id)
+    await window.api.products.delete(deleteTarget.id)
     show('Produto excluído')
+    setDeleteTarget(null)
     load()
   }
 
@@ -84,16 +199,31 @@ export function ProductsPage() {
     setModal(true)
   }
 
+  const handleEscape = () => {
+    if (isDirty) {
+      setShowDiscardConfirm(true)
+    } else {
+      closeModal()
+    }
+  }
+
+  const handleConfirmDiscard = () => {
+    setShowDiscardConfirm(false)
+    closeModal()
+  }
+
   return (
     <div className="p-12 max-w-7xl mx-auto">
       {toast && <Toast message={toast.message} type={toast.type} />}
 
-      {/* Header */}
       <PageHeader
         pretitle="Gestão de Inventário"
         title="Catálogo de Produtos"
         actionLabel="Novo Produto"
-        onAction={() => setModal(true)}
+        onAction={() => {
+          window.focus()
+          setModal(true)
+        }}
       >
         <div className="flex items-center bg-surface-container-highest rounded-lg p-1 border border-outline-variant/10 shadow-sm">
           <div className="relative flex items-center h-9">
@@ -123,7 +253,6 @@ export function ProductsPage() {
         </div>
       </PageHeader>
 
-      {/* Stats */}
       <div className="grid grid-cols-3 gap-6 mb-10">
         {[
           { label: 'Total de Produtos', value: rows.length, icon: 'inventory_2' },
@@ -151,7 +280,6 @@ export function ProductsPage() {
         ))}
       </div>
 
-      {/* Table */}
       <div className="bg-surface-container rounded-xl overflow-hidden border border-outline-variant/10">
         <table className="w-full text-left border-collapse">
           <thead>
@@ -203,6 +331,14 @@ export function ProductsPage() {
                     <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                       <button
                         type="button"
+                        onClick={() => setPricesModal(row)}
+                        className="p-2 text-outline hover:text-tertiary hover:bg-tertiary/10 rounded-lg transition-all"
+                        title="Ver Preços"
+                      >
+                        <span className="material-symbols-outlined text-xl">price_check</span>
+                      </button>
+                      <button
+                        type="button"
                         onClick={() => edit(row)}
                         className="p-2 text-outline hover:text-primary hover:bg-primary/10 rounded-lg transition-all"
                       >
@@ -210,7 +346,7 @@ export function ProductsPage() {
                       </button>
                       <button
                         type="button"
-                        onClick={() => handleDelete(row)}
+                        onClick={() => setDeleteTarget(row)}
                         className="p-2 text-outline hover:text-error hover:bg-error/10 rounded-lg transition-all"
                       >
                         <span className="material-symbols-outlined text-xl">delete</span>
@@ -230,25 +366,84 @@ export function ProductsPage() {
         </div>
       </div>
 
+      {pricesModal && (
+        <Modal title={`Preços - ${pricesModal.name}`} onClose={() => setPricesModal(null)}>
+          <Table
+            data={productPrices}
+            columns={[
+              {
+                key: 'customerCustomId',
+                label: 'ID',
+                render: (row) => (
+                  <span className="font-mono text-xs text-on-surface-variant">
+                    {row.customerCustomId || '—'}
+                  </span>
+                ),
+              },
+              { key: 'customerName', label: 'Cliente' },
+              {
+                key: 'price',
+                label: 'Preço',
+                render: (row) =>
+                  new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
+                    row.price,
+                  ),
+              },
+            ]}
+          />
+          <div className="flex justify-end mt-6">
+            <Button onClick={() => setPricesModal(null)}>Fechar</Button>
+          </div>
+        </Modal>
+      )}
+
       {modal && (
-        <Modal title={editing ? 'Editar Produto' : 'Novo Produto'} onClose={() => setModal(false)}>
+        <Modal
+          title={editing ? 'Editar Produto' : 'Novo Produto'}
+          onClose={closeModal}
+          onEscape={handleEscape}
+        >
           <div className="flex flex-col gap-4">
-            <Input
-              label="ID Personalizado"
-              type="number"
-              optional
-              {...register('customId')}
-              error={errors.customId?.message}
+            <Controller
+              name="customId"
+              control={control}
+              render={({ field }) => (
+                <Input
+                  ref={customIdRef}
+                  label="ID Personalizado"
+                  type="number"
+                  optional
+                  value={field.value ?? ''}
+                  onChange={field.onChange}
+                  error={errors.customId?.message}
+                  onKeyDown={(e) => e.key === 'Enter' && nameRef.current?.focus()}
+                />
+              )}
             />
-            <Input label="Nome do produto" {...register('name')} error={errors.name?.message} />
+            <Controller
+              name="name"
+              control={control}
+              render={({ field }) => (
+                <Input
+                  ref={nameRef}
+                  label="Nome do produto"
+                  value={field.value}
+                  onChange={field.onChange}
+                  error={errors.name?.message}
+                  onKeyDown={(e) => e.key === 'Enter' && unitSelectRef.current?.open()}
+                />
+              )}
+            />
             <Controller
               name="unit"
               control={control}
               render={({ field }) => (
                 <Select
+                  ref={unitSelectRef}
                   label="Unidade"
                   value={field.value}
                   onChange={field.onChange}
+                  onEnterSelect={() => handleSubmit(onEnterSubmit as any)()}
                   error={errors.unit?.message}
                   options={UNITS}
                 />
@@ -256,12 +451,36 @@ export function ProductsPage() {
             />
           </div>
           <div className="flex justify-end gap-3 mt-6">
-            <Button variant="ghost" onClick={() => setModal(false)}>
+            <Button variant="ghost" onClick={closeModal}>
               Cancelar
             </Button>
-            <Button onClick={handleSubmit(onSubmit)}>Salvar</Button>
+            <Button onClick={handleSubmit(onSubmit as any)}>Salvar</Button>
           </div>
         </Modal>
+      )}
+
+      {pendingData && (
+        <ConfirmModal
+          message="Tem certeza que deseja cadastrar este produto?"
+          onConfirm={() => save(pendingData)}
+          onCancel={() => setPendingData(null)}
+        />
+      )}
+
+      {deleteTarget && (
+        <ConfirmModal
+          message="Excluir este produto?"
+          onConfirm={handleConfirmDelete}
+          onCancel={() => setDeleteTarget(null)}
+        />
+      )}
+
+      {showDiscardConfirm && (
+        <ConfirmModal
+          message="Existem alterações não salvas. Deseja realmente fechar?"
+          onConfirm={handleConfirmDiscard}
+          onCancel={() => setShowDiscardConfirm(false)}
+        />
       )}
     </div>
   )
