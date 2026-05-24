@@ -13,6 +13,7 @@ import {
   Toast,
   useToast,
 } from '../components/ui'
+import { generatePdf } from '../lib/pdfGenerator' // <-- Adicionar esta linha
 import type { Customer, CustomerPrice, Product } from '../lib/types'
 
 interface PriceFormData {
@@ -129,6 +130,60 @@ export function PriceManagementPage() {
     return matchCustomer && matchProduct
   })
 
+  const handleExportPriceManagementPdf = () => {
+    const headers = ['Cliente', 'Produto', 'Preço']
+
+    const data = filteredRows.map((row) => {
+      const customer = customers.find((c) => c.id === row.customerId)
+      const product = products.find((p) => p.id === row.productId)
+
+      const customerName = customer ? customer.name : 'Desconhecido'
+      const productName = product ? product.name : 'Desconhecido'
+      const formattedPrice = new Intl.NumberFormat('pt-BR', {
+        style: 'currency',
+        currency: 'BRL',
+      }).format(row.price)
+
+      return [customerName, productName, formattedPrice]
+    })
+
+    const date = new Date().toLocaleDateString('pt-BR')
+    let subtitle = `Relatório emitido em ${date}.`
+
+    const filterCustomerName = filterCustomer
+      ? customers.find((c) => c.id === Number(filterCustomer))?.name
+      : ''
+    const filterProductName = filterProduct
+      ? products.find((p) => p.id === Number(filterProduct))?.name
+      : ''
+
+    const fileNameParts = ['tabela-precos-geral']
+    if (filterCustomerName) {
+      fileNameParts.push(filterCustomerName.toLowerCase().replace(/[^a-z0-9]/g, '-'))
+    }
+    if (filterProductName) {
+      fileNameParts.push(filterProductName.toLowerCase().replace(/[^a-z0-9]/g, '-'))
+    }
+    fileNameParts.push(date.replace(/\//g, '-'))
+    const dynamicFileName = fileNameParts.join('-')
+
+    if (filterCustomerName && filterProductName) {
+      subtitle = `Filtros: Cliente: "${filterCustomerName}", Produto: "${filterProductName}". ${subtitle}`
+    } else if (filterCustomerName) {
+      subtitle = `Filtro: Cliente: "${filterCustomerName}". ${subtitle}`
+    } else if (filterProductName) {
+      subtitle = `Filtro: Produto: "${filterProductName}". ${subtitle}`
+    }
+
+    generatePdf({
+      title: 'Tabela de Preços Geral',
+      subtitle,
+      headers,
+      data,
+      fileName: dynamicFileName,
+    })
+  }
+
   const save = async (data: PriceFormData) => {
     try {
       await window.api.customerPrices.set(data)
@@ -226,7 +281,13 @@ export function PriceManagementPage() {
         subtitle="Gerencie preços específicos de produtos para cada cliente."
         actionLabel="Definir Novo Preço"
         onAction={() => setModal(true)}
-      />
+      >
+        {/* Adicionar o botão de exportação aqui, perto dos filtros */}
+        <Button variant="ghost" onClick={handleExportPriceManagementPdf} className="ml-4 mb-2">
+          <span className="material-symbols-outlined text-lg -ml-1 mr-2">picture_as_pdf</span>
+          Exportar PDF
+        </Button>
+      </PageHeader>
 
       {/* Filters */}
       <div className="bg-surface-container-low p-4 rounded-xl mb-10 border border-outline-variant/10 shadow-sm">
