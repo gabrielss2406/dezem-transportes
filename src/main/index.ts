@@ -1,7 +1,13 @@
 import { join } from 'path'
+import * as dotenv from 'dotenv'
+// Load environment variables as early as possible
+dotenv.config()
+
 import { BrowserWindow, app, shell } from 'electron'
 import { setupDatabase } from './database'
 import { registerAuthHandlers } from './modules/auth/auth.handlers'
+import { startBackupScheduler } from './modules/backup/backup-scheduler'
+import { registerBackupHandlers } from './modules/backup/backup.handlers'
 import { registerCostCategoryHandlers } from './modules/cost-categories/cost-categories.handlers'
 import { registerCostHandlers } from './modules/costs/costs.handlers'
 import { registerCustomerPricesHandlers } from './modules/customer-prices/customer-prices.handlers'
@@ -45,6 +51,8 @@ function createWindow(): void {
   } else {
     mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
   }
+
+  startBackupScheduler(mainWindow)
 }
 
 app.whenReady().then(() => {
@@ -62,6 +70,7 @@ app.whenReady().then(() => {
   registerSupplierTypesHandlers()
   registerTripHandlers()
   registerTruckHandlers()
+  registerBackupHandlers()
 
   createWindow()
 

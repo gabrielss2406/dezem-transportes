@@ -219,6 +219,19 @@ declare global {
       dashboard: {
         summary(startDate: string, endDate: string): Promise<DashboardSummary>
       }
+      backup: {
+        getConfig(): Promise<import('../../../shared/types').BackupConfig | null>
+        saveConfig(config: import('../../../shared/types').BackupConfig): Promise<void>
+        clearConfig(): Promise<void>
+        performBackup(): Promise<{ ok: boolean; error?: string }>
+        getStatus(): Promise<import('../../../shared/types').BackupStatus | null>
+        isEnvConfigured(): Promise<{ isEnv: boolean; isDb: boolean }>
+        list(): Promise<Array<{ key: string; size: number; lastModified: string }>>
+        restore(key: string): Promise<{ ok: boolean }>
+        onStatusUpdate(
+          callback: (status: import('../../../shared/types').BackupStatus) => void,
+        ): () => void
+      }
     }
   }
 }

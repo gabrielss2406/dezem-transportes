@@ -30,7 +30,7 @@ export const customerSchema = z.object({
     (val) => (val === '' || val === null || val === undefined ? undefined : Number(val)),
     z.number().int().positive().optional(),
   ),
-  name: z.string().min(3).max(100),
+  name: z.string().min(3, 'Nome deve ter pelo menos 3 caracteres').max(100),
   cnpj: z
     .string()
     .optional()
@@ -48,7 +48,7 @@ export const productSchema = z.object({
     (val) => (val === '' || val === null || val === undefined ? undefined : Number(val)),
     z.number().int().positive().optional(),
   ),
-  name: z.string().min(2).max(100),
+  name: z.string().min(2, 'Nome deve ter pelo menos 2 caracteres').max(100),
   unit: z.string().max(10).optional(),
 })
 
@@ -57,7 +57,7 @@ export const supplierSchema = z.object({
     (val) => (val === '' || val === null || val === undefined ? undefined : Number(val)),
     z.number().int().positive().optional(),
   ),
-  name: z.string().min(3).max(100),
+  name: z.string().min(3, 'Nome deve ter pelo menos 3 caracteres').max(100),
   type: z.string().max(50).optional(),
   phone: z
     .string()
@@ -77,7 +77,7 @@ export const truckSchema = z.object({
       .length(7, 'Placa deve ter 7 caracteres')
       .regex(/^[A-Z]{3}[0-9][A-Z0-9][0-9]{2}$/, 'Placa inválida (use ABC1D23 ou ABC-1234)'),
   ),
-  model: z.string().min(2).max(50),
+  model: z.string().min(2, 'Modelo deve ter pelo menos 2 caracteres').max(50),
   year: z.preprocess(
     (val) => (val === '' || val === null ? null : Number(val)),
     z
@@ -99,7 +99,7 @@ export const driverSchema = z.object({
     (val) => (val === '' || val === null || val === undefined ? undefined : Number(val)),
     z.number().int().positive().optional(),
   ),
-  name: z.string().min(3).max(100),
+  name: z.string().min(3, 'Nome deve ter pelo menos 3 caracteres').max(100),
   cpf: z
     .string()
     .optional()
@@ -116,7 +116,7 @@ export const driverSchema = z.object({
 })
 
 export const routeSchema = z.object({
-  name: z.string().min(3).max(100),
+  name: z.string().min(3, 'Nome deve ter pelo menos 3 caracteres').max(100),
   distance_km: requiredNumber(100000, 'Distância máxima de 100.000 km'),
   customer_id: optionalNumber(999999999, 'ID inválido'),
 })
@@ -161,4 +161,11 @@ export const customerPriceSchema = z.object({
 
 export const loginSchema = z.object({
   password: z.string().min(1, 'Senha é obrigatória'),
+})
+
+export const backupConfigSchema = z.object({
+  endpoint: z.string().url('Endpoint deve ser uma URL válida'),
+  bucket: z.string().min(3, 'Nome do bucket é obrigatório'),
+  accessKeyId: z.string().min(1, 'Access Key ID é obrigatório'),
+  secretAccessKey: z.string().min(1, 'Secret Access Key é obrigatório'),
 })
