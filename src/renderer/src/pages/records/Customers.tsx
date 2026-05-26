@@ -4,6 +4,7 @@ import { Controller, useForm } from 'react-hook-form'
 import { customerSchema } from '../../../../shared/schemas'
 import { PageHeader } from '../../components/PageHeader'
 import { Button, Input, Modal, Table, Toast, useToast } from '../../components/ui'
+import { generatePdf } from '../../lib/pdfGenerator'
 import type { Customer } from '../../lib/types'
 
 interface CustomerFormData {
@@ -142,6 +143,30 @@ export function CustomersPage() {
       setCustomerPrices([])
     }
   }, [pricesModal])
+
+  const handleExportPricesPdf = () => {
+    if (!pricesModal) {
+      return
+    }
+
+    const headers = ['ID do Produto', 'Produto', 'Preço']
+    const data = customerPrices.map((price) => [
+      price.productCustomId || '—',
+      price.productName,
+      new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(price.price),
+    ])
+
+    const date = new Date().toLocaleDateString('pt-BR')
+    const fileNameSafeName = pricesModal.name.toLowerCase().replace(/[^a-z0-9]/g, '-')
+
+    generatePdf({
+      title: `Tabela de Preços - ${pricesModal.name}`,
+      subtitle: `Preços especiais válidos para ${date}.`,
+      headers,
+      data,
+      fileName: `tabela-precos-${fileNameSafeName}`,
+    })
+  }
 
   const save = async (data: CustomerFormData) => {
     try {
@@ -383,7 +408,11 @@ export function CustomersPage() {
               },
             ]}
           />
-          <div className="flex justify-end mt-6">
+          <div className="flex justify-end items-center gap-3 mt-6">
+            <Button variant="ghost" onClick={handleExportPricesPdf}>
+              <span className="material-symbols-outlined text-lg -ml-1 mr-2">picture_as_pdf</span>
+              Exportar
+            </Button>
             <Button onClick={() => setPricesModal(null)}>Fechar</Button>
           </div>
         </Modal>
