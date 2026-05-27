@@ -9,6 +9,7 @@ import { OverviewPage } from './pages/Overview'
 import { PriceManagementPage } from './pages/PriceManagement'
 import { SettingsPage } from './pages/Settings'
 import { TripsPage } from './pages/Trips'
+import { ContractorsPage } from './pages/records/Contractors'
 import { CustomersPage } from './pages/records/Customers'
 import { DriversPage } from './pages/records/Drivers'
 import { ProductsPage } from './pages/records/Products'
@@ -70,6 +71,7 @@ function AppRoutes() {
                 <Route path="/customers" element={<CustomersPage />} />
                 <Route path="/products" element={<ProductsPage />} />
                 <Route path="/suppliers" element={<SuppliersPage />} />
+                <Route path="/contractors" element={<ContractorsPage />} />
                 <Route
                   path="/settings"
                   element={<SettingsPage theme={theme} onToggleTheme={toggleTheme} />}

@@ -4,7 +4,7 @@ import { Controller, useForm } from 'react-hook-form'
 import { driverSchema } from '../../../../shared/schemas'
 import { PageHeader } from '../../components/PageHeader'
 import { Button, CurrencyInput, Input, Modal, Select, Toast, useToast } from '../../components/ui'
-import type { Driver, Truck } from '../../lib/types'
+import type { Contractor, Driver, Truck } from '../../lib/types'
 import { formatBRL } from '../../lib/utils'
 
 interface DriverFormData {
@@ -14,6 +14,8 @@ interface DriverFormData {
   monthly_salary: number
   truck_id: number | null
   customId?: number
+  is_outsourced: number
+  contractor_id: number | null
 }
 
 const EMPTY_VALUES: DriverFormData = {
@@ -23,6 +25,8 @@ const EMPTY_VALUES: DriverFormData = {
   monthly_salary: 0,
   truck_id: null,
   customId: undefined,
+  is_outsourced: 0,
+  contractor_id: null,
 }
 
 function initials(name: string) {
@@ -34,7 +38,6 @@ function initials(name: string) {
     .toUpperCase()
 }
 
-// Modal de confirmação próprio — sem confirm() nativo do Electron
 function ConfirmModal({
   message,
   onConfirm,
@@ -70,8 +73,10 @@ function ConfirmModal({
 export function DriversPage() {
   const [rows, setRows] = useState<Driver[]>([])
   const [trucks, setTrucks] = useState<Truck[]>([])
+  const [contractors, setContractors] = useState<Contractor[]>([])
   const [modal, setModal] = useState(false)
   const [editing, setEditing] = useState<Driver | null>(null)
+  const [view, setView] = useState<'internal' | 'outsourced'>('internal')
   const [filters, setFilters] = useState({ name: '', cpf: '', truck_id: '' })
   const [appliedFilters, setAppliedFilters] = useState({ name: '', cpf: '', truck_id: '' })
   const [pendingData, setPendingData] = useState<any>(null)
@@ -84,6 +89,7 @@ export function DriversPage() {
   const phoneRef = useRef<HTMLInputElement>(null)
   const salaryRef = useRef<HTMLInputElement>(null)
   const truckSelectRef = useRef<any>(null)
+  const contractorSelectRef = useRef<any>(null)
 
   const {
     handleSubmit,
@@ -106,14 +112,22 @@ export function DriversPage() {
       ? '(00) 00000-0000'
       : '(00) 0000-0000'
 
+  const isOutsourcedValue = watch('is_outsourced')
+
   const load = useCallback(async () => {
-    const [d, t] = await Promise.all([
-      window.api.drivers.list(appliedFilters),
+    const listFilters = {
+      ...appliedFilters,
+      is_outsourced: view === 'outsourced',
+    }
+    const [d, t, c] = await Promise.all([
+      window.api.drivers.list(listFilters),
       window.api.trucks.list(),
+      window.api.contractors.list(),
     ])
     setRows(d)
     setTrucks(t)
-  }, [appliedFilters])
+    setContractors(c)
+  }, [appliedFilters, view])
 
   useEffect(() => {
     load()
@@ -128,7 +142,6 @@ export function DriversPage() {
     return nextId
   }, [rows])
 
-  // Foco inteligente e sugestão de ID
   useEffect(() => {
     if (modal) {
       setTimeout(() => {
@@ -136,6 +149,7 @@ export function DriversPage() {
         if (!editing) {
           const nextId = findNextAvailableId()
           setValue('customId', nextId as any, { shouldValidate: false })
+          setValue('is_outsourced', view === 'outsourced' ? 1 : 0, { shouldValidate: false })
           nameRef.current?.focus()
         } else {
           nameRef.current?.focus()
@@ -146,7 +160,7 @@ export function DriversPage() {
       setEditing(null)
       reset(EMPTY_VALUES)
     }
-  }, [modal, editing, reset, setValue, findNextAvailableId])
+  }, [modal, editing, reset, setValue, findNextAvailableId, view])
 
   const save = async (data: DriverFormData) => {
     try {
@@ -165,10 +179,7 @@ export function DriversPage() {
             if (field === 'customId' && finalMessage.toLowerCase().includes('uso')) {
               finalMessage = `${finalMessage}. Sugestão: ${findNextAvailableId()}`
             }
-            setError(field as any, {
-              type: 'manual',
-              message: finalMessage,
-            })
+            setError(field as any, { type: 'manual', message: finalMessage })
           }
         } else {
           show('Ocorreu um erro ao salvar.', 'error')
@@ -186,13 +197,8 @@ export function DriversPage() {
     }
   }
 
-  const onSubmit = (data: DriverFormData) => {
-    save(data)
-  }
-
-  const onEnterSubmit = (data: DriverFormData) => {
-    setPendingData(data)
-  }
+  const onSubmit = (data: DriverFormData) => save(data)
+  const onEnterSubmit = (data: DriverFormData) => setPendingData(data)
 
   const handleConfirmDelete = async () => {
     if (!deleteTarget) {
@@ -211,8 +217,10 @@ export function DriversPage() {
       cpf: row.cpf ?? '',
       phone: row.phone ?? '',
       monthly_salary: row.monthly_salary,
-      truck_id: row.truck_id,
+      truck_id: row.truck_id ?? null,
       customId: row.customId ?? undefined,
+      is_outsourced: row.is_outsourced ?? 0,
+      contractor_id: row.contractor_id ?? null,
     })
     setModal(true)
   }
@@ -225,16 +233,19 @@ export function DriversPage() {
     }
   }
 
-  const handleConfirmDiscard = () => {
-    setShowDiscardConfirm(false)
-    setModal(false)
-  }
-
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       setAppliedFilters(filters)
     }
   }
+
+  // Trucks filtered to current view for assignment (internal trucks for internal drivers, all trucks for outsourced)
+  const availableTrucks =
+    view === 'outsourced'
+      ? trucks.filter((t) => t.is_outsourced === 1)
+      : trucks.filter((t) => !t.is_outsourced)
+
+  const internalPayroll = view === 'internal' ? rows.reduce((s, r) => s + r.monthly_salary, 0) : 0
 
   return (
     <div className="p-12 max-w-7xl mx-auto">
@@ -244,8 +255,12 @@ export function DriversPage() {
       <PageHeader
         pretitle="Gestão de Frota"
         title="Motoristas"
-        subtitle="Gerencie os motoristas vinculados à frota."
-        actionLabel="Novo Motorista"
+        subtitle={
+          view === 'internal'
+            ? 'Motoristas da frota própria da empresa.'
+            : 'Motoristas fornecidos por terceiros.'
+        }
+        actionLabel={view === 'internal' ? 'Novo Motorista' : 'Novo Motorista Terceirizado'}
         onAction={() => {
           window.focus()
           setModal(true)
@@ -312,21 +327,64 @@ export function DriversPage() {
         </div>
       </PageHeader>
 
+      {/* View tabs */}
+      <div className="flex gap-1 mb-8 bg-surface-container-high rounded-lg p-1 w-fit border border-outline-variant/10">
+        <button
+          type="button"
+          onClick={() => setView('internal')}
+          className={`px-5 py-2 rounded-md text-sm font-bold transition-all ${
+            view === 'internal'
+              ? 'bg-primary text-on-primary shadow-sm'
+              : 'text-on-surface-variant hover:text-on-surface'
+          }`}
+        >
+          <span className="material-symbols-outlined text-base align-middle mr-1.5">person</span>
+          Próprios
+        </button>
+        <button
+          type="button"
+          onClick={() => setView('outsourced')}
+          className={`px-5 py-2 rounded-md text-sm font-bold transition-all ${
+            view === 'outsourced'
+              ? 'bg-primary text-on-primary shadow-sm'
+              : 'text-on-surface-variant hover:text-on-surface'
+          }`}
+        >
+          <span className="material-symbols-outlined text-base align-middle mr-1.5">group_add</span>
+          Terceirizados
+        </button>
+      </div>
+
       {/* Stats */}
       <div className="grid grid-cols-3 gap-6 mb-10">
-        {[
-          { label: 'Total de Motoristas', value: rows.length, icon: 'badge' },
-          {
-            label: 'Com Caminhão Vinculado',
-            value: rows.filter((r) => r.truck_id).length,
-            icon: 'local_shipping',
-          },
-          {
-            label: 'Folha Mensal',
-            value: formatBRL(rows.reduce((s, r) => s + r.monthly_salary, 0)),
-            icon: 'payments',
-          },
-        ].map(({ label, value, icon }) => (
+        {(view === 'internal'
+          ? [
+              { label: 'Total de Motoristas', value: rows.length, icon: 'badge' },
+              {
+                label: 'Com Caminhão Vinculado',
+                value: rows.filter((r) => r.truck_id).length,
+                icon: 'local_shipping',
+              },
+              {
+                label: 'Folha Mensal',
+                value: formatBRL(internalPayroll),
+                icon: 'payments',
+              },
+            ]
+          : [
+              { label: 'Motoristas Terceirizados', value: rows.length, icon: 'group_add' },
+              {
+                label: 'Com Caminhão Vinculado',
+                value: rows.filter((r) => r.truck_id).length,
+                icon: 'local_shipping',
+              },
+              {
+                label: 'Empresas Distintas',
+                value: new Set(rows.map((r) => r.contractor_id).filter(Boolean)).size,
+                icon: 'business',
+              },
+            ]
+        ).map(({ label, value, icon }) => (
           <div
             key={label}
             className="bg-surface-container-low p-6 rounded-lg relative overflow-hidden group"
@@ -345,7 +403,15 @@ export function DriversPage() {
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-surface-container-high">
-              {['ID', 'Nome', 'CPF', 'Telefone', 'Salário', 'Caminhão', ''].map((h) => (
+              {[
+                'ID',
+                'Nome',
+                'CPF',
+                'Telefone',
+                view === 'internal' ? 'Salário' : 'Empresa',
+                'Caminhão',
+                '',
+              ].map((h) => (
                 <th
                   key={h}
                   className="px-6 py-5 text-[10px] font-black uppercase tracking-widest text-on-surface-variant"
@@ -359,7 +425,9 @@ export function DriversPage() {
             {rows.length === 0 && (
               <tr>
                 <td colSpan={7} className="px-6 py-12 text-center text-on-surface-variant text-sm">
-                  Nenhum motorista cadastrado
+                  {view === 'internal'
+                    ? 'Nenhum motorista próprio cadastrado'
+                    : 'Nenhum motorista terceirizado cadastrado'}
                 </td>
               </tr>
             )}
@@ -383,8 +451,14 @@ export function DriversPage() {
                   {row.cpf || '—'}
                 </td>
                 <td className="px-6 py-4 text-sm text-on-surface-variant">{row.phone || '—'}</td>
-                <td className="px-6 py-4 text-sm font-medium text-primary">
-                  {formatBRL(row.monthly_salary)}
+                <td className="px-6 py-4 text-sm">
+                  {view === 'internal' ? (
+                    <span className="font-medium text-primary">
+                      {formatBRL(row.monthly_salary)}
+                    </span>
+                  ) : (
+                    <span className="text-on-surface-variant">{row.contractor_name || '—'}</span>
+                  )}
                 </td>
                 <td className="px-6 py-4">
                   {row.truck_license_plate ? (
@@ -420,14 +494,22 @@ export function DriversPage() {
 
         <div className="px-6 py-4 bg-surface-container-high/50 border-t border-outline-variant/10">
           <p className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">
-            {rows.length} motorista{rows.length !== 1 ? 's' : ''} cadastrado
+            {rows.length} motorista{rows.length !== 1 ? 's' : ''}{' '}
+            {view === 'outsourced' ? 'terceirizado' : 'próprio'}
+            {rows.length !== 1 ? 's' : ''}
           </p>
         </div>
       </div>
 
       {modal && (
         <Modal
-          title={editing ? 'Editar Motorista' : 'Novo Motorista'}
+          title={
+            editing
+              ? 'Editar Motorista'
+              : view === 'outsourced'
+                ? 'Novo Motorista Terceirizado'
+                : 'Novo Motorista'
+          }
           onClose={() => setModal(false)}
           onEscape={handleEscape}
         >
@@ -497,48 +579,142 @@ export function DriversPage() {
                 />
               )}
             />
-            <Controller
-              name="monthly_salary"
-              control={control}
-              render={({ field }) => (
-                <CurrencyInput
-                  ref={salaryRef}
-                  label="Salário mensal"
-                  value={field.value}
-                  onChange={field.onChange}
-                  error={errors.monthly_salary?.message}
-                  onKeyDown={(e) => e.key === 'Enter' && truckSelectRef.current?.open()}
+
+            {/* Outsourced toggle */}
+            <div className="col-span-2 flex items-center gap-3 py-1">
+              <Controller
+                name="is_outsourced"
+                control={control}
+                render={({ field }) => (
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={field.value === 1}
+                    onClick={() => {
+                      const next = field.value === 1 ? 0 : 1
+                      field.onChange(next)
+                      if (next === 0) {
+                        setValue('contractor_id', null)
+                      }
+                    }}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${
+                      field.value === 1 ? 'bg-primary' : 'bg-outline-variant'
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+                        field.value === 1 ? 'translate-x-6' : 'translate-x-1'
+                      }`}
+                    />
+                  </button>
+                )}
+              />
+              <span className="text-sm text-on-surface-variant">Motorista terceirizado</span>
+            </div>
+
+            {isOutsourcedValue === 1 ? (
+              <>
+                <div className="col-span-2">
+                  <Controller
+                    name="contractor_id"
+                    control={control}
+                    render={({ field }) => (
+                      <Select
+                        ref={contractorSelectRef}
+                        label="Empresa Terceirizada"
+                        optional
+                        value={field.value}
+                        onChange={field.onChange}
+                        error={errors.contractor_id?.message}
+                        options={contractors.map((c) => ({
+                          value: c.id,
+                          label: c.name,
+                          displayLabel: c.name,
+                          searchableLabel: c.name,
+                        }))}
+                      />
+                    )}
+                  />
+                </div>
+                <div className="col-span-2">
+                  <Controller
+                    name="truck_id"
+                    control={control}
+                    render={({ field }) => (
+                      <Select
+                        ref={truckSelectRef}
+                        label="Caminhão terceirizado vinculado"
+                        optional
+                        value={field.value}
+                        onChange={field.onChange}
+                        error={errors.truck_id?.message}
+                        onEnterSelect={() => handleSubmit(onEnterSubmit as any)()}
+                        options={availableTrucks.map((t) => ({
+                          value: t.id,
+                          label: (
+                            <div className="flex justify-between">
+                              <span>{t.license_plate}</span>
+                              {t.contractor_name && (
+                                <span className="text-on-surface-variant/50 text-xs">
+                                  {t.contractor_name}
+                                </span>
+                              )}
+                            </div>
+                          ),
+                          displayLabel: t.license_plate,
+                          searchableLabel: `${t.license_plate} ${t.contractor_name || ''}`,
+                        }))}
+                      />
+                    )}
+                  />
+                </div>
+              </>
+            ) : (
+              <>
+                <Controller
+                  name="monthly_salary"
+                  control={control}
+                  render={({ field }) => (
+                    <CurrencyInput
+                      ref={salaryRef}
+                      label="Salário mensal"
+                      value={field.value}
+                      onChange={field.onChange}
+                      error={errors.monthly_salary?.message}
+                      onKeyDown={(e) => e.key === 'Enter' && truckSelectRef.current?.open()}
+                    />
+                  )}
                 />
-              )}
-            />
-            <Controller
-              name="truck_id"
-              control={control}
-              render={({ field }) => (
-                <Select
-                  ref={truckSelectRef}
-                  label="Caminhão vinculado"
-                  optional
-                  value={field.value}
-                  onChange={field.onChange}
-                  error={errors.truck_id?.message}
-                  onEnterSelect={() => handleSubmit(onEnterSubmit as any)()}
-                  options={trucks.map((t) => ({
-                    value: t.id,
-                    label: (
-                      <div className="flex justify-between">
-                        <span>{t.license_plate}</span>
-                        {t.customId && (
-                          <span className="text-on-surface-variant/50">#{t.customId}</span>
-                        )}
-                      </div>
-                    ),
-                    displayLabel: t.license_plate,
-                    searchableLabel: `${t.license_plate} ${t.customId || ''}`,
-                  }))}
+                <Controller
+                  name="truck_id"
+                  control={control}
+                  render={({ field }) => (
+                    <Select
+                      ref={truckSelectRef}
+                      label="Caminhão vinculado"
+                      optional
+                      value={field.value}
+                      onChange={field.onChange}
+                      error={errors.truck_id?.message}
+                      onEnterSelect={() => handleSubmit(onEnterSubmit as any)()}
+                      options={availableTrucks.map((t) => ({
+                        value: t.id,
+                        label: (
+                          <div className="flex justify-between">
+                            <span>{t.license_plate}</span>
+                            {t.customId && (
+                              <span className="text-on-surface-variant/50">#{t.customId}</span>
+                            )}
+                          </div>
+                        ),
+                        displayLabel: t.license_plate,
+                        searchableLabel: `${t.license_plate} ${t.customId || ''}`,
+                      }))}
+                    />
+                  )}
                 />
-              )}
-            />
+              </>
+            )}
           </div>
           <div className="flex justify-end gap-3 mt-6">
             <Button variant="ghost" onClick={() => setModal(false)}>
@@ -568,7 +744,10 @@ export function DriversPage() {
       {showDiscardConfirm && (
         <ConfirmModal
           message="Existem alterações não salvas. Deseja realmente fechar?"
-          onConfirm={handleConfirmDiscard}
+          onConfirm={() => {
+            setShowDiscardConfirm(false)
+            setModal(false)
+          }}
           onCancel={() => setShowDiscardConfirm(false)}
         />
       )}

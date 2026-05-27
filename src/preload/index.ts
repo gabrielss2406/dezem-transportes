@@ -61,6 +61,14 @@ contextBridge.exposeInMainWorld('api', {
     delete: (id: number) => ipcRenderer.invoke('cost-categories:delete', id),
   },
 
+  // Contractors
+  contractors: {
+    list: (filters?: any) => ipcRenderer.invoke('contractors:list', filters),
+    create: (data: any) => ipcRenderer.invoke('contractors:create', data),
+    update: (id: number, data: any) => ipcRenderer.invoke('contractors:update', id, data),
+    delete: (id: number) => ipcRenderer.invoke('contractors:delete', id),
+  },
+
   // Trucks
   trucks: {
     list: (filters?: any) => ipcRenderer.invoke('trucks:list', filters),
