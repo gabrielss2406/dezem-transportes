@@ -7,7 +7,6 @@ import { DesignSystemPage } from './pages/DesignSystem'
 import { LoginPage } from './pages/Login'
 import { OverviewPage } from './pages/Overview'
 import { PriceManagementPage } from './pages/PriceManagement'
-import { RoutesPage } from './pages/Routes'
 import { SettingsPage } from './pages/Settings'
 import { TripsPage } from './pages/Trips'
 import { CustomersPage } from './pages/records/Customers'
@@ -71,7 +70,6 @@ function AppRoutes() {
                 <Route path="/customers" element={<CustomersPage />} />
                 <Route path="/products" element={<ProductsPage />} />
                 <Route path="/suppliers" element={<SuppliersPage />} />
-                <Route path="/routes" element={<RoutesPage />} />
                 <Route
                   path="/settings"
                   element={<SettingsPage theme={theme} onToggleTheme={toggleTheme} />}

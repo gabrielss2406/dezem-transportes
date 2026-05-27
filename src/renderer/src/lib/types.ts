@@ -53,14 +53,6 @@ export interface Driver {
   active: number
 }
 
-export interface Route {
-  id: number
-  name: string
-  distance_km?: number
-  customer_id?: number
-  customer_name?: string
-}
-
 export interface FuelStop {
   id?: number
   trip_id?: number
@@ -78,7 +70,6 @@ export interface Trip {
   driver_id: number
   product_id: number
   customer_id?: number
-  route_id?: number
   supplier_id?: number
   weight_ton: number
   price_charged: number
@@ -92,7 +83,6 @@ export interface Trip {
   driver_name?: string
   product_name?: string
   customer_name?: string
-  route_name?: string
 }
 
 export interface Cost {
@@ -133,7 +123,6 @@ export interface DashboardSummary {
     last_maintenance_date: string | null
     km_since_last_maintenance: number
   }>
-  perRoute: Array<{ name: string; revenue: number; fuel_cost: number }>
   perCategory: Array<{ category: string; total: number }>
 }
 
@@ -194,14 +183,6 @@ declare global {
         create(data: any): Promise<{ id: number; ok?: boolean; errors?: any }>
         update(id: number, data: any): Promise<{ ok: boolean; errors?: any }>
         delete(id: number): Promise<{ ok: boolean }>
-      }
-      routes: {
-        list(search?: string): Promise<Route[]>
-        create(data: any): Promise<{ id: number }>
-        update(data: any): Promise<{ ok: boolean }>
-        delete(id: number): Promise<{ ok: boolean }>
-        getWaypoints(route_id: number): Promise<any[]>
-        updateWaypoints(data: { route_id: number; waypoints: any[] }): Promise<{ ok: boolean }>
       }
       trips: {
         list(filters?: any): Promise<Trip[]>

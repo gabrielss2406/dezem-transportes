@@ -22,12 +22,9 @@ export function registerDashboardHandlers(): void {
     tr.id,
     tr.date,
     tr.truck_id,
-    tr.route_id,
     tr.price_charged,
-    tr.km_driven,
-    r.name as route_name
+    tr.km_driven
   FROM trips tr
-  LEFT JOIN routes r ON tr.route_id = r.id
   WHERE tr.date BETWEEN ? AND ?
 `,
       )
@@ -237,42 +234,6 @@ export function registerDashboardHandlers(): void {
       km_since_last_maintenance: m.km_since_last_maintenance,
     }))
 
-    const routeData = new Map<
-      number,
-      {
-        name: string
-        revenue: number
-        fuel_cost: number
-        cost: number
-      }
-    >()
-
-    for (const trip of allTrips) {
-      if (!trip.route_id) {
-        continue
-      }
-
-      let data = routeData.get(trip.route_id)
-      if (!data) {
-        data = {
-          name: trip.route_name || 'Rota Desconhecida',
-          revenue: 0,
-          fuel_cost: 0,
-          cost: 0,
-        }
-        routeData.set(trip.route_id, data)
-      }
-
-      data.revenue += Number(trip.price_charged) || 0
-      const fuelCost = Number(fuelCostPerTrip.get(trip.id)) || 0
-      const additionalCost = Number(additionalCostPerTrip.get(trip.id)) || 0
-
-      data.fuel_cost += fuelCost
-      data.cost += fuelCost + additionalCost
-    }
-
-    const perRoute = Array.from(routeData.values()).sort((a, b) => b.revenue - a.revenue)
-
     const categoryTotals = new Map<string, number>()
 
     // 1. Costs from 'costs' table
@@ -341,7 +302,6 @@ export function registerDashboardHandlers(): void {
       perTruck: trucksWithMetrics,
       monthlyRevenue,
       maintenanceAlerts: maintenanceAlertsFormatted,
-      perRoute,
       perCategory,
     }
   })

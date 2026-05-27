@@ -90,23 +90,6 @@ export function setupDatabase(): void {
       created_at     TEXT DEFAULT (datetime('now'))
     );
 
-    -- Routes
-    CREATE TABLE IF NOT EXISTS routes (
-      id          INTEGER PRIMARY KEY AUTOINCREMENT,
-      name        TEXT NOT NULL,
-      distance_km REAL,
-      customer_id INTEGER REFERENCES customers(id),
-      created_at  TEXT DEFAULT (datetime('now'))
-    );
-
-    -- Route Waypoints
-    CREATE TABLE IF NOT EXISTS route_waypoints (
-      id         INTEGER PRIMARY KEY AUTOINCREMENT,
-      route_id   INTEGER NOT NULL REFERENCES routes(id) ON DELETE CASCADE,
-      name       TEXT NOT NULL,
-      sequence   INTEGER NOT NULL
-    );
-
     -- Trips
     CREATE TABLE IF NOT EXISTS trips (
       id            INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -115,7 +98,6 @@ export function setupDatabase(): void {
       driver_id     INTEGER NOT NULL REFERENCES drivers(id),
       product_id    INTEGER NOT NULL REFERENCES products(id),
       customer_id   INTEGER REFERENCES customers(id),
-      route_id      INTEGER REFERENCES routes(id),
       supplier_id   INTEGER REFERENCES suppliers(id),
       weight_ton    REAL NOT NULL DEFAULT 0,
       price_charged REAL NOT NULL DEFAULT 0,
@@ -172,7 +154,6 @@ export function setupDatabase(): void {
     CREATE INDEX IF NOT EXISTS idx_trips_driver    ON trips(driver_id);
     CREATE INDEX IF NOT EXISTS idx_costs_date      ON costs(date);
     CREATE INDEX IF NOT EXISTS idx_costs_category  ON costs(category);
-    CREATE INDEX IF NOT EXISTS idx_route_waypoints_route_id ON route_waypoints(route_id);
     CREATE INDEX IF NOT EXISTS idx_trip_fuel_stops_trip_id  ON trip_fuel_stops(trip_id);
     CREATE INDEX IF NOT EXISTS idx_customer_prices_customer_id ON customer_prices(customer_id);
     CREATE INDEX IF NOT EXISTS idx_customer_prices_product_id ON customer_prices(product_id);
@@ -193,14 +174,6 @@ export function setupDatabase(): void {
       `UPDATE supplier_types SET is_deletable = 0 WHERE value IN ('gas_station', 'workshop', 'quarry', 'other')`,
     ).run()
   }
-
-  // Migration: Add customer_id to routes if it doesn't exist
-  const routeInfo = db.pragma('table_info(routes)') as { name: string }[]
-  if (!routeInfo.some((col) => col.name === 'customer_id')) {
-    db.exec('ALTER TABLE routes ADD COLUMN customer_id INTEGER REFERENCES customers(id)')
-  }
-  // This needs to be after the column is guaranteed to exist
-  db.exec('CREATE INDEX IF NOT EXISTS idx_routes_customer ON routes(customer_id)')
 
   // Migrations for customId
   const tablesWithCustomId = ['customers', 'products', 'suppliers', 'trucks', 'drivers']
