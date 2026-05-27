@@ -161,6 +161,12 @@ export function setupDatabase(): void {
       PRIMARY KEY (customer_id, product_id)
     );
 
+    -- Settings
+    CREATE TABLE IF NOT EXISTS settings (
+      key   TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    );
+
     -- Indexes for performance on frequent queries
     CREATE INDEX IF NOT EXISTS idx_trips_date      ON trips(date);
     CREATE INDEX IF NOT EXISTS idx_trips_truck     ON trips(truck_id);

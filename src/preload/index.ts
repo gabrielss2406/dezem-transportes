@@ -108,4 +108,21 @@ contextBridge.exposeInMainWorld('api', {
     summary: (startDate: string, endDate: string) =>
       ipcRenderer.invoke('dashboard:summary', startDate, endDate),
   },
+
+  // Backup
+  backup: {
+    getConfig: () => ipcRenderer.invoke('backup:getConfig'),
+    saveConfig: (config: any) => ipcRenderer.invoke('backup:saveConfig', config),
+    clearConfig: () => ipcRenderer.invoke('backup:clearConfig'),
+    performBackup: () => ipcRenderer.invoke('backup:performBackup'),
+    getStatus: () => ipcRenderer.invoke('backup:getStatus'),
+    isEnvConfigured: () => ipcRenderer.invoke('backup:isEnvConfigured'),
+    list: () => ipcRenderer.invoke('backup:list'),
+    restore: (key: string) => ipcRenderer.invoke('backup:restore', key),
+    onStatusUpdate: (callback: (status: any) => void) => {
+      const listener = (_event: any, status: any) => callback(status)
+      ipcRenderer.on('backup-status-update', listener)
+      return () => ipcRenderer.removeListener('backup-status-update', listener)
+    },
+  },
 })

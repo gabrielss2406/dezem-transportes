@@ -4,6 +4,7 @@ import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { PageHeader } from '../components/PageHeader'
 import { Button, ConfirmModal, Input, Toast, useToast } from '../components/ui'
+import { BackupSettings } from './BackupSettings'
 
 // Section component for styling
 const formSchema = z.object({
@@ -177,6 +178,7 @@ export function SettingsPage({ theme, onToggleTheme }: SettingsPageProps) {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 mt-10 items-start">
         <DynamicTypeManager title="Tipos de Fornecedor" api={window.api['supplier-types']} />
         <DynamicTypeManager title="Categorias de Custo" api={window.api['cost-categories']} />
+        <BackupSettings />
 
         <Section title="Tema e Aparência">
           <div className="flex items-center justify-between">
