@@ -3,8 +3,8 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Controller, useForm } from 'react-hook-form'
 import { truckSchema } from '../../../../shared/schemas'
 import { PageHeader } from '../../components/PageHeader'
-import { Button, Input, Modal, Toast, useToast } from '../../components/ui'
-import type { Truck } from '../../lib/types'
+import { Button, Input, Modal, Select, Toast, useToast } from '../../components/ui'
+import type { Contractor, Truck } from '../../lib/types'
 
 interface TruckFormData {
   license_plate: string
@@ -13,6 +13,8 @@ interface TruckFormData {
   capacity_ton: number | null
   current_odometer: number
   customId?: number
+  is_outsourced: number
+  contractor_id: number | null
 }
 
 const EMPTY: TruckFormData = {
@@ -22,6 +24,8 @@ const EMPTY: TruckFormData = {
   capacity_ton: null,
   current_odometer: 0,
   customId: undefined,
+  is_outsourced: 0,
+  contractor_id: null,
 }
 
 function ConfirmModal({
@@ -58,8 +62,10 @@ function ConfirmModal({
 
 export function TrucksPage() {
   const [rows, setRows] = useState<Truck[]>([])
+  const [contractors, setContractors] = useState<Contractor[]>([])
   const [modal, setModal] = useState(false)
   const [editing, setEditing] = useState<Truck | null>(null)
+  const [view, setView] = useState<'internal' | 'outsourced'>('internal')
   const [filters, setFilters] = useState({ license_plate: '', capacity_ton: '' })
   const [appliedFilters, setAppliedFilters] = useState({ license_plate: '', capacity_ton: '' })
   const [pendingData, setPendingData] = useState<any>(null)
@@ -73,6 +79,7 @@ export function TrucksPage() {
   const yearRef = useRef<HTMLInputElement>(null)
   const capacityRef = useRef<HTMLInputElement>(null)
   const odometerRef = useRef<HTMLInputElement>(null)
+  const contractorSelectRef = useRef<any>(null)
 
   const {
     handleSubmit,
@@ -80,6 +87,7 @@ export function TrucksPage() {
     reset,
     control,
     setValue,
+    watch,
     setError,
   } = useForm<TruckFormData>({
     resolver: zodResolver(truckSchema) as any,
@@ -87,9 +95,20 @@ export function TrucksPage() {
     mode: 'all',
   })
 
-  const load = useCallback(() => {
-    return window.api.trucks.list(appliedFilters).then(setRows)
-  }, [appliedFilters])
+  const isOutsourcedValue = watch('is_outsourced')
+
+  const load = useCallback(async () => {
+    const listFilters = {
+      ...appliedFilters,
+      is_outsourced: view === 'outsourced',
+    }
+    const [t, c] = await Promise.all([
+      window.api.trucks.list(listFilters),
+      window.api.contractors.list(),
+    ])
+    setRows(t)
+    setContractors(c)
+  }, [appliedFilters, view])
 
   useEffect(() => {
     load()
@@ -111,6 +130,7 @@ export function TrucksPage() {
         if (!editing) {
           const nextId = findNextAvailableId()
           setValue('customId', nextId as any, { shouldValidate: false })
+          setValue('is_outsourced', view === 'outsourced' ? 1 : 0, { shouldValidate: false })
           plateRef.current?.focus()
         } else {
           customIdRef.current?.focus()
@@ -120,7 +140,7 @@ export function TrucksPage() {
       setEditing(null)
       reset(EMPTY)
     }
-  }, [modal, editing, reset, setValue, findNextAvailableId])
+  }, [modal, editing, reset, setValue, findNextAvailableId, view])
 
   const save = async (data: TruckFormData) => {
     try {
@@ -143,10 +163,7 @@ export function TrucksPage() {
                 const suggestion = findNextAvailableId()
                 finalMessage = `${finalMessage}. Sugestão: ${suggestion}`
               }
-              setError(field as any, {
-                type: 'manual',
-                message: finalMessage,
-              })
+              setError(field as any, { type: 'manual', message: finalMessage })
             }
           }
         } else {
@@ -165,13 +182,8 @@ export function TrucksPage() {
     }
   }
 
-  const onSubmit = (data: TruckFormData) => {
-    save(data)
-  }
-
-  const onEnterSubmit = (data: TruckFormData) => {
-    setPendingData(data)
-  }
+  const onSubmit = (data: TruckFormData) => save(data)
+  const onEnterSubmit = (data: TruckFormData) => setPendingData(data)
 
   const handleConfirmDelete = async () => {
     if (!deleteTarget) {
@@ -199,10 +211,12 @@ export function TrucksPage() {
     reset({
       license_plate: formatPlate(row.license_plate),
       model: row.model,
-      year: row.year,
-      capacity_ton: row.capacity_ton,
+      year: row.year ?? null,
+      capacity_ton: row.capacity_ton ?? null,
       current_odometer: row.current_odometer,
       customId: row.customId ?? undefined,
+      is_outsourced: row.is_outsourced ?? 0,
+      contractor_id: row.contractor_id ?? null,
     })
     setModal(true)
   }
@@ -213,11 +227,6 @@ export function TrucksPage() {
     } else {
       setModal(false)
     }
-  }
-
-  const handleConfirmDiscard = () => {
-    setShowDiscardConfirm(false)
-    setModal(false)
   }
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -233,8 +242,12 @@ export function TrucksPage() {
       <PageHeader
         pretitle="Gestão de Frota"
         title="Caminhões"
-        subtitle="Gerencie os veículos da sua frota."
-        actionLabel="Novo Caminhão"
+        subtitle={
+          view === 'internal'
+            ? 'Veículos da frota própria da empresa.'
+            : 'Veículos fornecidos por terceiros.'
+        }
+        actionLabel={view === 'internal' ? 'Novo Caminhão' : 'Novo Caminhão Terceirizado'}
         onAction={() => {
           window.focus()
           setModal(true)
@@ -278,20 +291,66 @@ export function TrucksPage() {
         </div>
       </PageHeader>
 
+      {/* View tabs */}
+      <div className="flex gap-1 mb-8 bg-surface-container-high rounded-lg p-1 w-fit border border-outline-variant/10">
+        <button
+          type="button"
+          onClick={() => setView('internal')}
+          className={`px-5 py-2 rounded-md text-sm font-bold transition-all ${
+            view === 'internal'
+              ? 'bg-primary text-on-primary shadow-sm'
+              : 'text-on-surface-variant hover:text-on-surface'
+          }`}
+        >
+          <span className="material-symbols-outlined text-base align-middle mr-1.5">
+            local_shipping
+          </span>
+          Próprios
+        </button>
+        <button
+          type="button"
+          onClick={() => setView('outsourced')}
+          className={`px-5 py-2 rounded-md text-sm font-bold transition-all ${
+            view === 'outsourced'
+              ? 'bg-primary text-on-primary shadow-sm'
+              : 'text-on-surface-variant hover:text-on-surface'
+          }`}
+        >
+          <span className="material-symbols-outlined text-base align-middle mr-1.5">group_add</span>
+          Terceirizados
+        </button>
+      </div>
+
+      {/* Stats */}
       <div className="grid grid-cols-3 gap-6 mb-10">
-        {[
-          { label: 'Total de Caminhões', value: rows.length, icon: 'local_shipping' },
-          {
-            label: 'Km Acumulado',
-            value: rows.reduce((s, r) => s + (r.current_odometer || 0), 0).toFixed(0),
-            icon: 'route',
-          },
-          {
-            label: 'Capacidade Total',
-            value: `${rows.reduce((s, r) => s + (r.capacity_ton ?? 0), 0).toFixed(0)} ton`,
-            icon: 'scale',
-          },
-        ].map(({ label, value, icon }) => (
+        {(view === 'internal'
+          ? [
+              { label: 'Total de Caminhões', value: rows.length, icon: 'local_shipping' },
+              {
+                label: 'Km Acumulado',
+                value: rows.reduce((s, r) => s + (r.current_odometer || 0), 0).toFixed(0),
+                icon: 'route',
+              },
+              {
+                label: 'Capacidade Total',
+                value: `${rows.reduce((s, r) => s + (r.capacity_ton ?? 0), 0).toFixed(0)} ton`,
+                icon: 'scale',
+              },
+            ]
+          : [
+              { label: 'Caminhões Terceirizados', value: rows.length, icon: 'group_add' },
+              {
+                label: 'Empresas Distintas',
+                value: new Set(rows.map((r) => r.contractor_id).filter(Boolean)).size,
+                icon: 'business',
+              },
+              {
+                label: 'Capacidade Total',
+                value: `${rows.reduce((s, r) => s + (r.capacity_ton ?? 0), 0).toFixed(0)} ton`,
+                icon: 'scale',
+              },
+            ]
+        ).map(({ label, value, icon }) => (
           <div
             key={label}
             className="bg-surface-container-low p-6 rounded-lg relative overflow-hidden group"
@@ -305,11 +364,20 @@ export function TrucksPage() {
         ))}
       </div>
 
+      {/* Table */}
       <div className="bg-surface-container rounded-xl overflow-hidden border border-outline-variant/10">
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-surface-container-high">
-              {['ID', 'Placa', 'Modelo', 'Ano', 'Capacidade', 'Odômetro', ''].map((h) => (
+              {[
+                'ID',
+                'Placa',
+                'Modelo',
+                'Ano',
+                'Capacidade',
+                view === 'internal' ? 'Odômetro' : 'Empresa',
+                '',
+              ].map((h) => (
                 <th
                   key={h}
                   className="px-6 py-5 text-[10px] font-black uppercase tracking-widest text-on-surface-variant"
@@ -323,7 +391,9 @@ export function TrucksPage() {
             {rows.length === 0 && (
               <tr>
                 <td colSpan={7} className="px-6 py-12 text-center text-on-surface-variant text-sm">
-                  Nenhum caminhão cadastrado
+                  {view === 'internal'
+                    ? 'Nenhum caminhão próprio cadastrado'
+                    : 'Nenhum caminhão terceirizado cadastrado'}
                 </td>
               </tr>
             )}
@@ -352,8 +422,14 @@ export function TrucksPage() {
                 <td className="px-6 py-4 text-sm text-on-surface-variant">
                   {row.capacity_ton ? `${row.capacity_ton} ton` : '—'}
                 </td>
-                <td className="px-6 py-4 text-sm font-mono text-on-surface-variant">
-                  {Number(row.current_odometer || 0).toFixed(0)} km
+                <td className="px-6 py-4 text-sm">
+                  {view === 'internal' ? (
+                    <span className="font-mono text-on-surface-variant">
+                      {Number(row.current_odometer || 0).toFixed(0)} km
+                    </span>
+                  ) : (
+                    <span className="text-on-surface-variant">{row.contractor_name || '—'}</span>
+                  )}
                 </td>
                 <td className="px-6 py-4">
                   <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -380,14 +456,22 @@ export function TrucksPage() {
 
         <div className="px-6 py-4 bg-surface-container-high/50 border-t border-outline-variant/10">
           <p className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">
-            {rows.length} caminh{rows.length !== 1 ? 'ões' : 'ão'} cadastrado
+            {rows.length} caminh{rows.length !== 1 ? 'ões' : 'ão'}{' '}
+            {view === 'outsourced' ? 'terceirizado' : 'próprio'}
+            {rows.length !== 1 ? 's' : ''} cadastrado
           </p>
         </div>
       </div>
 
       {modal && (
         <Modal
-          title={editing ? 'Editar Caminhão' : 'Novo Caminhão'}
+          title={
+            editing
+              ? 'Editar Caminhão'
+              : view === 'outsourced'
+                ? 'Novo Caminhão Terceirizado'
+                : 'Novo Caminhão'
+          }
           onClose={() => setModal(false)}
           onEscape={handleEscape}
         >
@@ -496,6 +580,63 @@ export function TrucksPage() {
                 )}
               />
             </div>
+
+            {/* Outsourced toggle */}
+            <div className="col-span-2 flex items-center gap-3 py-1">
+              <Controller
+                name="is_outsourced"
+                control={control}
+                render={({ field }) => (
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={field.value === 1}
+                    onClick={() => {
+                      const next = field.value === 1 ? 0 : 1
+                      field.onChange(next)
+                      if (next === 0) {
+                        setValue('contractor_id', null)
+                      }
+                    }}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${
+                      field.value === 1 ? 'bg-primary' : 'bg-outline-variant'
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+                        field.value === 1 ? 'translate-x-6' : 'translate-x-1'
+                      }`}
+                    />
+                  </button>
+                )}
+              />
+              <span className="text-sm text-on-surface-variant">Caminhão terceirizado</span>
+            </div>
+
+            {isOutsourcedValue === 1 && (
+              <div className="col-span-2">
+                <Controller
+                  name="contractor_id"
+                  control={control}
+                  render={({ field }) => (
+                    <Select
+                      ref={contractorSelectRef}
+                      label="Empresa Terceirizada"
+                      optional
+                      value={field.value}
+                      onChange={field.onChange}
+                      error={errors.contractor_id?.message}
+                      options={contractors.map((c) => ({
+                        value: c.id,
+                        label: c.name,
+                        displayLabel: c.name,
+                        searchableLabel: c.name,
+                      }))}
+                    />
+                  )}
+                />
+              </div>
+            )}
           </div>
           <div className="flex justify-end gap-3 mt-6">
             <Button variant="ghost" onClick={() => setModal(false)}>
@@ -525,7 +666,10 @@ export function TrucksPage() {
       {showDiscardConfirm && (
         <ConfirmModal
           message="Existem alterações não salvas. Deseja realmente fechar?"
-          onConfirm={handleConfirmDiscard}
+          onConfirm={() => {
+            setShowDiscardConfirm(false)
+            setModal(false)
+          }}
           onCancel={() => setShowDiscardConfirm(false)}
         />
       )}

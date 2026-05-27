@@ -12,9 +12,10 @@ export function registerDriverHandlers(): void {
 
   ipcMain.handle('drivers:list', (_e, filters: any = {}) => {
     let query = `
-      SELECT d.*, t.license_plate as truck_license_plate
+      SELECT d.*, t.license_plate as truck_license_plate, c.name as contractor_name
       FROM drivers d
       LEFT JOIN trucks t ON d.truck_id = t.id
+      LEFT JOIN contractors c ON d.contractor_id = c.id
       WHERE 1=1
     `
     const params: any[] = []
@@ -31,6 +32,10 @@ export function registerDriverHandlers(): void {
       query += ' AND d.truck_id = ?'
       params.push(filters.truck_id)
     }
+    if (filters.is_outsourced !== undefined) {
+      query += ' AND d.is_outsourced = ?'
+      params.push(filters.is_outsourced ? 1 : 0)
+    }
 
     query += ' ORDER BY d.name'
     return db()
@@ -41,7 +46,7 @@ export function registerDriverHandlers(): void {
   createValidatedHandler('drivers:create', driverSchema, (data) => {
     const r = db()
       .prepare(
-        'INSERT INTO drivers (name, cpf, phone, monthly_salary, truck_id, customId) VALUES (?,?,?,?,?,?)',
+        'INSERT INTO drivers (name, cpf, phone, monthly_salary, truck_id, customId, is_outsourced, contractor_id) VALUES (?,?,?,?,?,?,?,?)',
       )
       .run(
         data.name,
@@ -50,6 +55,8 @@ export function registerDriverHandlers(): void {
         data.monthly_salary,
         data.truck_id || null,
         data.customId,
+        data.is_outsourced ?? 0,
+        data.contractor_id || null,
       )
     return { id: r.lastInsertRowid }
   })
@@ -57,7 +64,7 @@ export function registerDriverHandlers(): void {
   createValidatedHandlerWithId('drivers:update', driverSchema, (id, data) => {
     const result = db()
       .prepare(
-        'UPDATE drivers SET name=?, cpf=?, phone=?, monthly_salary=?, truck_id=?, customId=? WHERE id=?',
+        'UPDATE drivers SET name=?, cpf=?, phone=?, monthly_salary=?, truck_id=?, customId=?, is_outsourced=?, contractor_id=? WHERE id=?',
       )
       .run(
         data.name,
@@ -66,6 +73,8 @@ export function registerDriverHandlers(): void {
         data.monthly_salary,
         data.truck_id || null,
         data.customId,
+        data.is_outsourced ?? 0,
+        data.contractor_id || null,
         id,
       )
 

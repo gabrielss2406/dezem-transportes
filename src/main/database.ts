@@ -65,6 +65,15 @@ export function setupDatabase(): void {
       created_at TEXT DEFAULT (datetime('now'))
     );
 
+    -- Contractors (external companies providing outsourced drivers/trucks)
+    CREATE TABLE IF NOT EXISTS contractors (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      name       TEXT NOT NULL,
+      cnpj       TEXT,
+      phone      TEXT,
+      created_at TEXT DEFAULT (datetime('now'))
+    );
+
     -- Trucks
     CREATE TABLE IF NOT EXISTS trucks (
       id               INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -74,6 +83,8 @@ export function setupDatabase(): void {
       year             INTEGER,
       capacity_ton     REAL,
       current_odometer REAL NOT NULL DEFAULT 0,
+      is_outsourced    INTEGER NOT NULL DEFAULT 0,
+      contractor_id    INTEGER REFERENCES contractors(id),
       created_at       TEXT DEFAULT (datetime('now'))
     );
 
@@ -87,24 +98,9 @@ export function setupDatabase(): void {
       monthly_salary REAL NOT NULL DEFAULT 0,
       truck_id       INTEGER REFERENCES trucks(id),
       active         INTEGER NOT NULL DEFAULT 1,
+      is_outsourced  INTEGER NOT NULL DEFAULT 0,
+      contractor_id  INTEGER REFERENCES contractors(id),
       created_at     TEXT DEFAULT (datetime('now'))
-    );
-
-    -- Routes
-    CREATE TABLE IF NOT EXISTS routes (
-      id          INTEGER PRIMARY KEY AUTOINCREMENT,
-      name        TEXT NOT NULL,
-      distance_km REAL,
-      customer_id INTEGER REFERENCES customers(id),
-      created_at  TEXT DEFAULT (datetime('now'))
-    );
-
-    -- Route Waypoints
-    CREATE TABLE IF NOT EXISTS route_waypoints (
-      id         INTEGER PRIMARY KEY AUTOINCREMENT,
-      route_id   INTEGER NOT NULL REFERENCES routes(id) ON DELETE CASCADE,
-      name       TEXT NOT NULL,
-      sequence   INTEGER NOT NULL
     );
 
     -- Trips
@@ -115,7 +111,6 @@ export function setupDatabase(): void {
       driver_id     INTEGER NOT NULL REFERENCES drivers(id),
       product_id    INTEGER NOT NULL REFERENCES products(id),
       customer_id   INTEGER REFERENCES customers(id),
-      route_id      INTEGER REFERENCES routes(id),
       supplier_id   INTEGER REFERENCES suppliers(id),
       weight_ton    REAL NOT NULL DEFAULT 0,
       price_charged REAL NOT NULL DEFAULT 0,
@@ -178,7 +173,6 @@ export function setupDatabase(): void {
     CREATE INDEX IF NOT EXISTS idx_trips_driver    ON trips(driver_id);
     CREATE INDEX IF NOT EXISTS idx_costs_date      ON costs(date);
     CREATE INDEX IF NOT EXISTS idx_costs_category  ON costs(category);
-    CREATE INDEX IF NOT EXISTS idx_route_waypoints_route_id ON route_waypoints(route_id);
     CREATE INDEX IF NOT EXISTS idx_trip_fuel_stops_trip_id  ON trip_fuel_stops(trip_id);
     CREATE INDEX IF NOT EXISTS idx_customer_prices_customer_id ON customer_prices(customer_id);
     CREATE INDEX IF NOT EXISTS idx_customer_prices_product_id ON customer_prices(product_id);
@@ -200,13 +194,23 @@ export function setupDatabase(): void {
     ).run()
   }
 
-  // Migration: Add customer_id to routes if it doesn't exist
-  const routeInfo = db.pragma('table_info(routes)') as { name: string }[]
-  if (!routeInfo.some((col) => col.name === 'customer_id')) {
-    db.exec('ALTER TABLE routes ADD COLUMN customer_id INTEGER REFERENCES customers(id)')
+  // Migration: Add is_outsourced and contractor_id to trucks if missing
+  const truckInfo = db.pragma('table_info(trucks)') as { name: string }[]
+  if (!truckInfo.some((col) => col.name === 'is_outsourced')) {
+    db.exec('ALTER TABLE trucks ADD COLUMN is_outsourced INTEGER NOT NULL DEFAULT 0')
   }
-  // This needs to be after the column is guaranteed to exist
-  db.exec('CREATE INDEX IF NOT EXISTS idx_routes_customer ON routes(customer_id)')
+  if (!truckInfo.some((col) => col.name === 'contractor_id')) {
+    db.exec('ALTER TABLE trucks ADD COLUMN contractor_id INTEGER REFERENCES contractors(id)')
+  }
+
+  // Migration: Add is_outsourced and contractor_id to drivers if missing
+  const driverInfo = db.pragma('table_info(drivers)') as { name: string }[]
+  if (!driverInfo.some((col) => col.name === 'is_outsourced')) {
+    db.exec('ALTER TABLE drivers ADD COLUMN is_outsourced INTEGER NOT NULL DEFAULT 0')
+  }
+  if (!driverInfo.some((col) => col.name === 'contractor_id')) {
+    db.exec('ALTER TABLE drivers ADD COLUMN contractor_id INTEGER REFERENCES contractors(id)')
+  }
 
   // Migrations for customId
   const tablesWithCustomId = ['customers', 'products', 'suppliers', 'trucks', 'drivers']

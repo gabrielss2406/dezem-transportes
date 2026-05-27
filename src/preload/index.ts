@@ -61,6 +61,14 @@ contextBridge.exposeInMainWorld('api', {
     delete: (id: number) => ipcRenderer.invoke('cost-categories:delete', id),
   },
 
+  // Contractors
+  contractors: {
+    list: (filters?: any) => ipcRenderer.invoke('contractors:list', filters),
+    create: (data: any) => ipcRenderer.invoke('contractors:create', data),
+    update: (id: number, data: any) => ipcRenderer.invoke('contractors:update', id, data),
+    delete: (id: number) => ipcRenderer.invoke('contractors:delete', id),
+  },
+
   // Trucks
   trucks: {
     list: (filters?: any) => ipcRenderer.invoke('trucks:list', filters),
@@ -75,17 +83,6 @@ contextBridge.exposeInMainWorld('api', {
     create: (data: any) => ipcRenderer.invoke('drivers:create', data),
     update: (id: number, data: any) => ipcRenderer.invoke('drivers:update', id, data),
     delete: (id: number) => ipcRenderer.invoke('drivers:delete', id),
-  },
-
-  // Routes
-  routes: {
-    list: () => ipcRenderer.invoke('routes:list'),
-    create: (data: any) => ipcRenderer.invoke('routes:create', data),
-    update: (data: any) => ipcRenderer.invoke('routes:update', data),
-    delete: (id: number) => ipcRenderer.invoke('routes:delete', id),
-    getWaypoints: (route_id: number) => ipcRenderer.invoke('routes:getWaypoints', route_id),
-    updateWaypoints: (data: { route_id: number; waypoints: any[] }) =>
-      ipcRenderer.invoke('routes:updateWaypoints', data),
   },
 
   // Trips

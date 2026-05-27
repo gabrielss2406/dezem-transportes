@@ -31,6 +31,13 @@ export interface Supplier {
   phone?: string
 }
 
+export interface Contractor {
+  id: number
+  name: string
+  cnpj?: string
+  phone?: string
+}
+
 export interface Truck {
   id: number
   customId?: number
@@ -39,6 +46,9 @@ export interface Truck {
   year?: number
   capacity_ton?: number
   current_odometer: number
+  is_outsourced?: number
+  contractor_id?: number
+  contractor_name?: string
 }
 
 export interface Driver {
@@ -51,14 +61,9 @@ export interface Driver {
   truck_id?: number
   truck_license_plate?: string
   active: number
-}
-
-export interface Route {
-  id: number
-  name: string
-  distance_km?: number
-  customer_id?: number
-  customer_name?: string
+  is_outsourced?: number
+  contractor_id?: number
+  contractor_name?: string
 }
 
 export interface FuelStop {
@@ -78,7 +83,6 @@ export interface Trip {
   driver_id: number
   product_id: number
   customer_id?: number
-  route_id?: number
   supplier_id?: number
   weight_ton: number
   price_charged: number
@@ -92,7 +96,6 @@ export interface Trip {
   driver_name?: string
   product_name?: string
   customer_name?: string
-  route_name?: string
 }
 
 export interface Cost {
@@ -133,7 +136,6 @@ export interface DashboardSummary {
     last_maintenance_date: string | null
     km_since_last_maintenance: number
   }>
-  perRoute: Array<{ name: string; revenue: number; fuel_cost: number }>
   perCategory: Array<{ category: string; total: number }>
 }
 
@@ -183,6 +185,12 @@ declare global {
         create(data: any): Promise<{ id: number }>
         delete(id: number): Promise<{ ok: boolean; error?: string }>
       }
+      contractors: {
+        list(filters?: any): Promise<Contractor[]>
+        create(data: any): Promise<{ id: number; ok?: boolean; errors?: any }>
+        update(id: number, data: any): Promise<{ ok: boolean; errors?: any }>
+        delete(id: number): Promise<{ ok: boolean; error?: string }>
+      }
       trucks: {
         list(filters?: any): Promise<Truck[]>
         create(data: any): Promise<{ id: number; ok?: boolean; errors?: any }>
@@ -194,14 +202,6 @@ declare global {
         create(data: any): Promise<{ id: number; ok?: boolean; errors?: any }>
         update(id: number, data: any): Promise<{ ok: boolean; errors?: any }>
         delete(id: number): Promise<{ ok: boolean }>
-      }
-      routes: {
-        list(search?: string): Promise<Route[]>
-        create(data: any): Promise<{ id: number }>
-        update(data: any): Promise<{ ok: boolean }>
-        delete(id: number): Promise<{ ok: boolean }>
-        getWaypoints(route_id: number): Promise<any[]>
-        updateWaypoints(data: { route_id: number; waypoints: any[] }): Promise<{ ok: boolean }>
       }
       trips: {
         list(filters?: any): Promise<Trip[]>

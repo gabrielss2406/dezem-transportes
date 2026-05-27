@@ -17,13 +17,17 @@ const requiredNumber = (max: number, maxMsg: string) =>
 
 export const idSchema = z.number().int().positive()
 
-export const waypointSchema = z.object({
-  id: idSchema.optional(), // id is optional for new waypoints
-  name: z.string().min(1, 'Nome do ponto de parada é obrigatório').max(100),
-  sequence: z.number().int().min(0),
+export const contractorSchema = z.object({
+  name: z.string().min(3).max(100),
+  cnpj: z
+    .string()
+    .optional()
+    .refine((val) => !val || isValidCNPJ(val), { message: 'CNPJ inválido' }),
+  phone: z
+    .string()
+    .optional()
+    .refine((val) => !val || isValidPhone(val), { message: 'Telefone inválido' }),
 })
-
-export const waypointsSchema = z.array(waypointSchema)
 
 export const customerSchema = z.object({
   customId: z.preprocess(
@@ -92,6 +96,14 @@ export const truckSchema = z.object({
     (val) => (val === '' || val === null ? 0 : Number(val)),
     z.number().min(0).max(9999999, 'Limite de 9.999.999 km'),
   ),
+  is_outsourced: z.preprocess(
+    (val) => (val === true || val === 1 || val === '1' ? 1 : 0),
+    z.number().int().optional(),
+  ),
+  contractor_id: z.preprocess(
+    (val) => (val === '' || val === null || val === undefined ? null : Number(val)),
+    z.number().int().positive().nullable().optional(),
+  ),
 })
 
 export const driverSchema = z.object({
@@ -108,10 +120,21 @@ export const driverSchema = z.object({
     .string()
     .optional()
     .refine((val) => !val || isValidPhone(val), { message: 'Telefone inválido' }),
-  monthly_salary: requiredNumber(1000000, 'Salário máximo de R$ 1.000.000'),
+  monthly_salary: z.preprocess(
+    (val) => (val === '' || val === null || val === undefined ? 0 : Number(val)),
+    z.number().min(0).max(1000000, 'Salário máximo de R$ 1.000.000'),
+  ),
   truck_id: z.preprocess(
     (val) => (val === '' || val === null ? null : Number(val)),
     z.number().int().positive().nullable(),
+  ),
+  is_outsourced: z.preprocess(
+    (val) => (val === true || val === 1 || val === '1' ? 1 : 0),
+    z.number().int().optional(),
+  ),
+  contractor_id: z.preprocess(
+    (val) => (val === '' || val === null || val === undefined ? null : Number(val)),
+    z.number().int().positive().nullable().optional(),
   ),
 })
 
@@ -134,7 +157,6 @@ export const tripSchema = z.object({
   driver_id: requiredNumber(999999999, 'ID inválido'),
   product_id: requiredNumber(999999999, 'ID inválido'),
   customer_id: optionalNumber(999999999, 'ID inválido'),
-  route_id: optionalNumber(999999999, 'ID inválido'),
   supplier_id: optionalNumber(999999999, 'ID inválido'), // Keep for backward compatibility or main supplier
   weight_ton: requiredNumber(100, 'Peso máximo de 100 toneladas'),
   price_charged: requiredNumber(1000000, 'Valor máximo de R$ 1.000.000'),

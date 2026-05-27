@@ -11,19 +11,28 @@ export function registerTruckHandlers(): void {
   const db = () => getDb()
 
   ipcMain.handle('trucks:list', (_e, filters: any = {}) => {
-    let query = 'SELECT * FROM trucks WHERE 1=1'
+    let query = `
+      SELECT t.*, c.name as contractor_name
+      FROM trucks t
+      LEFT JOIN contractors c ON t.contractor_id = c.id
+      WHERE 1=1
+    `
     const params: any[] = []
 
     if (filters.license_plate) {
-      query += ' AND license_plate LIKE ?'
+      query += ' AND t.license_plate LIKE ?'
       params.push(`%${filters.license_plate}%`)
     }
     if (filters.capacity_ton) {
-      query += ' AND capacity_ton >= ?'
+      query += ' AND t.capacity_ton >= ?'
       params.push(Number(filters.capacity_ton))
     }
+    if (filters.is_outsourced !== undefined) {
+      query += ' AND t.is_outsourced = ?'
+      params.push(filters.is_outsourced ? 1 : 0)
+    }
 
-    query += ' ORDER BY license_plate'
+    query += ' ORDER BY t.license_plate'
     return db()
       .prepare(query)
       .all(...params)
@@ -32,7 +41,7 @@ export function registerTruckHandlers(): void {
   createValidatedHandler('trucks:create', truckSchema, (data) => {
     const r = db()
       .prepare(
-        'INSERT INTO trucks (license_plate, model, year, capacity_ton, current_odometer, customId) VALUES (?,?,?,?,?,?)',
+        'INSERT INTO trucks (license_plate, model, year, capacity_ton, current_odometer, customId, is_outsourced, contractor_id) VALUES (?,?,?,?,?,?,?,?)',
       )
       .run(
         data.license_plate,
@@ -41,6 +50,8 @@ export function registerTruckHandlers(): void {
         data.capacity_ton,
         data.current_odometer || 0,
         data.customId,
+        data.is_outsourced ?? 0,
+        data.contractor_id || null,
       )
     return { id: r.lastInsertRowid }
   })
@@ -48,7 +59,7 @@ export function registerTruckHandlers(): void {
   createValidatedHandlerWithId('trucks:update', truckSchema, (id, data) => {
     const result = db()
       .prepare(
-        'UPDATE trucks SET license_plate=?, model=?, year=?, capacity_ton=?, current_odometer=?, customId=? WHERE id=?',
+        'UPDATE trucks SET license_plate=?, model=?, year=?, capacity_ton=?, current_odometer=?, customId=?, is_outsourced=?, contractor_id=? WHERE id=?',
       )
       .run(
         data.license_plate,
@@ -57,6 +68,8 @@ export function registerTruckHandlers(): void {
         data.capacity_ton,
         data.current_odometer,
         data.customId,
+        data.is_outsourced ?? 0,
+        data.contractor_id || null,
         id,
       )
 
