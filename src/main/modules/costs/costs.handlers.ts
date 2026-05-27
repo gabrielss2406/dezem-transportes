@@ -68,7 +68,11 @@ export function registerCostHandlers(): void {
 
   ipcMain.handle('costs:issueMonthlySalaries', (_e, monthYear: string) => {
     // monthYear format: 'YYYY-MM'
-    const drivers = db().prepare('SELECT * FROM drivers WHERE active = 1').all() as any[]
+    const drivers = db()
+      .prepare(
+        'SELECT * FROM drivers WHERE active = 1 AND (is_outsourced = 0 OR is_outsourced IS NULL)',
+      )
+      .all() as any[]
     const date = `${monthYear}-01`
     let issued = 0
     const insert = db().prepare(`

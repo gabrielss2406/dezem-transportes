@@ -65,6 +65,15 @@ export function setupDatabase(): void {
       created_at TEXT DEFAULT (datetime('now'))
     );
 
+    -- Contractors (external companies providing outsourced drivers/trucks)
+    CREATE TABLE IF NOT EXISTS contractors (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      name       TEXT NOT NULL,
+      cnpj       TEXT,
+      phone      TEXT,
+      created_at TEXT DEFAULT (datetime('now'))
+    );
+
     -- Trucks
     CREATE TABLE IF NOT EXISTS trucks (
       id               INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -74,6 +83,8 @@ export function setupDatabase(): void {
       year             INTEGER,
       capacity_ton     REAL,
       current_odometer REAL NOT NULL DEFAULT 0,
+      is_outsourced    INTEGER NOT NULL DEFAULT 0,
+      contractor_id    INTEGER REFERENCES contractors(id),
       created_at       TEXT DEFAULT (datetime('now'))
     );
 
@@ -87,6 +98,8 @@ export function setupDatabase(): void {
       monthly_salary REAL NOT NULL DEFAULT 0,
       truck_id       INTEGER REFERENCES trucks(id),
       active         INTEGER NOT NULL DEFAULT 1,
+      is_outsourced  INTEGER NOT NULL DEFAULT 0,
+      contractor_id  INTEGER REFERENCES contractors(id),
       created_at     TEXT DEFAULT (datetime('now'))
     );
 
@@ -173,6 +186,24 @@ export function setupDatabase(): void {
     db.prepare(
       `UPDATE supplier_types SET is_deletable = 0 WHERE value IN ('gas_station', 'workshop', 'quarry', 'other')`,
     ).run()
+  }
+
+  // Migration: Add is_outsourced and contractor_id to trucks if missing
+  const truckInfo = db.pragma('table_info(trucks)') as { name: string }[]
+  if (!truckInfo.some((col) => col.name === 'is_outsourced')) {
+    db.exec('ALTER TABLE trucks ADD COLUMN is_outsourced INTEGER NOT NULL DEFAULT 0')
+  }
+  if (!truckInfo.some((col) => col.name === 'contractor_id')) {
+    db.exec('ALTER TABLE trucks ADD COLUMN contractor_id INTEGER REFERENCES contractors(id)')
+  }
+
+  // Migration: Add is_outsourced and contractor_id to drivers if missing
+  const driverInfo = db.pragma('table_info(drivers)') as { name: string }[]
+  if (!driverInfo.some((col) => col.name === 'is_outsourced')) {
+    db.exec('ALTER TABLE drivers ADD COLUMN is_outsourced INTEGER NOT NULL DEFAULT 0')
+  }
+  if (!driverInfo.some((col) => col.name === 'contractor_id')) {
+    db.exec('ALTER TABLE drivers ADD COLUMN contractor_id INTEGER REFERENCES contractors(id)')
   }
 
   // Migrations for customId

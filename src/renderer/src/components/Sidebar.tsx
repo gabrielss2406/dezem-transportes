@@ -9,6 +9,7 @@ const navItems = [
   { path: '/customers', label: 'Clientes', icon: 'group' },
   { path: '/prices', label: 'Tabela de Preços', icon: 'request_quote' },
   { path: '/suppliers', label: 'Fornecedores', icon: 'handshake' },
+  { path: '/contractors', label: 'Terceirizados', icon: 'group_add' },
   { path: '/trips', label: 'Viagens', icon: 'route' },
   { path: '/costs', label: 'Custos', icon: 'payments' },
   { path: '/settings', label: 'Configurações', icon: 'settings' },

@@ -5,50 +5,61 @@ export function registerDashboardHandlers(): void {
   const db = () => getDb()
 
   ipcMain.handle('dashboard:summary', (_e, startDate: string, endDate: string) => {
-    // 1. Total Revenue
+    // All financial queries filter out trips/costs linked to outsourced trucks or drivers.
+    const INTERNAL_TRUCK = '(t.is_outsourced = 0 OR t.is_outsourced IS NULL)'
+    const INTERNAL_DRIVER = '(d.is_outsourced = 0 OR d.is_outsourced IS NULL)'
+
+    // 1. Total Revenue — trips with internal trucks only
     const revenue = (
       db()
         .prepare(
           `
-      SELECT COALESCE(SUM(price_charged), 0) as total FROM trips WHERE date BETWEEN ? AND ?
-    `,
+        SELECT COALESCE(SUM(tr.price_charged), 0) as total
+        FROM trips tr
+        JOIN trucks t ON tr.truck_id = t.id
+        JOIN drivers d ON tr.driver_id = d.id
+        WHERE tr.date BETWEEN ? AND ? AND ${INTERNAL_TRUCK} AND ${INTERNAL_DRIVER}
+      `,
         )
         .get(startDate, endDate) as any
     ).total
+
     const allTrips = db()
       .prepare(
         `
-  SELECT
-    tr.id,
-    tr.date,
-    tr.truck_id,
-    tr.price_charged,
-    tr.km_driven
-  FROM trips tr
-  WHERE tr.date BETWEEN ? AND ?
-`,
+      SELECT tr.id, tr.date, tr.truck_id, tr.price_charged, tr.km_driven
+      FROM trips tr
+      JOIN trucks t ON tr.truck_id = t.id
+      JOIN drivers d ON tr.driver_id = d.id
+      WHERE tr.date BETWEEN ? AND ? AND ${INTERNAL_TRUCK} AND ${INTERNAL_DRIVER}
+    `,
       )
       .all(startDate, endDate) as any[]
 
+    // Costs linked to internal trucks only
     const truckCosts = db()
       .prepare(
         `
-  SELECT date, truck_id, value
-  FROM costs
-  WHERE date BETWEEN ? AND ? AND truck_id IS NOT NULL
-`,
+      SELECT c.date, c.truck_id, c.value
+      FROM costs c
+      JOIN trucks t ON c.truck_id = t.id
+      WHERE c.date BETWEEN ? AND ? AND c.truck_id IS NOT NULL AND ${INTERNAL_TRUCK}
+    `,
       )
       .all(startDate, endDate) as any[]
 
+    // Fuel stops for internal-truck trips only
     const fuelCostsByTrip = db()
       .prepare(
         `
-  SELECT fs.trip_id, SUM(fs.value) as total
-  FROM trip_fuel_stops fs
-  JOIN trips t ON fs.trip_id = t.id
-  WHERE t.date BETWEEN ? AND ?
-  GROUP BY fs.trip_id
-`,
+      SELECT fs.trip_id, SUM(fs.value) as total
+      FROM trip_fuel_stops fs
+      JOIN trips tr ON fs.trip_id = tr.id
+      JOIN trucks t ON tr.truck_id = t.id
+      JOIN drivers d ON tr.driver_id = d.id
+      WHERE tr.date BETWEEN ? AND ? AND ${INTERNAL_TRUCK} AND ${INTERNAL_DRIVER}
+      GROUP BY fs.trip_id
+    `,
       )
       .all(startDate, endDate) as any[]
 
@@ -95,13 +106,19 @@ export function registerDashboardHandlers(): void {
       }
     }
 
-    // 2. Total Costs (costs table + fuel stops)
+    // 2. Total Costs — exclude outsourced trucks and outsourced driver salaries
     const directCosts = (
       db()
         .prepare(
           `
-      SELECT COALESCE(SUM(value), 0) as total FROM costs WHERE date BETWEEN ? AND ?
-    `,
+        SELECT COALESCE(SUM(c.value), 0) as total
+        FROM costs c
+        LEFT JOIN trucks t ON c.truck_id = t.id
+        LEFT JOIN drivers d ON c.driver_id = d.id
+        WHERE c.date BETWEEN ? AND ?
+          AND (c.truck_id IS NULL OR ${INTERNAL_TRUCK})
+          AND (c.driver_id IS NULL OR ${INTERNAL_DRIVER})
+      `,
         )
         .get(startDate, endDate) as any
     ).total
@@ -110,11 +127,13 @@ export function registerDashboardHandlers(): void {
       db()
         .prepare(
           `
-      SELECT COALESCE(SUM(fs.value), 0) as total 
-      FROM trip_fuel_stops fs
-      JOIN trips t ON fs.trip_id = t.id
-      WHERE t.date BETWEEN ? AND ?
-    `,
+        SELECT COALESCE(SUM(fs.value), 0) as total
+        FROM trip_fuel_stops fs
+        JOIN trips tr ON fs.trip_id = tr.id
+        JOIN trucks t ON tr.truck_id = t.id
+        JOIN drivers d ON tr.driver_id = d.id
+        WHERE tr.date BETWEEN ? AND ? AND ${INTERNAL_TRUCK} AND ${INTERNAL_DRIVER}
+      `,
         )
         .get(startDate, endDate) as any
     ).total
@@ -125,8 +144,12 @@ export function registerDashboardHandlers(): void {
       db()
         .prepare(
           `
-      SELECT COUNT(*) as c FROM trips WHERE date BETWEEN ? AND ?
-    `,
+        SELECT COUNT(*) as c
+        FROM trips tr
+        JOIN trucks t ON tr.truck_id = t.id
+        JOIN drivers d ON tr.driver_id = d.id
+        WHERE tr.date BETWEEN ? AND ? AND ${INTERNAL_TRUCK} AND ${INTERNAL_DRIVER}
+      `,
         )
         .get(startDate, endDate) as any
     ).c
@@ -135,24 +158,28 @@ export function registerDashboardHandlers(): void {
       db()
         .prepare(
           `
-      SELECT COALESCE(SUM(km_driven), 0) as total FROM trips WHERE date BETWEEN ? AND ?
-    `,
+        SELECT COALESCE(SUM(tr.km_driven), 0) as total
+        FROM trips tr
+        JOIN trucks t ON tr.truck_id = t.id
+        JOIN drivers d ON tr.driver_id = d.id
+        WHERE tr.date BETWEEN ? AND ? AND ${INTERNAL_TRUCK} AND ${INTERNAL_DRIVER}
+      `,
         )
         .get(startDate, endDate) as any
     ).total
 
-    // 3. Profitability and CPK per Truck
+    // 3. Profitability and CPK per internal Truck
     const perTruck = db()
       .prepare(
         `
-      SELECT 
-        t.license_plate, 
+      SELECT
+        t.license_plate,
         t.model,
         COALESCE(SUM(tr.price_charged), 0) as revenue,
         COALESCE(SUM(tr.km_driven), 0) as km,
         (
-          SELECT COALESCE(SUM(c.value), 0) 
-          FROM costs c 
+          SELECT COALESCE(SUM(c.value), 0)
+          FROM costs c
           WHERE c.truck_id = t.id AND c.date BETWEEN ? AND ?
         ) + (
           SELECT COALESCE(SUM(fs.value), 0)
@@ -162,6 +189,7 @@ export function registerDashboardHandlers(): void {
         ) as cost
       FROM trucks t
       LEFT JOIN trips tr ON tr.truck_id = t.id AND tr.date BETWEEN ? AND ?
+      WHERE ${INTERNAL_TRUCK}
       GROUP BY t.id
       ORDER BY revenue DESC
     `,
@@ -174,22 +202,23 @@ export function registerDashboardHandlers(): void {
       cpk: t.km > 0 ? t.cost / t.km : 0,
     }))
 
-    // 4. Monthly Revenue (Last 6 months)
+    // 4. Monthly Revenue (Last 6 months) — internal trucks only
     const monthlyRevenueRaw = db()
       .prepare(
         `
-      SELECT 
-        strftime('%Y-%m', date) as month,
-        SUM(price_charged) as revenue
-      FROM trips
-      WHERE date >= date('now', '-6 months')
+      SELECT
+        strftime('%Y-%m', tr.date) as month,
+        SUM(tr.price_charged) as revenue
+      FROM trips tr
+      JOIN trucks t ON tr.truck_id = t.id
+      JOIN drivers d ON tr.driver_id = d.id
+      WHERE tr.date >= date('now', '-6 months') AND ${INTERNAL_TRUCK} AND ${INTERNAL_DRIVER}
       GROUP BY month
       ORDER BY month ASC
     `,
       )
       .all() as any[]
 
-    // Fill missing months to ensure a continuous 6-month timeline
     const monthlyRevenue: Array<{ month: string; revenue: number }> = []
     const now = new Date()
     for (let i = 5; i >= 0; i--) {
@@ -205,19 +234,18 @@ export function registerDashboardHandlers(): void {
       })
     }
 
-    // 5. Maintenance Alerts
-    // Logic: Trucks that haven't had 'maintenance' cost category in the last 10,000km
+    // 5. Maintenance Alerts — all trucks (operational view, not financial)
     const maintenanceAlerts = db()
       .prepare(
         `
-      SELECT 
+      SELECT
         t.license_plate,
         t.current_odometer,
         MAX(c.date) as last_maintenance_date,
         COALESCE((
           SELECT SUM(tr.km_driven)
           FROM trips tr
-          WHERE tr.truck_id = t.id 
+          WHERE tr.truck_id = t.id
           AND tr.date > COALESCE(MAX(c.date), '1900-01-01')
         ), 0) as km_since_last_maintenance
       FROM trucks t
@@ -236,13 +264,18 @@ export function registerDashboardHandlers(): void {
 
     const categoryTotals = new Map<string, number>()
 
-    // 1. Costs from 'costs' table
+    // Cost categories from 'costs' table — exclude outsourced
     const directCategoryCosts = db()
       .prepare(
         `
-      SELECT category, COALESCE(SUM(value), 0) as total
-      FROM costs WHERE date BETWEEN ? AND ?
-      GROUP BY category
+      SELECT c.category, COALESCE(SUM(c.value), 0) as total
+      FROM costs c
+      LEFT JOIN trucks t ON c.truck_id = t.id
+      LEFT JOIN drivers d ON c.driver_id = d.id
+      WHERE c.date BETWEEN ? AND ?
+        AND (c.truck_id IS NULL OR ${INTERNAL_TRUCK})
+        AND (c.driver_id IS NULL OR ${INTERNAL_DRIVER})
+      GROUP BY c.category
     `,
       )
       .all(startDate, endDate) as any[]
@@ -251,15 +284,17 @@ export function registerDashboardHandlers(): void {
       categoryTotals.set(c.category, Number(c.total) || 0)
     }
 
-    // 2. Costs from 'trip_fuel_stops' (Extra trip costs)
+    // Fuel stop costs from 'trip_fuel_stops' — internal trips only
     const fuelStopCosts = db()
       .prepare(
         `
       SELECT s.type, SUM(fs.value) as total
       FROM trip_fuel_stops fs
       JOIN suppliers s ON fs.supplier_id = s.id
-      JOIN trips t ON fs.trip_id = t.id
-      WHERE t.date BETWEEN ? AND ?
+      JOIN trips tr ON fs.trip_id = tr.id
+      JOIN trucks t ON tr.truck_id = t.id
+      JOIN drivers d ON tr.driver_id = d.id
+      WHERE tr.date BETWEEN ? AND ? AND ${INTERNAL_TRUCK} AND ${INTERNAL_DRIVER}
       GROUP BY s.type
     `,
       )

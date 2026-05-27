@@ -2,6 +2,7 @@ import { join } from 'path'
 import { BrowserWindow, app, shell } from 'electron'
 import { setupDatabase } from './database'
 import { registerAuthHandlers } from './modules/auth/auth.handlers'
+import { registerContractorHandlers } from './modules/contractors/contractors.handlers'
 import { registerCostCategoryHandlers } from './modules/cost-categories/cost-categories.handlers'
 import { registerCostHandlers } from './modules/costs/costs.handlers'
 import { registerCustomerPricesHandlers } from './modules/customer-prices/customer-prices.handlers'
@@ -49,6 +50,7 @@ function createWindow(): void {
 app.whenReady().then(() => {
   setupDatabase()
   registerAuthHandlers()
+  registerContractorHandlers()
   registerCostCategoryHandlers()
   registerCostHandlers()
   registerCustomerHandlers()

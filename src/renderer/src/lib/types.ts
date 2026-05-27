@@ -31,6 +31,13 @@ export interface Supplier {
   phone?: string
 }
 
+export interface Contractor {
+  id: number
+  name: string
+  cnpj?: string
+  phone?: string
+}
+
 export interface Truck {
   id: number
   customId?: number
@@ -39,6 +46,9 @@ export interface Truck {
   year?: number
   capacity_ton?: number
   current_odometer: number
+  is_outsourced?: number
+  contractor_id?: number
+  contractor_name?: string
 }
 
 export interface Driver {
@@ -51,6 +61,9 @@ export interface Driver {
   truck_id?: number
   truck_license_plate?: string
   active: number
+  is_outsourced?: number
+  contractor_id?: number
+  contractor_name?: string
 }
 
 export interface FuelStop {
@@ -170,6 +183,12 @@ declare global {
       'cost-categories': {
         list(): Promise<{ value: string; label: string }[]>
         create(data: any): Promise<{ id: number }>
+        delete(id: number): Promise<{ ok: boolean; error?: string }>
+      }
+      contractors: {
+        list(filters?: any): Promise<Contractor[]>
+        create(data: any): Promise<{ id: number; ok?: boolean; errors?: any }>
+        update(id: number, data: any): Promise<{ ok: boolean; errors?: any }>
         delete(id: number): Promise<{ ok: boolean; error?: string }>
       }
       trucks: {
