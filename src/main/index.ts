@@ -9,7 +9,6 @@ import { registerCustomerHandlers } from './modules/customers/customers.handlers
 import { registerDashboardHandlers } from './modules/dashboard/dashboard.handlers'
 import { registerDriverHandlers } from './modules/drivers/drivers.handlers'
 import { registerProductHandlers } from './modules/products/products.handlers'
-import { registerRouteHandlers } from './modules/routes/routes.handlers'
 import { registerSupplierTypesHandlers } from './modules/supplier-types/supplier-types.handlers'
 import { registerSupplierHandlers } from './modules/suppliers/suppliers.handlers'
 import { registerTripHandlers } from './modules/trips/trips.handlers'
@@ -57,7 +56,6 @@ app.whenReady().then(() => {
   registerDashboardHandlers()
   registerDriverHandlers()
   registerProductHandlers()
-  registerRouteHandlers()
   registerSupplierHandlers()
   registerSupplierTypesHandlers()
   registerTripHandlers()

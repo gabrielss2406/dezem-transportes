@@ -243,57 +243,6 @@ export function DashboardPage() {
                 </tbody>
               </table>
             </div>
-
-            {/* 4. Rentabilidade de Rotas */}
-            <div className="bg-surface-container rounded-2xl overflow-hidden border border-outline-variant/10">
-              <div className="p-8 pb-4">
-                <SectionHeader title="Desempenho de Rotas" icon="route" />
-              </div>
-              <table className="w-full text-left">
-                <thead>
-                  <tr className="bg-surface-container-high">
-                    <th className="px-8 py-4 text-[10px] font-black uppercase tracking-widest text-on-surface-variant">
-                      Rota
-                    </th>
-                    <th className="px-8 py-4 text-[10px] font-black uppercase tracking-widest text-on-surface-variant text-right">
-                      Combustível
-                    </th>
-                    <th className="px-8 py-4 text-[10px] font-black uppercase tracking-widest text-on-surface-variant text-right">
-                      Receita
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-outline-variant/10">
-                  {summary.perRoute.map((r) => {
-                    const margin = ((r.revenue - r.fuel_cost) / r.revenue) * 100
-                    return (
-                      <tr key={r.name} className="hover:bg-surface-bright/5 transition-colors">
-                        <td className="px-8 py-5">
-                          <p className="font-black text-on-surface">{r.name}</p>
-                          <div className="flex items-center gap-2 mt-1">
-                            <div className="flex-1 h-1.5 bg-surface-container-highest rounded-full overflow-hidden max-w-[100px]">
-                              <div
-                                className="h-full bg-primary"
-                                style={{ width: `${Math.min(margin, 100)}%` }}
-                              />
-                            </div>
-                            <span className="text-[10px] font-bold text-primary">
-                              {margin.toFixed(0)}% margem
-                            </span>
-                          </div>
-                        </td>
-                        <td className="px-8 py-5 text-right font-headline font-bold text-error/70">
-                          {formatBRL(r.fuel_cost)}
-                        </td>
-                        <td className="px-8 py-5 text-right font-headline font-black text-primary">
-                          {formatBRL(r.revenue)}
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
           </div>
 
           {/* 5. Custos por Categoria (Visual) */}

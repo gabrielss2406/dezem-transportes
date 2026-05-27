@@ -17,14 +17,6 @@ const requiredNumber = (max: number, maxMsg: string) =>
 
 export const idSchema = z.number().int().positive()
 
-export const waypointSchema = z.object({
-  id: idSchema.optional(), // id is optional for new waypoints
-  name: z.string().min(1, 'Nome do ponto de parada é obrigatório').max(100),
-  sequence: z.number().int().min(0),
-})
-
-export const waypointsSchema = z.array(waypointSchema)
-
 export const customerSchema = z.object({
   customId: z.preprocess(
     (val) => (val === '' || val === null || val === undefined ? undefined : Number(val)),
@@ -115,12 +107,6 @@ export const driverSchema = z.object({
   ),
 })
 
-export const routeSchema = z.object({
-  name: z.string().min(3).max(100),
-  distance_km: requiredNumber(100000, 'Distância máxima de 100.000 km'),
-  customer_id: optionalNumber(999999999, 'ID inválido'),
-})
-
 export const fuelStopSchema = z.object({
   supplier_id: requiredNumber(999999999, 'ID inválido'),
   value: requiredNumber(1000000, 'Valor máximo de R$ 1.000.000'),
@@ -134,7 +120,6 @@ export const tripSchema = z.object({
   driver_id: requiredNumber(999999999, 'ID inválido'),
   product_id: requiredNumber(999999999, 'ID inválido'),
   customer_id: optionalNumber(999999999, 'ID inválido'),
-  route_id: optionalNumber(999999999, 'ID inválido'),
   supplier_id: optionalNumber(999999999, 'ID inválido'), // Keep for backward compatibility or main supplier
   weight_ton: requiredNumber(100, 'Peso máximo de 100 toneladas'),
   price_charged: requiredNumber(1000000, 'Valor máximo de R$ 1.000.000'),

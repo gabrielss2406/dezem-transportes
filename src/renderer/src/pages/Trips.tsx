@@ -17,7 +17,7 @@ import {
   useToast,
 } from '../components/ui'
 import { generatePdf } from '../lib/pdfGenerator'
-import type { Customer, Driver, Product, Route, Supplier, Trip, Truck } from '../lib/types'
+import type { Customer, Driver, Product, Supplier, Trip, Truck } from '../lib/types'
 import { formatBRL, formatDate } from '../lib/utils'
 
 interface TripFormData {
@@ -26,7 +26,6 @@ interface TripFormData {
   driver_id: number
   product_id: number
   customer_id: number | null
-  route_id: number | null
   supplier_id: number | null
   weight_ton: number
   price_charged: number
@@ -41,7 +40,6 @@ const EMPTY: TripFormData = {
   driver_id: 0,
   product_id: 0,
   customer_id: null,
-  route_id: null,
   supplier_id: null,
   weight_ton: 0,
   price_charged: 0,
@@ -96,7 +94,6 @@ export function TripsPage() {
   const [drivers, setDrivers] = useState<Driver[]>([])
   const [products, setProducts] = useState<Product[]>([])
   const [customers, setCustomers] = useState<Customer[]>([])
-  const [routes, setRoutes] = useState<Route[]>([])
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [modal, setModal] = useState(false)
   const [editing, setEditing] = useState<Trip | null>(null)
@@ -111,7 +108,6 @@ export function TripsPage() {
     driver_id: '',
     product_id: '',
     customer_id: '',
-    route_id: '',
   })
   const { toast, show } = useToast()
 
@@ -124,7 +120,6 @@ export function TripsPage() {
   const driverSelectRef = useRef<SelectRef>(null)
   const productSelectRef = useRef<SelectRef>(null)
   const customerSelectRef = useRef<SelectRef>(null)
-  const routeSelectRef = useRef<SelectRef>(null)
   const weightInputRef = useRef<HTMLInputElement>(null)
   const priceInputRef = useRef<HTMLInputElement>(null)
   const kmInputRef = useRef<HTMLInputElement>(null)
@@ -173,13 +168,12 @@ export function TripsPage() {
   }, [selectedCustomerId, selectedProductId, currentWeight, editing, setValue])
 
   const load = useCallback(async () => {
-    const [t, tr, d, p, c, r, s] = await Promise.all([
+    const [t, tr, d, p, c, s] = await Promise.all([
       window.api.trips.list(filters),
       window.api.trucks.list(),
       window.api.drivers.list(),
       window.api.products.list(),
       window.api.customers.list(),
-      window.api.routes.list(),
       window.api.suppliers.list(),
     ])
     setTrips(t)
@@ -187,7 +181,6 @@ export function TripsPage() {
     setDrivers(d)
     setProducts(p)
     setCustomers(c)
-    setRoutes(r)
     setSuppliers(s)
   }, [filters])
 
@@ -259,7 +252,6 @@ export function TripsPage() {
         driver_id: row.driver_id,
         product_id: row.product_id,
         customer_id: row.customer_id ?? null,
-        route_id: row.route_id ?? null,
         supplier_id: row.supplier_id ?? null,
         weight_ton: row.weight_ton,
         price_charged: row.price_charged,
@@ -505,15 +497,6 @@ export function TripsPage() {
               optional
             />
           </div>
-          <div className="flex-1 min-w-[150px]">
-            <Select
-              label="Rota"
-              value={filters.route_id}
-              onChange={(v) => setFilters((f) => ({ ...f, route_id: v }))}
-              options={routes.map((r) => ({ value: r.id, label: r.name }))}
-              optional
-            />
-          </div>
         </div>
       </div>
 
@@ -755,7 +738,7 @@ export function TripsPage() {
                     icon="business"
                     value={field.value}
                     onChange={field.onChange}
-                    onEnterSelect={() => routeSelectRef.current?.open()}
+                    onEnterSelect={() => weightInputRef.current?.focus()}
                     error={errors.customer_id?.message}
                     options={customers.map((c) => ({
                       value: c.id,
@@ -770,38 +753,6 @@ export function TripsPage() {
                       displayLabel: c.name,
                       searchableLabel: `${c.name} ${c.customId || ''}`,
                     }))}
-                  />
-                )}
-              />
-
-              <Controller
-                name="route_id"
-                control={control}
-                render={({ field }) => (
-                  <Select
-                    ref={routeSelectRef}
-                    label="Rota"
-                    optional
-                    value={field.value}
-                    onChange={field.onChange}
-                    onEnterSelect={() => weightInputRef.current?.focus()}
-                    error={errors.route_id?.message}
-                    options={routes.map((r) => {
-                      const isSelectedCustomer =
-                        r.customer_id && r.customer_id === Number(selectedCustomerId)
-
-                      const baseOption = {
-                        value: r.id,
-                        displayLabel: r.name,
-                        label: (
-                          <div className="flex items-center justify-between w-full">
-                            <span>{r.name}</span>
-                            {isSelectedCustomer && <Badge label="Cliente" color="blue" />}
-                          </div>
-                        ),
-                      }
-                      return baseOption
-                    })}
                   />
                 )}
               />

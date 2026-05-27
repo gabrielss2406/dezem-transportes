@@ -8,7 +8,6 @@ const navItems = [
   { path: '/products', label: 'Produtos', icon: 'inventory_2' },
   { path: '/customers', label: 'Clientes', icon: 'group' },
   { path: '/prices', label: 'Tabela de Preços', icon: 'request_quote' },
-  { path: '/routes', label: 'Rotas', icon: 'map' },
   { path: '/suppliers', label: 'Fornecedores', icon: 'handshake' },
   { path: '/trips', label: 'Viagens', icon: 'route' },
   { path: '/costs', label: 'Custos', icon: 'payments' },

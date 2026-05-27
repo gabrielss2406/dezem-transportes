@@ -17,14 +17,12 @@ export function registerTripHandlers(): void {
         d.name           as driver_name,
         p.name           as product_name,
         c.name           as customer_name,
-        r.name           as route_name,
         (SELECT COUNT(*) FROM trip_fuel_stops WHERE trip_id = t.id) as fuel_stops_count
       FROM trips t
       JOIN trucks tr ON t.truck_id = tr.id
       JOIN drivers d ON t.driver_id = d.id
       JOIN products p ON t.product_id = p.id
       LEFT JOIN customers c ON t.customer_id = c.id
-      LEFT JOIN routes r ON t.route_id = r.id
       WHERE 1=1
     `
     const params: any[] = []
@@ -52,10 +50,6 @@ export function registerTripHandlers(): void {
       query += ' AND t.customer_id = ?'
       params.push(filters.customer_id)
     }
-    if (filters.route_id) {
-      query += ' AND t.route_id = ?'
-      params.push(filters.route_id)
-    }
     query += ' ORDER BY t.date DESC'
     return db()
       .prepare(query)
@@ -79,8 +73,8 @@ export function registerTripHandlers(): void {
       const res = db()
         .prepare(
           `
-        INSERT INTO trips (date, truck_id, driver_id, product_id, customer_id, route_id, supplier_id, weight_ton, price_charged, km_driven, observation)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?)
+        INSERT INTO trips (date, truck_id, driver_id, product_id, customer_id, supplier_id, weight_ton, price_charged, km_driven, observation)
+        VALUES (?,?,?,?,?,?,?,?,?,?)
       `,
         )
         .run(
@@ -89,7 +83,6 @@ export function registerTripHandlers(): void {
           tripData.driver_id,
           tripData.product_id,
           tripData.customer_id || null,
-          tripData.route_id || null,
           tripData.supplier_id || null,
           tripData.weight_ton,
           tripData.price_charged,
@@ -128,7 +121,7 @@ export function registerTripHandlers(): void {
       db()
         .prepare(
           `UPDATE trips SET date=?, truck_id=?, driver_id=?, product_id=?, customer_id=?,
-            route_id=?, supplier_id=?, weight_ton=?, price_charged=?, km_driven=?, observation=?
+            supplier_id=?, weight_ton=?, price_charged=?, km_driven=?, observation=?
           WHERE id=?`,
         )
         .run(
@@ -137,7 +130,6 @@ export function registerTripHandlers(): void {
           tripData.driver_id,
           tripData.product_id,
           tripData.customer_id || null,
-          tripData.route_id || null,
           tripData.supplier_id || null,
           tripData.weight_ton,
           tripData.price_charged,
