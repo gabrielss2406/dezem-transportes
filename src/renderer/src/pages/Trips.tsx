@@ -309,7 +309,7 @@ export function TripsPage() {
           setModal(true)
         }}
         secondaryActionLabel="Exportar para PDF"
-        onSecondaryAction={() => {
+        onSecondaryAction={async () => {
           const headers = [
             'Data',
             'Caminhão',
@@ -386,13 +386,28 @@ export function TripsPage() {
             : 'relatorio_viagens'
           const subtitle = subtitleParts.join(' | ')
 
-          generatePdf({
+          const pdfData = generatePdf({
             title: 'Relatório de Viagens',
             subtitle,
             headers,
             data,
-            fileName,
           })
+
+          try {
+            const result = await window.api.exportPdf({
+              fileName,
+              data: pdfData,
+            })
+
+            if (result.success) {
+              show(`PDF salvo e aberto com sucesso em: ${result.path}`, 'success')
+            } else {
+              show(`Erro ao exportar PDF: ${result.error}`, 'error')
+            }
+          } catch (error) {
+            show('Ocorreu um erro inesperado ao exportar o PDF.', 'error')
+            console.error(error)
+          }
         }}
       />
 

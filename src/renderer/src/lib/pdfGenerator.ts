@@ -6,10 +6,11 @@ interface PdfOptions {
   subtitle?: string
   headers: string[]
   data: (string | number)[][]
-  fileName: string
+  // fileName: string // Removido
 }
 
-export function generatePdf({ title, subtitle, headers, data, fileName }: PdfOptions) {
+export function generatePdf({ title, subtitle, headers, data }: PdfOptions): ArrayBuffer {
+  // Alterada a assinatura
   const doc = new jsPDF()
 
   // Cores da Identidade Visual (Dezem Transportes)
@@ -57,5 +58,6 @@ export function generatePdf({ title, subtitle, headers, data, fileName }: PdfOpt
     },
   })
 
-  doc.save(`${fileName}.pdf`)
+  // doc.save(`${fileName}.pdf`) // Removido
+  return doc.output('arraybuffer') // Adicionado
 }

@@ -130,7 +130,7 @@ export function PriceManagementPage() {
     return matchCustomer && matchProduct
   })
 
-  const handleExportPriceManagementPdf = () => {
+  const handleExportPriceManagementPdf = async () => {
     const headers = ['Cliente', 'Produto', 'Preço']
 
     const data = filteredRows.map((row) => {
@@ -175,13 +175,28 @@ export function PriceManagementPage() {
       subtitle = `Filtro: Produto: "${filterProductName}". ${subtitle}`
     }
 
-    generatePdf({
+    const pdfData = generatePdf({
       title: 'Tabela de Preços Geral',
       subtitle,
       headers,
       data,
-      fileName: dynamicFileName,
     })
+
+    try {
+      const result = await window.api.exportPdf({
+        fileName: dynamicFileName,
+        data: pdfData,
+      })
+
+      if (result.success) {
+        show(`PDF salvo e aberto com sucesso em: ${result.path}`, 'success')
+      } else {
+        show(`Erro ao exportar PDF: ${result.error}`, 'error')
+      }
+    } catch (error) {
+      show('Ocorreu um erro inesperado ao exportar o PDF.', 'error')
+      console.error(error)
+    }
   }
 
   const save = async (data: PriceFormData) => {

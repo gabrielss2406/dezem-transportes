@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
+import type { PdfExportData } from '../shared/types'
 
 // Exposes secure API to the renderer via contextBridge
 contextBridge.exposeInMainWorld('api', {
@@ -125,4 +126,6 @@ contextBridge.exposeInMainWorld('api', {
       return () => ipcRenderer.removeListener('backup-status-update', listener)
     },
   },
+  // PDF
+  exportPdf: (data: PdfExportData) => ipcRenderer.invoke('export-pdf', data),
 })

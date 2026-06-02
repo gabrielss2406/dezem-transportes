@@ -144,7 +144,7 @@ export function CustomersPage() {
     }
   }, [pricesModal])
 
-  const handleExportPricesPdf = () => {
+  const handleExportPricesPdf = async () => {
     if (!pricesModal) {
       return
     }
@@ -158,14 +158,30 @@ export function CustomersPage() {
 
     const date = new Date().toLocaleDateString('pt-BR')
     const fileNameSafeName = pricesModal.name.toLowerCase().replace(/[^a-z0-9]/g, '-')
+    const dynamicFileName = `tabela-precos-${fileNameSafeName}-${date.replace(/\//g, '-')}`
 
-    generatePdf({
+    const pdfData = generatePdf({
       title: `Tabela de Preços - ${pricesModal.name}`,
       subtitle: `Preços especiais válidos para ${date}.`,
       headers,
       data,
-      fileName: `tabela-precos-${fileNameSafeName}`,
     })
+
+    try {
+      const result = await window.api.exportPdf({
+        fileName: dynamicFileName,
+        data: pdfData,
+      })
+
+      if (result.success) {
+        show(`PDF salvo e aberto com sucesso em: ${result.path}`, 'success')
+      } else {
+        show(`Erro ao exportar PDF: ${result.error}`, 'error')
+      }
+    } catch (error) {
+      show('Ocorreu um erro inesperado ao exportar o PDF.', 'error')
+      console.error(error)
+    }
   }
 
   const save = async (data: CustomerFormData) => {

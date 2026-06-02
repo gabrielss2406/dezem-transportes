@@ -3,7 +3,11 @@ import * as dotenv from 'dotenv'
 // Load environment variables as early as possible
 dotenv.config()
 
-import { BrowserWindow, app, shell } from 'electron'
+import fs from 'fs' // Adicionar import do fs
+import path from 'path' // Adicionar import do path
+import { BrowserWindow, app, ipcMain, shell } from 'electron'
+
+import type { PdfExportData } from '../shared/types' // Adicionar import de PdfExportData
 import { setupDatabase } from './database'
 import { registerAuthHandlers } from './modules/auth/auth.handlers'
 import { startBackupScheduler } from './modules/backup/backup-scheduler'
@@ -71,6 +75,24 @@ app.whenReady().then(() => {
   registerTripHandlers()
   registerTruckHandlers()
   registerBackupHandlers()
+
+  // Handler para exportação de PDF
+  ipcMain.handle('export-pdf', async (_event, pdfData: PdfExportData) => {
+    try {
+      const documentsPath = app.getPath('documents')
+      const filePath = path.join(documentsPath, `${pdfData.fileName}.pdf`)
+
+      const buffer = Buffer.from(pdfData.data)
+
+      fs.writeFileSync(filePath, buffer)
+      await shell.openPath(filePath)
+
+      return { success: true, path: filePath }
+    } catch (error) {
+      console.error('Falha ao salvar ou abrir o PDF:', error)
+      return { success: false, error: (error as Error).message }
+    }
+  })
 
   createWindow()
 

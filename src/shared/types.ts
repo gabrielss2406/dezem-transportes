@@ -10,3 +10,8 @@ export interface BackupStatus {
   timestamp?: string
   error?: string
 }
+
+export interface PdfExportData {
+  fileName: string
+  data: ArrayBuffer
+}
