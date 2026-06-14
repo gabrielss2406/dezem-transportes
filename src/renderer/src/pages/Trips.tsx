@@ -28,6 +28,8 @@ interface TripFormData {
   customer_id: number | null
   supplier_id: number | null
   weight_ton: number
+  overweight_ton?: number | null
+  overweight_observation?: string | null
   price_charged: number
   km_driven: number
   observation?: string
@@ -42,6 +44,8 @@ const EMPTY: TripFormData = {
   customer_id: null,
   supplier_id: null,
   weight_ton: 0,
+  overweight_ton: null,
+  overweight_observation: null,
   price_charged: 0,
   km_driven: 0,
   observation: '',
@@ -97,6 +101,7 @@ export function TripsPage() {
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [modal, setModal] = useState(false)
   const [editing, setEditing] = useState<Trip | null>(null)
+  const [hasOverweight, setHasOverweight] = useState(false)
   const [stopSearchId, setStopSearchId] = useState<string | number>('')
   const [pendingData, setPendingData] = useState<any>(null)
   const [deleteTarget, setDeleteTarget] = useState<Trip | null>(null)
@@ -153,6 +158,7 @@ export function TripsPage() {
   const selectedCustomerId = watch('customer_id')
   const selectedProductId = watch('product_id')
   const currentWeight = watch('weight_ton')
+  const currentOverweight = watch('overweight_ton')
 
   useEffect(() => {
     if (selectedCustomerId && selectedProductId && !editing) {
@@ -161,11 +167,12 @@ export function TripsPage() {
         .then((res) => {
           if (res?.price) {
             const weight = Number(currentWeight) || 0
-            setValue('price_charged', res.price * weight)
+            const overweight = Number(currentOverweight) || 0
+            setValue('price_charged', res.price * (weight + overweight))
           }
         })
     }
-  }, [selectedCustomerId, selectedProductId, currentWeight, editing, setValue])
+  }, [selectedCustomerId, selectedProductId, currentWeight, currentOverweight, editing, setValue])
 
   const load = useCallback(async () => {
     const [t, tr, d, p, c, s] = await Promise.all([
@@ -204,6 +211,7 @@ export function TripsPage() {
       setEditing(null)
       reset(EMPTY)
       setStopSearchId('')
+      setHasOverweight(false)
     }
   }, [modal, editing, reset])
 
@@ -254,11 +262,14 @@ export function TripsPage() {
         customer_id: row.customer_id ?? null,
         supplier_id: row.supplier_id ?? null,
         weight_ton: row.weight_ton,
+        overweight_ton: row.overweight_ton ?? null,
+        overweight_observation: row.overweight_observation ?? null,
         price_charged: row.price_charged,
         km_driven: row.km_driven,
         observation: row.observation ?? '',
         fuel_stops: fuelStops,
       })
+      setHasOverweight(!!(row.overweight_ton && row.overweight_ton > 0))
       setEditing(row)
       setModal(true)
     } catch (e: any) {
@@ -292,7 +303,7 @@ export function TripsPage() {
 
   const totalRevenue = trips.reduce((s, t) => s + t.price_charged, 0)
   const totalKm = trips.reduce((s, t) => s + t.km_driven, 0)
-  const totalTon = trips.reduce((s, t) => s + t.weight_ton, 0)
+  const totalTon = trips.reduce((s, t) => s + t.weight_ton + (t.overweight_ton || 0), 0)
 
   return (
     <div className="p-12 max-w-7xl mx-auto">
@@ -325,7 +336,9 @@ export function TripsPage() {
             trip.truck_license_plate ?? '—',
             trip.driver_name ?? '—',
             trip.product_name ?? '—',
-            `${trip.weight_ton} ton`,
+            trip.overweight_ton
+              ? `${trip.weight_ton} + ${trip.overweight_ton} ton (excesso)`
+              : `${trip.weight_ton} ton`,
             `${trip.km_driven} km`,
             formatBRL(trip.price_charged),
             trip.customer_name ?? '—',
@@ -585,7 +598,14 @@ export function TripsPage() {
                 </td>
                 <td className="px-6 py-4 text-sm text-on-surface">{row.driver_name}</td>
                 <td className="px-6 py-4 text-sm text-on-surface">{row.product_name}</td>
-                <td className="px-6 py-4 text-sm text-on-surface-variant">{row.weight_ton} ton</td>
+                <td className="px-6 py-4 text-sm text-on-surface-variant">
+                  {row.weight_ton} ton
+                  {row.overweight_ton ? (
+                    <div className="mt-1">
+                      <Badge label={`+${row.overweight_ton} ton excesso`} color="amber" />
+                    </div>
+                  ) : null}
+                </td>
                 <td className="px-6 py-4 text-sm text-on-surface-variant">
                   {row.km_driven} km
                   {row.fuel_stops_count
@@ -835,6 +855,78 @@ export function TripsPage() {
                   error={errors.observation?.message}
                 />
               </div>
+
+              {/* Overweight toggle */}
+              <div className="col-span-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const next = !hasOverweight
+                    setHasOverweight(next)
+                    if (!next) {
+                      setValue('overweight_ton', null)
+                      setValue('overweight_observation', null)
+                    }
+                  }}
+                  className="flex items-center gap-3 group"
+                >
+                  <div
+                    className={`relative w-10 h-5 rounded-full transition-colors ${hasOverweight ? 'bg-amber-500' : 'bg-surface-container-high'}`}
+                  >
+                    <div
+                      className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${hasOverweight ? 'translate-x-5' : ''}`}
+                    />
+                  </div>
+                  <span className="text-sm font-semibold text-on-surface group-hover:text-primary transition-colors">
+                    Carga com excesso de peso
+                  </span>
+                  {hasOverweight && <Badge label="EXCESSO" color="amber" />}
+                </button>
+              </div>
+
+              {/* Overweight section */}
+              {hasOverweight && (
+                <div className="col-span-2 border border-amber-500/30 bg-amber-500/5 rounded-xl p-4 space-y-4 animate-in fade-in slide-in-from-top-1 duration-200">
+                  <h4 className="text-[10px] font-black uppercase tracking-widest text-amber-600 flex items-center gap-2">
+                    <span className="material-symbols-outlined text-sm">warning</span>
+                    Informações do Excesso de Peso
+                  </h4>
+                  <div className="grid grid-cols-2 gap-4">
+                    <Controller
+                      name="overweight_ton"
+                      control={control}
+                      render={({ field }) => (
+                        <Input
+                          label="Peso Excedente (ton)"
+                          type="number"
+                          step="0.01"
+                          placeholder="0,00"
+                          value={field.value ?? ''}
+                          onChange={field.onChange}
+                          error={errors.overweight_ton?.message}
+                        />
+                      )}
+                    />
+                    <Input
+                      label="Autorização / Observação"
+                      optional
+                      placeholder="Nº autorização, motivo..."
+                      {...register('overweight_observation')}
+                      error={errors.overweight_observation?.message}
+                    />
+                  </div>
+                  {currentWeight && currentOverweight ? (
+                    <div className="flex items-center justify-between bg-amber-500/10 px-4 py-2 rounded-lg">
+                      <span className="text-[10px] font-bold uppercase tracking-widest text-amber-700">
+                        Peso Total
+                      </span>
+                      <span className="text-sm font-bold text-amber-700">
+                        {(Number(currentWeight) + Number(currentOverweight)).toFixed(2)} ton
+                      </span>
+                    </div>
+                  ) : null}
+                </div>
+              )}
             </div>
 
             {/* Paradas e Custos */}

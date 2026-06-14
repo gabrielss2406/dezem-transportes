@@ -8,3 +8,4 @@ out/
 .env.local
 .claude/settings.local.json
 stitch_dezem_transportes_login/
+CLAUDE.md

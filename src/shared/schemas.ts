@@ -159,6 +159,8 @@ export const tripSchema = z.object({
   customer_id: optionalNumber(999999999, 'ID inválido'),
   supplier_id: optionalNumber(999999999, 'ID inválido'), // Keep for backward compatibility or main supplier
   weight_ton: requiredNumber(100, 'Peso máximo de 100 toneladas'),
+  overweight_ton: optionalNumber(100, 'Excesso máximo de 100 toneladas'),
+  overweight_observation: z.string().max(500).optional().nullable(),
   price_charged: requiredNumber(1000000, 'Valor máximo de R$ 1.000.000'),
   km_driven: requiredNumber(10000, 'KM máximo de 10.000'),
   observation: z.string().max(500).optional(),
