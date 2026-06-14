@@ -185,6 +185,15 @@ export function setupDatabase(): void {
     db.prepare('INSERT INTO users (name, password_hash) VALUES (?, ?)').run('Admin', hash)
   }
 
+  // Migration: Add overweight fields to trips if missing
+  const tripInfo = db.pragma('table_info(trips)') as { name: string }[]
+  if (!tripInfo.some((col) => col.name === 'overweight_ton')) {
+    db.exec('ALTER TABLE trips ADD COLUMN overweight_ton REAL DEFAULT NULL')
+  }
+  if (!tripInfo.some((col) => col.name === 'overweight_observation')) {
+    db.exec('ALTER TABLE trips ADD COLUMN overweight_observation TEXT DEFAULT NULL')
+  }
+
   // Migration: Add is_deletable to supplier_types if it doesn't exist
   const supplierTypeInfo = db.pragma('table_info(supplier_types)') as { name: string }[]
   if (!supplierTypeInfo.some((col) => col.name === 'is_deletable')) {

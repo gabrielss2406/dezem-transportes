@@ -73,8 +73,8 @@ export function registerTripHandlers(): void {
       const res = db()
         .prepare(
           `
-        INSERT INTO trips (date, truck_id, driver_id, product_id, customer_id, supplier_id, weight_ton, price_charged, km_driven, observation)
-        VALUES (?,?,?,?,?,?,?,?,?,?)
+        INSERT INTO trips (date, truck_id, driver_id, product_id, customer_id, supplier_id, weight_ton, overweight_ton, overweight_observation, price_charged, km_driven, observation)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
       `,
         )
         .run(
@@ -85,6 +85,8 @@ export function registerTripHandlers(): void {
           tripData.customer_id || null,
           tripData.supplier_id || null,
           tripData.weight_ton,
+          (tripData as any).overweight_ton || null,
+          (tripData as any).overweight_observation || null,
           tripData.price_charged,
           tripData.km_driven,
           tripData.observation || null,
@@ -121,7 +123,7 @@ export function registerTripHandlers(): void {
       db()
         .prepare(
           `UPDATE trips SET date=?, truck_id=?, driver_id=?, product_id=?, customer_id=?,
-            supplier_id=?, weight_ton=?, price_charged=?, km_driven=?, observation=?
+            supplier_id=?, weight_ton=?, overweight_ton=?, overweight_observation=?, price_charged=?, km_driven=?, observation=?
           WHERE id=?`,
         )
         .run(
@@ -132,6 +134,8 @@ export function registerTripHandlers(): void {
           tripData.customer_id || null,
           tripData.supplier_id || null,
           tripData.weight_ton,
+          (tripData as any).overweight_ton || null,
+          (tripData as any).overweight_observation || null,
           tripData.price_charged,
           tripData.km_driven,
           tripData.observation || null,

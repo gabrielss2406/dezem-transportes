@@ -85,6 +85,8 @@ export interface Trip {
   customer_id?: number
   supplier_id?: number
   weight_ton: number
+  overweight_ton?: number | null
+  overweight_observation?: string | null
   price_charged: number
   km_driven: number
   observation?: string
