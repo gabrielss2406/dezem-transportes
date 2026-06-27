@@ -80,7 +80,7 @@ export const truckSchema = z.object({
       .length(7, 'Placa deve ter 7 caracteres')
       .regex(/^[A-Z]{3}[0-9][A-Z0-9][0-9]{2}$/, 'Placa inválida (use ABC1D23 ou ABC-1234)'),
   ),
-  model: z.string().min(2, 'Modelo deve ter pelo menos 2 caracteres').max(50),
+  model: z.string().max(50).optional(),
   year: z.preprocess(
     (val) => (val === '' || val === null ? null : Number(val)),
     z

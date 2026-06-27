@@ -8,7 +8,7 @@ import type { Contractor, Truck } from '../../lib/types'
 
 interface TruckFormData {
   license_plate: string
-  model: string
+  model?: string
   year: number | null
   capacity_ton: number | null
   current_odometer: number
@@ -417,7 +417,7 @@ export function TrucksPage() {
                     </span>
                   </div>
                 </td>
-                <td className="px-6 py-4 text-sm text-on-surface">{row.model}</td>
+                <td className="px-6 py-4 text-sm text-on-surface">{row.model || '—'}</td>
                 <td className="px-6 py-4 text-sm text-on-surface-variant">{row.year || '—'}</td>
                 <td className="px-6 py-4 text-sm text-on-surface-variant">
                   {row.capacity_ton ? `${row.capacity_ton} ton` : '—'}
@@ -519,7 +519,8 @@ export function TrucksPage() {
                 <Input
                   ref={modelRef}
                   label="Modelo"
-                  value={field.value}
+                  optional
+                  value={field.value ?? ''}
                   onChange={field.onChange}
                   error={errors.model?.message}
                   onKeyDown={(e) => e.key === 'Enter' && yearRef.current?.focus()}

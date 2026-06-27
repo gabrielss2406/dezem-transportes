@@ -45,7 +45,7 @@ export function registerTruckHandlers(): void {
       )
       .run(
         data.license_plate,
-        data.model,
+        data.model ?? '',
         data.year,
         data.capacity_ton,
         data.current_odometer || 0,
@@ -63,7 +63,7 @@ export function registerTruckHandlers(): void {
       )
       .run(
         data.license_plate,
-        data.model,
+        data.model ?? '',
         data.year,
         data.capacity_ton,
         data.current_odometer,

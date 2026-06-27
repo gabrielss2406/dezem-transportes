@@ -41,7 +41,7 @@ export interface Truck {
   id: number
   customId?: number
   license_plate: string
-  model: string
+  model?: string
   year?: number
   capacity_ton?: number
   current_odometer: number
