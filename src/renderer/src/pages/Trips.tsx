@@ -533,7 +533,7 @@ export function TripsPage() {
         {[
           { label: 'Receita Total', value: formatBRL(totalRevenue), icon: 'payments' },
           { label: 'Km Total', value: `${totalKm.toFixed(0)} km`, icon: 'route' },
-          { label: 'Tonelagem Total', value: `${totalTon.toFixed(1)} ton`, icon: 'scale' },
+          { label: 'Tonelagem Total', value: `${totalTon} ton`, icon: 'scale' },
         ].map(({ label, value, icon }) => (
           <div
             key={label}
@@ -921,7 +921,7 @@ export function TripsPage() {
                         Peso Total
                       </span>
                       <span className="text-sm font-bold text-amber-700">
-                        {(Number(currentWeight) + Number(currentOverweight)).toFixed(2)} ton
+                        {Number(currentWeight) + Number(currentOverweight)} ton
                       </span>
                     </div>
                   ) : null}
