@@ -16,7 +16,7 @@ import {
   useToast,
 } from '../components/ui'
 import type { Cost, Driver, Supplier, Truck } from '../lib/types'
-import { currentMonthKey, formatBRL, formatDate } from '../lib/utils'
+import { currentMonthKey, formatBRL, formatDate, today } from '../lib/utils'
 
 interface CostFormData {
   date: string
@@ -29,7 +29,7 @@ interface CostFormData {
 }
 
 const EMPTY: CostFormData = {
-  date: '',
+  date: today(),
   category: '',
   value: 0,
   truck_id: null,

@@ -18,7 +18,7 @@ import {
 } from '../components/ui'
 import { generatePdf } from '../lib/pdfGenerator'
 import type { Customer, Driver, Product, Supplier, Trip, Truck } from '../lib/types'
-import { formatBRL, formatDate } from '../lib/utils'
+import { formatBRL, formatDate, today } from '../lib/utils'
 
 interface TripFormData {
   date: string
@@ -37,7 +37,7 @@ interface TripFormData {
 }
 
 const EMPTY: TripFormData = {
-  date: '',
+  date: today(),
   truck_id: 0,
   driver_id: 0,
   product_id: 0,
