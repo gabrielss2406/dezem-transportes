@@ -53,7 +53,6 @@ export const productSchema = z.object({
     z.number().int().positive().optional(),
   ),
   name: z.string().min(2, 'Nome deve ter pelo menos 2 caracteres').max(100),
-  unit: z.string().max(10).optional(),
 })
 
 export const supplierSchema = z.object({

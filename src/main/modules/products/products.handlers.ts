@@ -16,15 +16,15 @@ export function registerProductHandlers(): void {
 
   createValidatedHandler('products:create', productSchema, (data) => {
     const r = db()
-      .prepare('INSERT INTO products (name, unit, customId) VALUES (?,?,?)')
-      .run(data.name, data.unit || 'ton', data.customId)
+      .prepare('INSERT INTO products (name, customId) VALUES (?,?)')
+      .run(data.name, data.customId)
     return { id: r.lastInsertRowid }
   })
 
   createValidatedHandlerWithId('products:update', productSchema, (id, data) => {
     db()
-      .prepare('UPDATE products SET name=?, unit=?, customId=? WHERE id=?')
-      .run(data.name, data.unit, data.customId, id)
+      .prepare('UPDATE products SET name=?, customId=? WHERE id=?')
+      .run(data.name, data.customId, id)
     return { ok: true }
   })
 

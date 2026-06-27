@@ -12,7 +12,6 @@ export interface Product {
   id: number
   customId?: number
   name: string
-  unit: string
 }
 
 export interface CustomerPrice {

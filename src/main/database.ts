@@ -43,7 +43,6 @@ export function setupDatabase(): void {
       id         INTEGER PRIMARY KEY AUTOINCREMENT,
       customId   INTEGER UNIQUE,
       name       TEXT NOT NULL,
-      unit       TEXT NOT NULL DEFAULT 'ton',
       created_at TEXT DEFAULT (datetime('now'))
     );
 
