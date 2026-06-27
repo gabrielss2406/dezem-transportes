@@ -116,7 +116,7 @@ export function DashboardPage() {
               label="Lucro Líquido"
               value={formatBRL(summary.profit).replace('R$ ', '')}
               accent
-              trend={`${summary.totalTrips} viagens concluídas`}
+              trend={`${summary.totalTrips} lançamentos concluídos`}
             />
             <KpiBlock
               label="Custo Médio / KM"

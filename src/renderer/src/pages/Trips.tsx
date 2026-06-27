@@ -219,10 +219,10 @@ export function TripsPage() {
     try {
       if (editing) {
         await window.api.trips.update(editing.id, data as any)
-        show('Viagem atualizada!')
+        show('Lançamento atualizado!')
       } else {
         await window.api.trips.create(data as any)
-        show('Viagem registrada!')
+        show('Lançamento registrado!')
       }
       setModal(false)
       setPendingData(null)
@@ -246,7 +246,7 @@ export function TripsPage() {
       return
     }
     await window.api.trips.delete(deleteTarget.id)
-    show('Viagem excluída', 'success')
+    show('Lançamento excluído', 'success')
     setDeleteTarget(null)
     load()
   }
@@ -273,7 +273,7 @@ export function TripsPage() {
       setEditing(row)
       setModal(true)
     } catch (e: any) {
-      show(e.message || 'Erro ao carregar viagem', 'error')
+      show(e.message || 'Erro ao carregar lançamento', 'error')
     }
   }
 
@@ -312,9 +312,9 @@ export function TripsPage() {
       {/* Header */}
       <PageHeader
         pretitle="Gestão Operacional"
-        title="Viagens"
+        title="Lançamentos"
         subtitle="Gerencie os manifestos de transporte e histórico de fretes."
-        actionLabel="Nova Viagem"
+        actionLabel="Novo Lançamento"
         onAction={() => {
           window.focus()
           setModal(true)
@@ -395,12 +395,12 @@ export function TripsPage() {
             .replace(/[^\w-]/g, '')
 
           const fileName = safeFilterName
-            ? `relatorio_viagens_${safeFilterName}`
-            : 'relatorio_viagens'
+            ? `relatorio_lancamentos_${safeFilterName}`
+            : 'relatorio_lancamentos'
           const subtitle = subtitleParts.join(' | ')
 
           const pdfData = generatePdf({
-            title: 'Relatório de Viagens',
+            title: 'Relatório de Lançamentos',
             subtitle,
             headers,
             data,
@@ -581,7 +581,7 @@ export function TripsPage() {
             {trips.length === 0 && (
               <tr>
                 <td colSpan={9} className="px-6 py-12 text-center text-on-surface-variant text-sm">
-                  Nenhuma viagem encontrada com os filtros selecionados
+                  Nenhum lançamento encontrado com os filtros selecionados
                 </td>
               </tr>
             )}
@@ -646,10 +646,10 @@ export function TripsPage() {
         </table>
       </div>
 
-      {/* Modal: Nova Viagem */}
+      {/* Modal: Novo Lançamento */}
       {modal && (
         <Modal
-          title={editing ? 'Editar Viagem' : 'Nova Viagem'}
+          title={editing ? 'Editar Lançamento' : 'Novo Lançamento'}
           onClose={() => setModal(false)}
           onEscape={handleEscape}
         >
@@ -1066,7 +1066,7 @@ export function TripsPage() {
                 onClick={handleSubmit(onSubmit as any)}
                 className="flex items-center gap-3 px-8 py-3 bg-primary text-on-primary font-extrabold rounded transition-all hover:brightness-110 active:scale-95 shadow-lg shadow-primary/20"
               >
-                {editing ? 'Salvar Alterações' : 'Salvar Viagem'}
+                {editing ? 'Salvar Alterações' : 'Salvar Lançamento'}
                 <span className="material-symbols-outlined">arrow_forward</span>
               </button>
             </div>
@@ -1076,7 +1076,7 @@ export function TripsPage() {
 
       {pendingData && (
         <ConfirmModal
-          message="Tem certeza que deseja cadastrar esta viagem?"
+          message="Tem certeza que deseja cadastrar este lançamento?"
           onConfirm={() => save(pendingData)}
           onCancel={() => setPendingData(null)}
         />
@@ -1084,7 +1084,7 @@ export function TripsPage() {
 
       {deleteTarget && (
         <ConfirmModal
-          message="Excluir esta viagem?"
+          message="Excluir este lançamento?"
           onConfirm={handleConfirmDelete}
           onCancel={() => setDeleteTarget(null)}
         />

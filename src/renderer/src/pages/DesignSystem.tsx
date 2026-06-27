@@ -511,7 +511,7 @@ export function DesignSystemPage() {
               ['handshake', 'Fornecedores'],
               ['local_shipping', 'Caminhões'],
               ['badge', 'Motoristas'],
-              ['route', 'Viagens'],
+              ['route', 'Lançamentos'],
               ['payments', 'Custos'],
               ['add', 'Adicionar'],
               ['edit', 'Editar'],
