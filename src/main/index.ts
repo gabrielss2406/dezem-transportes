@@ -1,10 +1,6 @@
+import fs from 'fs'
 import { join } from 'path'
-import * as dotenv from 'dotenv'
-// Load environment variables as early as possible
-dotenv.config()
-
-import fs from 'fs' // Adicionar import do fs
-import path from 'path' // Adicionar import do path
+import path from 'path'
 import { BrowserWindow, app, ipcMain, shell } from 'electron'
 
 import type { PdfExportData } from '../shared/types' // Adicionar import de PdfExportData

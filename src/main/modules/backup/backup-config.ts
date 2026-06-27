@@ -18,12 +18,11 @@ export function getBackupConfig(): BackupConfig | null {
     } catch {}
   }
 
-  // 2. Fallback para as variáveis de ambiente (Configurado no projeto)
-  const env = process.env
-  const endpoint = env.MAIN_VITE_R2_ENDPOINT
-  const bucket = env.MAIN_VITE_R2_BUCKET
-  const accessKeyId = env.MAIN_VITE_R2_ACCESS_KEY_ID
-  const secretAccessKey = env.MAIN_VITE_R2_SECRET_ACCESS_KEY
+  // 2. Fallback para as variáveis de ambiente (baked no bundle pelo electron-vite no build)
+  const endpoint = import.meta.env.MAIN_VITE_R2_ENDPOINT as string | undefined
+  const bucket = import.meta.env.MAIN_VITE_R2_BUCKET as string | undefined
+  const accessKeyId = import.meta.env.MAIN_VITE_R2_ACCESS_KEY_ID as string | undefined
+  const secretAccessKey = import.meta.env.MAIN_VITE_R2_SECRET_ACCESS_KEY as string | undefined
 
   if (endpoint && bucket && accessKeyId && secretAccessKey) {
     return { endpoint, bucket, accessKeyId, secretAccessKey }
