@@ -78,7 +78,7 @@ export function setupDatabase(): void {
       id               INTEGER PRIMARY KEY AUTOINCREMENT,
       customId         INTEGER UNIQUE,
       license_plate    TEXT NOT NULL UNIQUE,
-      model            TEXT NOT NULL,
+      model            TEXT,
       year             INTEGER,
       capacity_ton     REAL,
       current_odometer REAL NOT NULL DEFAULT 0,
@@ -209,6 +209,50 @@ export function setupDatabase(): void {
   }
   if (!truckInfo.some((col) => col.name === 'contractor_id')) {
     db.exec('ALTER TABLE trucks ADD COLUMN contractor_id INTEGER REFERENCES contractors(id)')
+  }
+
+  // Migration: Make model column nullable in trucks table
+  const modelColumn = (truckInfo as any[]).find((col) => col.name === 'model')
+  if (modelColumn && modelColumn.notnull === 1) {
+    try {
+      // SQLite requires recreating the table to change a column constraint
+      // Temporarily disable foreign keys to avoid constraint violations during migration
+      const fkState = db.pragma('foreign_keys', { simple: true })
+      db.pragma('foreign_keys = OFF')
+
+      db.exec(`
+        BEGIN TRANSACTION;
+        CREATE TABLE trucks_new AS SELECT * FROM trucks;
+        DROP TABLE trucks;
+        CREATE TABLE trucks (
+          id               INTEGER PRIMARY KEY AUTOINCREMENT,
+          customId         INTEGER UNIQUE,
+          license_plate    TEXT NOT NULL UNIQUE,
+          model            TEXT,
+          year             INTEGER,
+          capacity_ton     REAL,
+          current_odometer REAL NOT NULL DEFAULT 0,
+          is_outsourced    INTEGER NOT NULL DEFAULT 0,
+          contractor_id    INTEGER REFERENCES contractors(id),
+          created_at       TEXT DEFAULT (datetime('now'))
+        );
+        INSERT INTO trucks SELECT
+          id, customId, license_plate, model, year, capacity_ton,
+          current_odometer, COALESCE(is_outsourced, 0), contractor_id, created_at
+        FROM trucks_new;
+        DROP TABLE trucks_new;
+        COMMIT;
+      `)
+
+      // Restore original foreign_keys state
+      if (fkState) {
+        db.pragma('foreign_keys = ON')
+      }
+    } catch (error) {
+      // Ensure foreign_keys is restored even on error
+      db.pragma('foreign_keys = ON')
+      throw error
+    }
   }
 
   // Migration: Add is_outsourced and contractor_id to drivers if missing

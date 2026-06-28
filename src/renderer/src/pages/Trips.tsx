@@ -106,6 +106,7 @@ export function TripsPage() {
   const [pendingData, setPendingData] = useState<any>(null)
   const [deleteTarget, setDeleteTarget] = useState<Trip | null>(null)
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false)
+  const [showTruckBreakdown, setShowTruckBreakdown] = useState(false)
   const [filters, setFilters] = useState({
     startDate: '',
     endDate: '',
@@ -304,6 +305,19 @@ export function TripsPage() {
   const totalRevenue = trips.reduce((s, t) => s + t.price_charged, 0)
   const totalKm = trips.reduce((s, t) => s + t.km_driven, 0)
   const totalTon = trips.reduce((s, t) => s + t.weight_ton + (t.overweight_ton || 0), 0)
+
+  const perTruck = Object.values(
+    trips.reduce<Record<number, { license_plate: string; count: number }>>((acc, t) => {
+      if (!acc[t.truck_id]) {
+        acc[t.truck_id] = {
+          license_plate: t.truck_license_plate ?? String(t.truck_id),
+          count: 0,
+        }
+      }
+      acc[t.truck_id].count++
+      return acc
+    }, {}),
+  ).sort((a, b) => b.count - a.count)
 
   return (
     <div className="p-12 max-w-7xl mx-auto">
@@ -551,6 +565,38 @@ export function TripsPage() {
           </div>
         ))}
       </div>
+
+      {/* Per-truck breakdown */}
+      {perTruck.length > 1 && (
+        <div className="mb-10">
+          <button
+            type="button"
+            onClick={() => setShowTruckBreakdown((v) => !v)}
+            className="flex items-center gap-1.5 text-xs text-on-surface-variant hover:text-on-surface transition-colors mb-3"
+          >
+            <span className="material-symbols-outlined text-sm">
+              {showTruckBreakdown ? 'expand_less' : 'expand_more'}
+            </span>
+            {showTruckBreakdown ? 'Ocultar por caminhão' : 'Ver por caminhão'}
+          </button>
+
+          {showTruckBreakdown && (
+            <div className="flex flex-wrap gap-2">
+              {perTruck.map(({ license_plate, count }) => (
+                <div
+                  key={license_plate}
+                  className="flex items-center gap-2 px-3 py-1.5 bg-surface-container-low rounded-lg border border-outline-variant/10 text-sm"
+                >
+                  <span className="font-mono font-bold text-primary">{license_plate}</span>
+                  <span className="text-on-surface-variant text-xs">
+                    {count} lançamento{count !== 1 ? 's' : ''}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Table */}
       <div className="bg-surface-container rounded-xl overflow-hidden border border-outline-variant/10 shadow-sm">
