@@ -1,9 +1,11 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useCallback, useEffect, useState } from 'react'
-import { useForm } from 'react-hook-form'
+import { Controller, useForm } from 'react-hook-form'
 import { z } from 'zod'
+import { appSettingsSchema } from '../../../shared/schemas'
+import type { AppSettings } from '../../../shared/types'
 import { PageHeader } from '../components/PageHeader'
-import { Button, ConfirmModal, Input, Toast, useToast } from '../components/ui'
+import { Button, ConfirmModal, CurrencyInput, Input, Toast, useToast } from '../components/ui'
 import { BackupSettings } from './BackupSettings'
 
 // Section component for styling
@@ -160,6 +162,106 @@ function DynamicTypeManager({
   )
 }
 
+function TaxSettings() {
+  const [settings, setSettings] = useState<AppSettings>({ taxRate: 0, taxFixed: 0 })
+  const [loading, setLoading] = useState(true)
+  const { toast, show } = useToast()
+
+  const taxRateId = React.useId()
+  const taxFixedId = React.useId()
+
+  const {
+    handleSubmit,
+    formState: { errors },
+    reset,
+    control,
+  } = useForm<AppSettings>({
+    resolver: zodResolver(appSettingsSchema),
+    defaultValues: settings,
+  })
+
+  useEffect(() => {
+    window.api.settings.getApp().then((data) => {
+      setSettings(data)
+      reset(data)
+      setLoading(false)
+    })
+  }, [reset])
+
+  const onSubmit = async (data: AppSettings) => {
+    try {
+      await window.api.settings.saveApp(data)
+      setSettings(data)
+      show('Configurações de impostos salvas com sucesso!')
+    } catch (error: any) {
+      show(error.message || 'Erro ao salvar configurações.', 'error')
+    }
+  }
+
+  if (loading) {
+    return <div className="text-on-surface-variant">Carregando...</div>
+  }
+
+  return (
+    <Section title="Impostos">
+      {toast && <Toast message={toast.message} type={toast.type} />}
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+        <div>
+          <label htmlFor={taxRateId} className="block text-sm font-bold text-on-surface mb-2">
+            Alíquota Percentual (%)
+          </label>
+          <Controller
+            name="taxRate"
+            control={control}
+            render={({ field }) => (
+              <Input
+                id={taxRateId}
+                type="number"
+                step="0.01"
+                min="0"
+                max="100"
+                placeholder="Ex: 5 para 5%"
+                value={field.value}
+                onChange={field.onChange}
+                error={errors.taxRate?.message}
+              />
+            )}
+          />
+          <p className="text-xs text-on-surface-variant mt-1">
+            Percentual aplicado sobre o valor cobrado de cada viagem
+          </p>
+        </div>
+
+        <div>
+          <label htmlFor={taxFixedId} className="block text-sm font-bold text-on-surface mb-2">
+            Valor Fixo (R$)
+          </label>
+          <Controller
+            name="taxFixed"
+            control={control}
+            render={({ field }) => (
+              <CurrencyInput
+                id={taxFixedId}
+                placeholder="Ex: 50 para R$ 50,00"
+                value={field.value}
+                onChange={field.onChange}
+                error={errors.taxFixed?.message}
+              />
+            )}
+          />
+          <p className="text-xs text-on-surface-variant mt-1">
+            Valor fixo em reais aplicado a cada viagem
+          </p>
+        </div>
+
+        <Button type="submit" className="w-full">
+          Salvar Configurações
+        </Button>
+      </form>
+    </Section>
+  )
+}
+
 // Main Settings Page Component
 interface SettingsPageProps {
   theme: 'light' | 'dark'
@@ -178,6 +280,7 @@ export function SettingsPage({ theme, onToggleTheme }: SettingsPageProps) {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 mt-10 items-start">
         <DynamicTypeManager title="Tipos de Fornecedor" api={window.api['supplier-types']} />
         <DynamicTypeManager title="Categorias de Custo" api={window.api['cost-categories']} />
+        <TaxSettings />
         <BackupSettings />
 
         <Section title="Tema e Aparência">

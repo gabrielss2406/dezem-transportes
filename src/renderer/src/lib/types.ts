@@ -89,6 +89,8 @@ export interface Trip {
   price_charged: number
   km_driven: number
   observation?: string
+  has_percentage_tax?: boolean
+  has_fixed_tax?: boolean
   fuel_stops?: FuelStop[]
   fuel_stops_count?: number
   // joins
@@ -233,6 +235,15 @@ declare global {
           callback: (status: import('../../../shared/types').BackupStatus) => void,
         ): () => void
       }
+      settings: {
+        getApp(): Promise<import('../../../shared/types').AppSettings>
+        saveApp(data: import('../../../shared/types').AppSettings): Promise<{ ok: boolean }>
+      }
+      exportPdf(data: import('../../../shared/types').PdfExportData): Promise<{
+        success: boolean
+        path?: string
+        error?: string
+      }>
     }
   }
 }

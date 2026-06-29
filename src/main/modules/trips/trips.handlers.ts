@@ -73,8 +73,8 @@ export function registerTripHandlers(): void {
       const res = db()
         .prepare(
           `
-        INSERT INTO trips (date, truck_id, driver_id, product_id, customer_id, supplier_id, weight_ton, overweight_ton, overweight_observation, price_charged, km_driven, observation)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
+        INSERT INTO trips (date, truck_id, driver_id, product_id, customer_id, supplier_id, weight_ton, overweight_ton, overweight_observation, price_charged, km_driven, observation, has_percentage_tax, has_fixed_tax)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
       `,
         )
         .run(
@@ -90,6 +90,8 @@ export function registerTripHandlers(): void {
           tripData.price_charged,
           tripData.km_driven,
           tripData.observation || null,
+          (tripData as any).has_percentage_tax ? 1 : 0,
+          (tripData as any).has_fixed_tax ? 1 : 0,
         )
 
       const tripId = res.lastInsertRowid
@@ -123,7 +125,7 @@ export function registerTripHandlers(): void {
       db()
         .prepare(
           `UPDATE trips SET date=?, truck_id=?, driver_id=?, product_id=?, customer_id=?,
-            supplier_id=?, weight_ton=?, overweight_ton=?, overweight_observation=?, price_charged=?, km_driven=?, observation=?
+            supplier_id=?, weight_ton=?, overweight_ton=?, overweight_observation=?, price_charged=?, km_driven=?, observation=?, has_percentage_tax=?, has_fixed_tax=?
           WHERE id=?`,
         )
         .run(
@@ -139,6 +141,8 @@ export function registerTripHandlers(): void {
           tripData.price_charged,
           tripData.km_driven,
           tripData.observation || null,
+          (tripData as any).has_percentage_tax ? 1 : 0,
+          (tripData as any).has_fixed_tax ? 1 : 0,
           id,
         )
 

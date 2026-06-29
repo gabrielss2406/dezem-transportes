@@ -33,6 +33,8 @@ interface TripFormData {
   price_charged: number
   km_driven: number
   observation?: string
+  has_percentage_tax?: boolean
+  has_fixed_tax?: boolean
   fuel_stops?: any[]
 }
 
@@ -49,6 +51,8 @@ const EMPTY: TripFormData = {
   price_charged: 0,
   km_driven: 0,
   observation: '',
+  has_percentage_tax: false,
+  has_fixed_tax: false,
   fuel_stops: [],
 }
 
@@ -102,6 +106,7 @@ export function TripsPage() {
   const [modal, setModal] = useState(false)
   const [editing, setEditing] = useState<Trip | null>(null)
   const [hasOverweight, setHasOverweight] = useState(false)
+  const [appSettings, setAppSettings] = useState({ taxRate: 0, taxFixed: 0 })
   const [stopSearchId, setStopSearchId] = useState<string | number>('')
   const [pendingData, setPendingData] = useState<any>(null)
   const [deleteTarget, setDeleteTarget] = useState<Trip | null>(null)
@@ -176,13 +181,14 @@ export function TripsPage() {
   }, [selectedCustomerId, selectedProductId, currentWeight, currentOverweight, editing, setValue])
 
   const load = useCallback(async () => {
-    const [t, tr, d, p, c, s] = await Promise.all([
+    const [t, tr, d, p, c, s, settings] = await Promise.all([
       window.api.trips.list(filters),
       window.api.trucks.list(),
       window.api.drivers.list(),
       window.api.products.list(),
       window.api.customers.list(),
       window.api.suppliers.list(),
+      window.api.settings.getApp(),
     ])
     setTrips(t)
     setTrucks(tr)
@@ -190,6 +196,7 @@ export function TripsPage() {
     setProducts(p)
     setCustomers(c)
     setSuppliers(s)
+    setAppSettings(settings)
   }, [filters])
 
   useEffect(() => {
@@ -303,6 +310,17 @@ export function TripsPage() {
   }
 
   const totalRevenue = trips.reduce((s, t) => s + t.price_charged, 0)
+  const totalTaxes = trips.reduce((s, t) => {
+    let tax = 0
+    if (t.has_percentage_tax) {
+      tax += (t.price_charged * appSettings.taxRate) / 100
+    }
+    if (t.has_fixed_tax) {
+      tax += appSettings.taxFixed
+    }
+    return s + tax
+  }, 0)
+  const totalNetRevenue = totalRevenue - totalTaxes
   const totalKm = trips.reduce((s, t) => s + t.km_driven, 0)
   const totalTon = trips.reduce((s, t) => s + t.weight_ton + (t.overweight_ton || 0), 0)
 
@@ -343,20 +361,34 @@ export function TripsPage() {
             'Peso',
             'Km',
             'Valor',
+            'Imposto',
             'Cliente',
           ]
-          const data = trips.map((trip) => [
-            formatDate(trip.date),
-            trip.truck_license_plate ?? '—',
-            trip.driver_name ?? '—',
-            trip.product_name ?? '—',
-            trip.overweight_ton
-              ? `${trip.weight_ton} + ${trip.overweight_ton} ton (excesso)`
-              : `${trip.weight_ton} ton`,
-            `${trip.km_driven} km`,
-            formatBRL(trip.price_charged),
-            trip.customer_name ?? '—',
-          ])
+          const data = trips.map((trip) => {
+            const tripTax = (() => {
+              let tax = 0
+              if (trip.has_percentage_tax) {
+                tax += (trip.price_charged * appSettings.taxRate) / 100
+              }
+              if (trip.has_fixed_tax) {
+                tax += appSettings.taxFixed
+              }
+              return tax
+            })()
+            return [
+              formatDate(trip.date),
+              trip.truck_license_plate ?? '—',
+              trip.driver_name ?? '—',
+              trip.product_name ?? '—',
+              trip.overweight_ton
+                ? `${trip.weight_ton} + ${trip.overweight_ton} ton (excesso)`
+                : `${trip.weight_ton} ton`,
+              `${trip.km_driven} km`,
+              formatBRL(trip.price_charged),
+              formatBRL(tripTax),
+              trip.customer_name ?? '—',
+            ]
+          })
 
           // Resolver nomes dos filtros
           const filterParts: string[] = []
@@ -543,9 +575,11 @@ export function TripsPage() {
       </div>
 
       {/* KPI row */}
-      <div className="grid grid-cols-3 gap-6 mb-10">
+      <div className="grid grid-cols-3 lg:grid-cols-5 gap-6 mb-10">
         {[
-          { label: 'Receita Total', value: formatBRL(totalRevenue), icon: 'payments' },
+          { label: 'Receita Bruta', value: formatBRL(totalRevenue), icon: 'payments' },
+          { label: 'Total de Impostos', value: formatBRL(totalTaxes), icon: 'receipt' },
+          { label: 'Receita Líquida', value: formatBRL(totalNetRevenue), icon: 'trending_up' },
           { label: 'Km Total', value: `${totalKm.toFixed(0)} km`, icon: 'route' },
           { label: 'Tonelagem Total', value: `${totalTon} ton`, icon: 'scale' },
         ].map(({ label, value, icon }) => (
@@ -611,6 +645,7 @@ export function TripsPage() {
                 'Peso',
                 'Km',
                 'Valor',
+                'Imposto',
                 'Cliente',
                 '',
               ].map((h) => (
@@ -626,68 +661,94 @@ export function TripsPage() {
           <tbody className="divide-y divide-outline-variant/10">
             {trips.length === 0 && (
               <tr>
-                <td colSpan={9} className="px-6 py-12 text-center text-on-surface-variant text-sm">
+                <td colSpan={10} className="px-6 py-12 text-center text-on-surface-variant text-sm">
                   Nenhum lançamento encontrado com os filtros selecionados
                 </td>
               </tr>
             )}
-            {trips.map((row, i) => (
-              <tr
-                key={row.id}
-                className={`hover:bg-surface-bright/5 transition-colors group ${i % 2 === 1 ? 'bg-surface-container-lowest/30' : ''}`}
-              >
-                <td className="px-6 py-4 text-sm text-on-surface-variant">
-                  {formatDate(row.date)}
-                </td>
-                <td className="px-6 py-4 text-sm font-mono font-bold text-primary">
-                  {row.truck_license_plate}
-                </td>
-                <td className="px-6 py-4 text-sm text-on-surface">{row.driver_name}</td>
-                <td className="px-6 py-4 text-sm text-on-surface">{row.product_name}</td>
-                <td className="px-6 py-4 text-sm text-on-surface-variant">
-                  {row.weight_ton} ton
-                  {row.overweight_ton ? (
-                    <div className="mt-1">
-                      <Badge label={`+${row.overweight_ton} ton excesso`} color="amber" />
+            {trips.map((row, i) => {
+              const tripTax = (() => {
+                let tax = 0
+                if (row.has_percentage_tax) {
+                  tax += (row.price_charged * appSettings.taxRate) / 100
+                }
+                if (row.has_fixed_tax) {
+                  tax += appSettings.taxFixed
+                }
+                return tax
+              })()
+              return (
+                <tr
+                  key={row.id}
+                  className={`hover:bg-surface-bright/5 transition-colors group ${i % 2 === 1 ? 'bg-surface-container-lowest/30' : ''}`}
+                >
+                  <td className="px-6 py-4 text-sm text-on-surface-variant">
+                    {formatDate(row.date)}
+                  </td>
+                  <td className="px-6 py-4 text-sm font-mono font-bold text-primary">
+                    {row.truck_license_plate}
+                  </td>
+                  <td className="px-6 py-4 text-sm text-on-surface">{row.driver_name}</td>
+                  <td className="px-6 py-4 text-sm text-on-surface">{row.product_name}</td>
+                  <td className="px-6 py-4 text-sm text-on-surface-variant">
+                    {row.weight_ton} ton
+                    {row.overweight_ton ? (
+                      <div className="mt-1">
+                        <Badge label={`+${row.overweight_ton} ton excesso`} color="amber" />
+                      </div>
+                    ) : null}
+                  </td>
+                  <td className="px-6 py-4 text-sm text-on-surface-variant">
+                    {row.km_driven} km
+                    {row.fuel_stops_count
+                      ? row.fuel_stops_count > 0 && (
+                          <div className="mt-1">
+                            <Badge label={`${row.fuel_stops_count} paradas`} color="amber" />
+                          </div>
+                        )
+                      : null}
+                  </td>
+                  <td className="px-6 py-4 text-sm font-bold text-on-surface">
+                    {formatBRL(row.price_charged)}
+                  </td>
+                  <td className="px-6 py-4 text-sm font-bold text-on-surface">
+                    {tripTax > 0 ? (
+                      <div className="flex items-center gap-1">
+                        <span>{formatBRL(tripTax)}</span>
+                        {(row.has_percentage_tax || row.has_fixed_tax) && (
+                          <span className="material-symbols-outlined text-xs text-primary">
+                            receipt
+                          </span>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="text-on-surface-variant">—</span>
+                    )}
+                  </td>
+                  <td className="px-6 py-4 text-sm text-on-surface-variant">
+                    {row.customer_name ?? '—'}
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button
+                        type="button"
+                        onClick={() => edit(row)}
+                        className="p-2 text-on-surface-variant hover:text-primary hover:bg-primary/10 rounded-lg transition-all"
+                      >
+                        <span className="material-symbols-outlined text-xl">edit</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setDeleteTarget(row)}
+                        className="p-2 text-on-surface-variant hover:text-error hover:bg-error/10 rounded-lg transition-all"
+                      >
+                        <span className="material-symbols-outlined text-xl">delete</span>
+                      </button>
                     </div>
-                  ) : null}
-                </td>
-                <td className="px-6 py-4 text-sm text-on-surface-variant">
-                  {row.km_driven} km
-                  {row.fuel_stops_count
-                    ? row.fuel_stops_count > 0 && (
-                        <div className="mt-1">
-                          <Badge label={`${row.fuel_stops_count} paradas`} color="amber" />
-                        </div>
-                      )
-                    : null}
-                </td>
-                <td className="px-6 py-4 text-sm font-bold text-on-surface">
-                  {formatBRL(row.price_charged)}
-                </td>
-                <td className="px-6 py-4 text-sm text-on-surface-variant">
-                  {row.customer_name ?? '—'}
-                </td>
-                <td className="px-6 py-4">
-                  <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button
-                      type="button"
-                      onClick={() => edit(row)}
-                      className="p-2 text-on-surface-variant hover:text-primary hover:bg-primary/10 rounded-lg transition-all"
-                    >
-                      <span className="material-symbols-outlined text-xl">edit</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setDeleteTarget(row)}
-                      className="p-2 text-on-surface-variant hover:text-error hover:bg-error/10 rounded-lg transition-all"
-                    >
-                      <span className="material-symbols-outlined text-xl">delete</span>
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
+                  </td>
+                </tr>
+              )
+            })}
           </tbody>
         </table>
       </div>
@@ -841,19 +902,37 @@ export function TripsPage() {
               <Controller
                 name="weight_ton"
                 control={control}
-                render={({ field }) => (
-                  <Input
-                    ref={weightInputRef}
-                    label="Peso (ton)"
-                    type="number"
-                    step="0.01"
-                    placeholder="0,00"
-                    value={field.value}
-                    onChange={field.onChange}
-                    error={errors.weight_ton?.message}
-                    onKeyDown={(e) => e.key === 'Enter' && priceInputRef.current?.focus()}
-                  />
-                )}
+                render={({ field }) => {
+                  const selectedTruck = trucks.find((t) => t.id === watch('truck_id'))
+                  const capacity = selectedTruck?.capacity_ton || 0
+                  const totalWeight =
+                    Number(field.value || 0) + Number(watch('overweight_ton') || 0)
+                  const exceeds = capacity > 0 && totalWeight > capacity
+
+                  return (
+                    <div>
+                      <Input
+                        ref={weightInputRef}
+                        label="Peso (ton)"
+                        type="number"
+                        step="0.01"
+                        placeholder="0,00"
+                        value={field.value}
+                        onChange={field.onChange}
+                        error={errors.weight_ton?.message}
+                        onKeyDown={(e) => e.key === 'Enter' && priceInputRef.current?.focus()}
+                      />
+                      {capacity > 0 && (
+                        <p
+                          className={`text-xs mt-1 ${exceeds ? 'text-amber-600 font-bold' : 'text-on-surface-variant'}`}
+                        >
+                          Capacidade: {capacity} ton | Total: {totalWeight.toFixed(2)} ton
+                          {exceeds && ' ⚠️ Sobrecarga!'}
+                        </p>
+                      )}
+                    </div>
+                  )
+                }}
               />
 
               <Controller
@@ -900,6 +979,85 @@ export function TripsPage() {
                   {...register('observation')}
                   error={errors.observation?.message}
                 />
+              </div>
+
+              {/* Tax section */}
+              <div className="col-span-2 border border-primary/20 bg-primary/5 rounded-xl p-4 space-y-4">
+                <h4 className="text-[10px] font-black uppercase tracking-widest text-primary flex items-center gap-2">
+                  <span className="material-symbols-outlined text-sm">receipt</span>
+                  Impostos
+                </h4>
+                <div className="space-y-3">
+                  {/* Percentage tax toggle */}
+                  <div>
+                    <Controller
+                      name="has_percentage_tax"
+                      control={control}
+                      render={({ field }) => (
+                        <button
+                          type="button"
+                          onClick={() => field.onChange(!field.value)}
+                          className="flex items-center justify-between w-full group"
+                        >
+                          <div className="flex items-center gap-3">
+                            <div
+                              className={`relative w-10 h-5 rounded-full transition-colors ${field.value ? 'bg-primary' : 'bg-surface-container-high'}`}
+                            >
+                              <div
+                                className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${field.value ? 'translate-x-5' : ''}`}
+                              />
+                            </div>
+                            <div className="text-left">
+                              <span className="text-sm font-semibold text-on-surface group-hover:text-primary transition-colors">
+                                Imposto % ({appSettings.taxRate}%)
+                              </span>
+                              {field.value && appSettings.taxRate > 0 && (
+                                <p className="text-xs text-on-surface-variant">
+                                  {formatBRL((watch('price_charged') * appSettings.taxRate) / 100)}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        </button>
+                      )}
+                    />
+                  </div>
+
+                  {/* Fixed tax toggle */}
+                  <div>
+                    <Controller
+                      name="has_fixed_tax"
+                      control={control}
+                      render={({ field }) => (
+                        <button
+                          type="button"
+                          onClick={() => field.onChange(!field.value)}
+                          className="flex items-center justify-between w-full group"
+                        >
+                          <div className="flex items-center gap-3">
+                            <div
+                              className={`relative w-10 h-5 rounded-full transition-colors ${field.value ? 'bg-primary' : 'bg-surface-container-high'}`}
+                            >
+                              <div
+                                className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${field.value ? 'translate-x-5' : ''}`}
+                              />
+                            </div>
+                            <div className="text-left">
+                              <span className="text-sm font-semibold text-on-surface group-hover:text-primary transition-colors">
+                                Imposto Fixo ({formatBRL(appSettings.taxFixed)})
+                              </span>
+                              {field.value && appSettings.taxFixed > 0 && (
+                                <p className="text-xs text-on-surface-variant">
+                                  {formatBRL(appSettings.taxFixed)}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        </button>
+                      )}
+                    />
+                  </div>
+                </div>
               </div>
 
               {/* Overweight toggle */}
