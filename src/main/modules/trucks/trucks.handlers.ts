@@ -39,6 +39,13 @@ export function registerTruckHandlers(): void {
   })
 
   createValidatedHandler('trucks:create', truckSchema, (data) => {
+    let customId = data.customId
+
+    if (!customId) {
+      const maxId = db().prepare('SELECT MAX(customId) as max_id FROM trucks').get() as any
+      customId = (maxId?.max_id || 0) + 1
+    }
+
     const r = db()
       .prepare(
         'INSERT INTO trucks (license_plate, model, year, capacity_ton, current_odometer, customId, is_outsourced, contractor_id) VALUES (?,?,?,?,?,?,?,?)',
@@ -49,7 +56,7 @@ export function registerTruckHandlers(): void {
         data.year,
         data.capacity_ton,
         data.current_odometer || 0,
-        data.customId,
+        customId,
         data.is_outsourced ?? 0,
         data.contractor_id || null,
       )

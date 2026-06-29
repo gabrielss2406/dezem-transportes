@@ -62,6 +62,7 @@ function ConfirmModal({
 
 export function TrucksPage() {
   const [rows, setRows] = useState<Truck[]>([])
+  const [allTrucks, setAllTrucks] = useState<Truck[]>([])
   const [contractors, setContractors] = useState<Contractor[]>([])
   const [modal, setModal] = useState(false)
   const [editing, setEditing] = useState<Truck | null>(null)
@@ -102,12 +103,14 @@ export function TrucksPage() {
       ...appliedFilters,
       is_outsourced: view === 'outsourced',
     }
-    const [t, c] = await Promise.all([
+    const [t, c, all] = await Promise.all([
       window.api.trucks.list(listFilters),
       window.api.contractors.list(),
+      window.api.trucks.list({}),
     ])
     setRows(t)
     setContractors(c)
+    setAllTrucks(all)
   }, [appliedFilters, view])
 
   useEffect(() => {
@@ -115,13 +118,13 @@ export function TrucksPage() {
   }, [load])
 
   const findNextAvailableId = useCallback(() => {
-    const usedIds = new Set(rows.map((r) => r.customId).filter((id): id is number => !!id))
+    const usedIds = new Set(allTrucks.map((r) => r.customId).filter((id): id is number => !!id))
     let nextId = 1
     while (usedIds.has(nextId)) {
       nextId++
     }
     return nextId
-  }, [rows])
+  }, [allTrucks])
 
   useEffect(() => {
     if (modal) {
@@ -129,9 +132,15 @@ export function TrucksPage() {
         window.focus()
         if (!editing) {
           const nextId = findNextAvailableId()
-          setValue('customId', nextId as any, { shouldValidate: false })
-          setValue('is_outsourced', view === 'outsourced' ? 1 : 0, { shouldValidate: false })
-          plateRef.current?.focus()
+          const formData: TruckFormData = {
+            ...EMPTY,
+            customId: nextId,
+            is_outsourced: view === 'outsourced' ? 1 : 0,
+          }
+          reset(formData)
+          setTimeout(() => {
+            plateRef.current?.focus()
+          }, 50)
         } else {
           customIdRef.current?.focus()
         }
@@ -140,7 +149,7 @@ export function TrucksPage() {
       setEditing(null)
       reset(EMPTY)
     }
-  }, [modal, editing, reset, setValue, findNextAvailableId, view])
+  }, [modal, editing, reset, findNextAvailableId, view])
 
   const save = async (data: TruckFormData) => {
     try {
