@@ -34,7 +34,6 @@ interface TripFormData {
   km_driven: number
   observation?: string
   has_percentage_tax?: boolean
-  has_fixed_tax?: boolean
   fuel_stops?: any[]
 }
 
@@ -52,7 +51,6 @@ const EMPTY: TripFormData = {
   km_driven: 0,
   observation: '',
   has_percentage_tax: false,
-  has_fixed_tax: false,
   fuel_stops: [],
 }
 
@@ -134,6 +132,7 @@ export function TripsPage() {
   const weightInputRef = useRef<HTMLInputElement>(null)
   const priceInputRef = useRef<HTMLInputElement>(null)
   const kmInputRef = useRef<HTMLInputElement>(null)
+  const taxSelectRef = useRef<SelectRef>(null)
 
   useEffect(() => {
     if (location.state?.openModal) {
@@ -275,6 +274,7 @@ export function TripsPage() {
         price_charged: row.price_charged,
         km_driven: row.km_driven,
         observation: row.observation ?? '',
+        has_percentage_tax: !!row.has_percentage_tax,
         fuel_stops: fuelStops,
       })
       setHasOverweight(!!(row.overweight_ton && row.overweight_ton > 0))
@@ -314,9 +314,6 @@ export function TripsPage() {
     let tax = 0
     if (t.has_percentage_tax) {
       tax += (t.price_charged * appSettings.taxRate) / 100
-    }
-    if (t.has_fixed_tax) {
-      tax += appSettings.taxFixed
     }
     return s + tax
   }, 0)
@@ -369,9 +366,6 @@ export function TripsPage() {
               let tax = 0
               if (trip.has_percentage_tax) {
                 tax += (trip.price_charged * appSettings.taxRate) / 100
-              }
-              if (trip.has_fixed_tax) {
-                tax += appSettings.taxFixed
               }
               return tax
             })()
@@ -672,9 +666,6 @@ export function TripsPage() {
                 if (row.has_percentage_tax) {
                   tax += (row.price_charged * appSettings.taxRate) / 100
                 }
-                if (row.has_fixed_tax) {
-                  tax += appSettings.taxFixed
-                }
                 return tax
               })()
               return (
@@ -715,7 +706,7 @@ export function TripsPage() {
                     {tripTax > 0 ? (
                       <div className="flex items-center gap-1">
                         <span>{formatBRL(tripTax)}</span>
-                        {(row.has_percentage_tax || row.has_fixed_tax) && (
+                        {row.has_percentage_tax && (
                           <span className="material-symbols-outlined text-xs text-primary">
                             receipt
                           </span>
@@ -965,7 +956,7 @@ export function TripsPage() {
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
                         e.preventDefault()
-                        handleSubmit(onEnterSubmit as any)()
+                        taxSelectRef.current?.open()
                       }
                     }}
                   />
@@ -982,83 +973,34 @@ export function TripsPage() {
               </div>
 
               {/* Tax section */}
-              <div className="col-span-2 border border-primary/20 bg-primary/5 rounded-xl p-4 space-y-4">
-                <h4 className="text-[10px] font-black uppercase tracking-widest text-primary flex items-center gap-2">
-                  <span className="material-symbols-outlined text-sm">receipt</span>
-                  Impostos
-                </h4>
-                <div className="space-y-3">
-                  {/* Percentage tax toggle */}
-                  <div>
-                    <Controller
-                      name="has_percentage_tax"
-                      control={control}
-                      render={({ field }) => (
-                        <button
-                          type="button"
-                          onClick={() => field.onChange(!field.value)}
-                          className="flex items-center justify-between w-full group"
-                        >
-                          <div className="flex items-center gap-3">
-                            <div
-                              className={`relative w-10 h-5 rounded-full transition-colors ${field.value ? 'bg-primary' : 'bg-surface-container-high'}`}
-                            >
-                              <div
-                                className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${field.value ? 'translate-x-5' : ''}`}
-                              />
-                            </div>
-                            <div className="text-left">
-                              <span className="text-sm font-semibold text-on-surface group-hover:text-primary transition-colors">
-                                Imposto % ({appSettings.taxRate}%)
-                              </span>
-                              {field.value && appSettings.taxRate > 0 && (
-                                <p className="text-xs text-on-surface-variant">
-                                  {formatBRL((watch('price_charged') * appSettings.taxRate) / 100)}
-                                </p>
-                              )}
-                            </div>
-                          </div>
-                        </button>
-                      )}
-                    />
-                  </div>
-
-                  {/* Fixed tax toggle */}
-                  <div>
-                    <Controller
-                      name="has_fixed_tax"
-                      control={control}
-                      render={({ field }) => (
-                        <button
-                          type="button"
-                          onClick={() => field.onChange(!field.value)}
-                          className="flex items-center justify-between w-full group"
-                        >
-                          <div className="flex items-center gap-3">
-                            <div
-                              className={`relative w-10 h-5 rounded-full transition-colors ${field.value ? 'bg-primary' : 'bg-surface-container-high'}`}
-                            >
-                              <div
-                                className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${field.value ? 'translate-x-5' : ''}`}
-                              />
-                            </div>
-                            <div className="text-left">
-                              <span className="text-sm font-semibold text-on-surface group-hover:text-primary transition-colors">
-                                Imposto Fixo ({formatBRL(appSettings.taxFixed)})
-                              </span>
-                              {field.value && appSettings.taxFixed > 0 && (
-                                <p className="text-xs text-on-surface-variant">
-                                  {formatBRL(appSettings.taxFixed)}
-                                </p>
-                              )}
-                            </div>
-                          </div>
-                        </button>
-                      )}
-                    />
-                  </div>
-                </div>
-              </div>
+              <Controller
+                name="has_percentage_tax"
+                control={control}
+                render={({ field }) => (
+                  <Select
+                    ref={taxSelectRef}
+                    label="Imposto"
+                    icon="receipt"
+                    value={field.value ? 'true' : 'false'}
+                    onChange={(v) => field.onChange(v === 'true')}
+                    onEnterSelect={() => handleSubmit(onEnterSubmit as any)()}
+                    options={[
+                      {
+                        value: 'false',
+                        label: 'Sem imposto',
+                        displayLabel: 'Sem imposto',
+                        searchableLabel: 'sem imposto',
+                      },
+                      {
+                        value: 'true',
+                        label: `Com imposto (${appSettings.taxRate}%)`,
+                        displayLabel: `Com imposto (${appSettings.taxRate}%)`,
+                        searchableLabel: `com imposto ${appSettings.taxRate}`,
+                      },
+                    ]}
+                  />
+                )}
+              />
 
               {/* Overweight toggle */}
               <div className="col-span-2 pt-1">
