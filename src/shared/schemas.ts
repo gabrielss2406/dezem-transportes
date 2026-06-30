@@ -53,7 +53,6 @@ export const productSchema = z.object({
     z.number().int().positive().optional(),
   ),
   name: z.string().min(2, 'Nome deve ter pelo menos 2 caracteres').max(100),
-  unit: z.string().max(10).optional(),
 })
 
 export const supplierSchema = z.object({
@@ -81,7 +80,10 @@ export const truckSchema = z.object({
       .length(7, 'Placa deve ter 7 caracteres')
       .regex(/^[A-Z]{3}[0-9][A-Z0-9][0-9]{2}$/, 'Placa inválida (use ABC1D23 ou ABC-1234)'),
   ),
-  model: z.string().min(2, 'Modelo deve ter pelo menos 2 caracteres').max(50),
+  model: z.preprocess(
+    (val) => (val === '' || val === null || val === undefined ? undefined : val),
+    z.string().max(50).optional().nullable(),
+  ),
   year: z.preprocess(
     (val) => (val === '' || val === null ? null : Number(val)),
     z

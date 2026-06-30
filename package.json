@@ -89,6 +89,12 @@
     "compression": "maximum",
     "asar": true,
     "electronLanguages": ["pt-BR", "en-US"],
+    "extraResources": [
+      {
+        "from": ".env.production",
+        "to": ".env"
+      }
+    ],
     "files": [
       "out/**/*",
       "!**/*.map",

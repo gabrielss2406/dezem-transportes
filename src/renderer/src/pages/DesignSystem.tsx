@@ -61,9 +61,9 @@ function Swatch({ token, hex, dark }: { token: string; hex: string; dark: boolea
 
 // ── Sample table data ─────────────────────────────────────────────────────────
 const SAMPLE_ROWS = [
-  { id: 1, name: 'Soja em Grãos', unit: 'ton' },
-  { id: 2, name: 'Milho Híbrido Tipo A', unit: 'ton' },
-  { id: 3, name: 'Fertilizante NPK', unit: 'kg' },
+  { id: 1, name: 'Soja em Grãos' },
+  { id: 2, name: 'Milho Híbrido Tipo A' },
+  { id: 3, name: 'Fertilizante NPK' },
 ]
 
 // ── Main page ─────────────────────────────────────────────────────────────────
@@ -350,10 +350,7 @@ export function DesignSystemPage() {
       {/* ── Table ─────────────────────────────────────────────────────────── */}
       <Section title="Tabela">
         <Table
-          columns={[
-            { key: 'name', label: 'Nome' },
-            { key: 'unit', label: 'Unidade' },
-          ]}
+          columns={[{ key: 'name', label: 'Nome' }]}
           data={SAMPLE_ROWS}
           onEdit={() => {}}
           onDelete={() => {}}
@@ -514,7 +511,7 @@ export function DesignSystemPage() {
               ['handshake', 'Fornecedores'],
               ['local_shipping', 'Caminhões'],
               ['badge', 'Motoristas'],
-              ['route', 'Viagens'],
+              ['route', 'Lançamentos'],
               ['payments', 'Custos'],
               ['add', 'Adicionar'],
               ['edit', 'Editar'],

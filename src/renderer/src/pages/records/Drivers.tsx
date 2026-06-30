@@ -239,9 +239,9 @@ export function DriversPage() {
     }
   }
 
-  // Trucks filtered to current view for assignment (internal trucks for internal drivers, all trucks for outsourced)
+  // Trucks filtered based on form field, not view tab (so toggle within a form works correctly)
   const availableTrucks =
-    view === 'outsourced'
+    isOutsourcedValue === 1
       ? trucks.filter((t) => t.is_outsourced === 1)
       : trucks.filter((t) => !t.is_outsourced)
 

@@ -18,7 +18,7 @@ import {
 } from '../components/ui'
 import { generatePdf } from '../lib/pdfGenerator'
 import type { Customer, Driver, Product, Supplier, Trip, Truck } from '../lib/types'
-import { formatBRL, formatDate } from '../lib/utils'
+import { formatBRL, formatDate, today } from '../lib/utils'
 
 interface TripFormData {
   date: string
@@ -37,7 +37,7 @@ interface TripFormData {
 }
 
 const EMPTY: TripFormData = {
-  date: '',
+  date: today(),
   truck_id: 0,
   driver_id: 0,
   product_id: 0,
@@ -106,6 +106,7 @@ export function TripsPage() {
   const [pendingData, setPendingData] = useState<any>(null)
   const [deleteTarget, setDeleteTarget] = useState<Trip | null>(null)
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false)
+  const [showTruckBreakdown, setShowTruckBreakdown] = useState(false)
   const [filters, setFilters] = useState({
     startDate: '',
     endDate: '',
@@ -219,10 +220,10 @@ export function TripsPage() {
     try {
       if (editing) {
         await window.api.trips.update(editing.id, data as any)
-        show('Viagem atualizada!')
+        show('Lançamento atualizado!')
       } else {
         await window.api.trips.create(data as any)
-        show('Viagem registrada!')
+        show('Lançamento registrado!')
       }
       setModal(false)
       setPendingData(null)
@@ -246,7 +247,7 @@ export function TripsPage() {
       return
     }
     await window.api.trips.delete(deleteTarget.id)
-    show('Viagem excluída', 'success')
+    show('Lançamento excluído', 'success')
     setDeleteTarget(null)
     load()
   }
@@ -273,7 +274,7 @@ export function TripsPage() {
       setEditing(row)
       setModal(true)
     } catch (e: any) {
-      show(e.message || 'Erro ao carregar viagem', 'error')
+      show(e.message || 'Erro ao carregar lançamento', 'error')
     }
   }
 
@@ -305,6 +306,19 @@ export function TripsPage() {
   const totalKm = trips.reduce((s, t) => s + t.km_driven, 0)
   const totalTon = trips.reduce((s, t) => s + t.weight_ton + (t.overweight_ton || 0), 0)
 
+  const perTruck = Object.values(
+    trips.reduce<Record<number, { license_plate: string; count: number }>>((acc, t) => {
+      if (!acc[t.truck_id]) {
+        acc[t.truck_id] = {
+          license_plate: t.truck_license_plate ?? String(t.truck_id),
+          count: 0,
+        }
+      }
+      acc[t.truck_id].count++
+      return acc
+    }, {}),
+  ).sort((a, b) => b.count - a.count)
+
   return (
     <div className="p-12 max-w-7xl mx-auto">
       {toast && <Toast message={toast.message} type={toast.type} />}
@@ -312,9 +326,9 @@ export function TripsPage() {
       {/* Header */}
       <PageHeader
         pretitle="Gestão Operacional"
-        title="Viagens"
+        title="Lançamentos"
         subtitle="Gerencie os manifestos de transporte e histórico de fretes."
-        actionLabel="Nova Viagem"
+        actionLabel="Novo Lançamento"
         onAction={() => {
           window.focus()
           setModal(true)
@@ -395,12 +409,12 @@ export function TripsPage() {
             .replace(/[^\w-]/g, '')
 
           const fileName = safeFilterName
-            ? `relatorio_viagens_${safeFilterName}`
-            : 'relatorio_viagens'
+            ? `relatorio_lancamentos_${safeFilterName}`
+            : 'relatorio_lancamentos'
           const subtitle = subtitleParts.join(' | ')
 
           const pdfData = generatePdf({
-            title: 'Relatório de Viagens',
+            title: 'Relatório de Lançamentos',
             subtitle,
             headers,
             data,
@@ -533,7 +547,7 @@ export function TripsPage() {
         {[
           { label: 'Receita Total', value: formatBRL(totalRevenue), icon: 'payments' },
           { label: 'Km Total', value: `${totalKm.toFixed(0)} km`, icon: 'route' },
-          { label: 'Tonelagem Total', value: `${totalTon.toFixed(1)} ton`, icon: 'scale' },
+          { label: 'Tonelagem Total', value: `${totalTon} ton`, icon: 'scale' },
         ].map(({ label, value, icon }) => (
           <div
             key={label}
@@ -551,6 +565,38 @@ export function TripsPage() {
           </div>
         ))}
       </div>
+
+      {/* Per-truck breakdown */}
+      {perTruck.length > 1 && (
+        <div className="mb-10">
+          <button
+            type="button"
+            onClick={() => setShowTruckBreakdown((v) => !v)}
+            className="flex items-center gap-1.5 text-xs text-on-surface-variant hover:text-on-surface transition-colors mb-3"
+          >
+            <span className="material-symbols-outlined text-sm">
+              {showTruckBreakdown ? 'expand_less' : 'expand_more'}
+            </span>
+            {showTruckBreakdown ? 'Ocultar por caminhão' : 'Ver por caminhão'}
+          </button>
+
+          {showTruckBreakdown && (
+            <div className="flex flex-wrap gap-2">
+              {perTruck.map(({ license_plate, count }) => (
+                <div
+                  key={license_plate}
+                  className="flex items-center gap-2 px-3 py-1.5 bg-surface-container-low rounded-lg border border-outline-variant/10 text-sm"
+                >
+                  <span className="font-mono font-bold text-primary">{license_plate}</span>
+                  <span className="text-on-surface-variant text-xs">
+                    {count} lançamento{count !== 1 ? 's' : ''}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Table */}
       <div className="bg-surface-container rounded-xl overflow-hidden border border-outline-variant/10 shadow-sm">
@@ -581,7 +627,7 @@ export function TripsPage() {
             {trips.length === 0 && (
               <tr>
                 <td colSpan={9} className="px-6 py-12 text-center text-on-surface-variant text-sm">
-                  Nenhuma viagem encontrada com os filtros selecionados
+                  Nenhum lançamento encontrado com os filtros selecionados
                 </td>
               </tr>
             )}
@@ -646,10 +692,10 @@ export function TripsPage() {
         </table>
       </div>
 
-      {/* Modal: Nova Viagem */}
+      {/* Modal: Novo Lançamento */}
       {modal && (
         <Modal
-          title={editing ? 'Editar Viagem' : 'Nova Viagem'}
+          title={editing ? 'Editar Lançamento' : 'Novo Lançamento'}
           onClose={() => setModal(false)}
           onEscape={handleEscape}
         >
@@ -921,7 +967,7 @@ export function TripsPage() {
                         Peso Total
                       </span>
                       <span className="text-sm font-bold text-amber-700">
-                        {(Number(currentWeight) + Number(currentOverweight)).toFixed(2)} ton
+                        {Number(currentWeight) + Number(currentOverweight)} ton
                       </span>
                     </div>
                   ) : null}
@@ -1066,7 +1112,7 @@ export function TripsPage() {
                 onClick={handleSubmit(onSubmit as any)}
                 className="flex items-center gap-3 px-8 py-3 bg-primary text-on-primary font-extrabold rounded transition-all hover:brightness-110 active:scale-95 shadow-lg shadow-primary/20"
               >
-                {editing ? 'Salvar Alterações' : 'Salvar Viagem'}
+                {editing ? 'Salvar Alterações' : 'Salvar Lançamento'}
                 <span className="material-symbols-outlined">arrow_forward</span>
               </button>
             </div>
@@ -1076,7 +1122,7 @@ export function TripsPage() {
 
       {pendingData && (
         <ConfirmModal
-          message="Tem certeza que deseja cadastrar esta viagem?"
+          message="Tem certeza que deseja cadastrar este lançamento?"
           onConfirm={() => save(pendingData)}
           onCancel={() => setPendingData(null)}
         />
@@ -1084,7 +1130,7 @@ export function TripsPage() {
 
       {deleteTarget && (
         <ConfirmModal
-          message="Excluir esta viagem?"
+          message="Excluir este lançamento?"
           onConfirm={handleConfirmDelete}
           onCancel={() => setDeleteTarget(null)}
         />

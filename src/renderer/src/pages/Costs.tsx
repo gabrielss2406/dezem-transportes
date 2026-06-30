@@ -16,7 +16,7 @@ import {
   useToast,
 } from '../components/ui'
 import type { Cost, Driver, Supplier, Truck } from '../lib/types'
-import { currentMonthKey, formatBRL, formatDate } from '../lib/utils'
+import { currentMonthKey, formatBRL, formatDate, today } from '../lib/utils'
 
 interface CostFormData {
   date: string
@@ -29,7 +29,7 @@ interface CostFormData {
 }
 
 const EMPTY: CostFormData = {
-  date: '',
+  date: today(),
   category: '',
   value: 0,
   truck_id: null,
@@ -55,6 +55,7 @@ export function CostsPage() {
   const [drivers, setDrivers] = useState<Driver[]>([])
   const [modal, setModal] = useState(false)
   const [filterCategory, setFilterCategory] = useState('')
+  const [filterTruckId, setFilterTruckId] = useState('')
   const [pendingData, setPendingData] = useState<any>(null)
   const [deleteTarget, setDeleteTarget] = useState<Cost | null>(null)
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false)
@@ -82,7 +83,7 @@ export function CostsPage() {
 
   const load = useCallback(async () => {
     const [c, cc, tr, s, d] = await Promise.all([
-      window.api.costs.list({}),
+      window.api.costs.list({ truck_id: filterTruckId || undefined }),
       window.api['cost-categories'].list(),
       window.api.trucks.list(),
       window.api.suppliers.list(),
@@ -93,7 +94,7 @@ export function CostsPage() {
     setTrucks(tr)
     setSuppliers(s)
     setDrivers(d)
-  }, [])
+  }, [filterTruckId])
 
   useEffect(() => {
     load()
@@ -208,6 +209,31 @@ export function CostsPage() {
       <div className="grid grid-cols-12 gap-8 items-start">
         {/* Table */}
         <div className="col-span-12 space-y-6">
+          {/* Truck filter */}
+          <div className="flex items-end gap-4">
+            <div className="w-52">
+              <Select
+                label="Caminhão"
+                value={filterTruckId}
+                onChange={(v) => setFilterTruckId(v as string)}
+                options={trucks.map((t) => ({
+                  value: t.id,
+                  label: (
+                    <div className="flex justify-between">
+                      <span>{t.license_plate}</span>
+                      {t.customId && (
+                        <span className="text-on-surface-variant/50">#{t.customId}</span>
+                      )}
+                    </div>
+                  ),
+                  displayLabel: t.license_plate,
+                  searchableLabel: `${t.license_plate} ${t.customId || ''}`,
+                }))}
+                optional
+              />
+            </div>
+          </div>
+
           {/* Category chips */}
           <div className="flex flex-wrap gap-2">
             <button
