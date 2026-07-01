@@ -167,7 +167,7 @@ export const tripSchema = z.object({
   km_driven: requiredNumber(10000, 'KM máximo de 10.000'),
   observation: z.string().max(500).optional(),
   has_percentage_tax: z.boolean().optional(),
-  has_fixed_tax: z.boolean().optional(),
+  has_commission: z.boolean().optional(),
   fuel_stops: z.array(fuelStopSchema).optional(),
 })
 
@@ -196,9 +196,9 @@ export const appSettingsSchema = z.object({
     (val) => (val === '' || val === null || val === undefined ? 0 : Number(val)),
     z.number().min(0).max(100, 'Máximo de 100%'),
   ),
-  taxFixed: z.preprocess(
+  commissionRate: z.preprocess(
     (val) => (val === '' || val === null || val === undefined ? 0 : Number(val)),
-    z.number().min(0).max(1000000, 'Valor máximo de R$ 1.000.000'),
+    z.number().min(0).max(100, 'Máximo de 100%'),
   ),
 })
 

@@ -197,8 +197,13 @@ export function setupDatabase(): void {
   if (!tripInfo.some((col) => col.name === 'has_percentage_tax')) {
     db.exec('ALTER TABLE trips ADD COLUMN has_percentage_tax INTEGER NOT NULL DEFAULT 0')
   }
-  if (!tripInfo.some((col) => col.name === 'has_fixed_tax')) {
-    db.exec('ALTER TABLE trips ADD COLUMN has_fixed_tax INTEGER NOT NULL DEFAULT 0')
+
+  // Migration: Add commission fields to trips if missing
+  if (!tripInfo.some((col) => col.name === 'has_commission')) {
+    db.exec('ALTER TABLE trips ADD COLUMN has_commission INTEGER NOT NULL DEFAULT 0')
+  }
+  if (!tripInfo.some((col) => col.name === 'commission_value')) {
+    db.exec('ALTER TABLE trips ADD COLUMN commission_value REAL NOT NULL DEFAULT 0')
   }
 
   // Migration: Add is_deletable to supplier_types if it doesn't exist

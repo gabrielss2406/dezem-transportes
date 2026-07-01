@@ -138,7 +138,21 @@ export function registerDashboardHandlers(): void {
         .get(startDate, endDate) as any
     ).total
 
-    const totalCost = directCosts + fuelCosts
+    const commissionCost = (
+      db()
+        .prepare(
+          `
+        SELECT COALESCE(SUM(tr.commission_value), 0) as total
+        FROM trips tr
+        JOIN trucks t ON tr.truck_id = t.id
+        JOIN drivers d ON tr.driver_id = d.id
+        WHERE tr.date BETWEEN ? AND ? AND tr.has_commission = 1 AND ${INTERNAL_TRUCK} AND ${INTERNAL_DRIVER}
+      `,
+        )
+        .get(startDate, endDate) as any
+    ).total
+
+    const totalCost = directCosts + fuelCosts + commissionCost
 
     const totalTrips = (
       db()
@@ -186,6 +200,12 @@ export function registerDashboardHandlers(): void {
           FROM trip_fuel_stops fs
           JOIN trips tr2 ON fs.trip_id = tr2.id
           WHERE tr2.truck_id = t.id AND tr2.date BETWEEN ? AND ?
+        ) + (
+          SELECT COALESCE(SUM(tr3.commission_value), 0)
+          FROM trips tr3
+          JOIN drivers d3 ON tr3.driver_id = d3.id
+          WHERE tr3.truck_id = t.id AND tr3.has_commission = 1 AND tr3.date BETWEEN ? AND ?
+            AND (d3.is_outsourced = 0 OR d3.is_outsourced IS NULL)
         ) as cost
       FROM trucks t
       LEFT JOIN trips tr ON tr.truck_id = t.id AND tr.date BETWEEN ? AND ?
@@ -194,7 +214,7 @@ export function registerDashboardHandlers(): void {
       ORDER BY revenue DESC
     `,
       )
-      .all(startDate, endDate, startDate, endDate, startDate, endDate) as any[]
+      .all(startDate, endDate, startDate, endDate, startDate, endDate, startDate, endDate) as any[]
 
     const trucksWithMetrics = perTruck.map((t) => ({
       ...t,
@@ -312,12 +332,18 @@ export function registerDashboardHandlers(): void {
       categoryTotals.set(cat, current + (Number(f.total) || 0))
     }
 
+    if (commissionCost > 0) {
+      const currentCommission = categoryTotals.get('commission') || 0
+      categoryTotals.set('commission', currentCommission + (Number(commissionCost) || 0))
+    }
+
     const categoryLabels: Record<string, string> = {
       fuel: 'Combustível',
       oil: 'Óleo',
       maintenance: 'Manutenção',
       salary: 'Salário',
       toll: 'Pedágio',
+      commission: 'Comissão',
       others: 'Outros',
     }
 

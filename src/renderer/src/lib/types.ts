@@ -90,7 +90,8 @@ export interface Trip {
   km_driven: number
   observation?: string
   has_percentage_tax?: boolean
-  has_fixed_tax?: boolean
+  has_commission?: boolean
+  commission_value?: number
   fuel_stops?: FuelStop[]
   fuel_stops_count?: number
   // joins

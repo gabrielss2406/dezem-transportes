@@ -34,6 +34,7 @@ interface TripFormData {
   km_driven: number
   observation?: string
   has_percentage_tax?: boolean
+  has_commission?: boolean
   fuel_stops?: any[]
 }
 
@@ -51,6 +52,7 @@ const EMPTY: TripFormData = {
   km_driven: 0,
   observation: '',
   has_percentage_tax: false,
+  has_commission: true,
   fuel_stops: [],
 }
 
@@ -104,7 +106,7 @@ export function TripsPage() {
   const [modal, setModal] = useState(false)
   const [editing, setEditing] = useState<Trip | null>(null)
   const [hasOverweight, setHasOverweight] = useState(false)
-  const [appSettings, setAppSettings] = useState({ taxRate: 0, taxFixed: 0 })
+  const [appSettings, setAppSettings] = useState({ taxRate: 0, commissionRate: 0 })
   const [stopSearchId, setStopSearchId] = useState<string | number>('')
   const [pendingData, setPendingData] = useState<any>(null)
   const [deleteTarget, setDeleteTarget] = useState<Trip | null>(null)
@@ -134,6 +136,7 @@ export function TripsPage() {
   const priceInputRef = useRef<HTMLInputElement>(null)
   const kmInputRef = useRef<HTMLInputElement>(null)
   const taxSelectRef = useRef<SelectRef>(null)
+  const commissionSelectRef = useRef<SelectRef>(null)
 
   useEffect(() => {
     if (location.state?.openModal) {
@@ -276,6 +279,7 @@ export function TripsPage() {
         km_driven: row.km_driven,
         observation: row.observation ?? '',
         has_percentage_tax: !!row.has_percentage_tax,
+        has_commission: !!row.has_commission,
         fuel_stops: fuelStops,
       })
       setHasOverweight(!!(row.overweight_ton && row.overweight_ton > 0))
@@ -319,6 +323,7 @@ export function TripsPage() {
     return s + tax
   }, 0)
   const totalNetRevenue = totalRevenue - totalTaxes
+  const totalCommissions = trips.reduce((s, t) => s + (t.commission_value || 0), 0)
   const totalKm = trips.reduce((s, t) => s + t.km_driven, 0)
   const totalTon = trips.reduce((s, t) => s + t.weight_ton + (t.overweight_ton || 0), 0)
 
@@ -373,6 +378,7 @@ export function TripsPage() {
             'Km',
             'Valor',
             'Imposto',
+            'Comissão',
             'Cliente',
           ]
           const data = trips.map((trip) => {
@@ -394,6 +400,7 @@ export function TripsPage() {
               `${trip.km_driven} km`,
               formatBRL(trip.price_charged),
               formatBRL(tripTax),
+              formatBRL(trip.commission_value || 0),
               trip.customer_name ?? '—',
             ]
           })
@@ -588,6 +595,7 @@ export function TripsPage() {
           { label: 'Receita Bruta', value: formatBRL(totalRevenue), icon: 'payments' },
           { label: 'Total de Impostos', value: formatBRL(totalTaxes), icon: 'receipt' },
           { label: 'Receita Líquida', value: formatBRL(totalNetRevenue), icon: 'trending_up' },
+          { label: 'Total de Comissões', value: formatBRL(totalCommissions), icon: 'percent' },
           { label: 'Km Total', value: `${totalKm.toFixed(0)} km`, icon: 'route' },
           { label: 'Tonelagem Total', value: `${totalTon} ton`, icon: 'scale' },
         ].map(({ label, value, icon }) => (
@@ -697,6 +705,7 @@ export function TripsPage() {
                 'Km',
                 'Valor',
                 'Imposto',
+                'Comissão',
                 'Cliente',
                 '',
               ].map((h) => (
@@ -712,7 +721,7 @@ export function TripsPage() {
           <tbody className="divide-y divide-outline-variant/10">
             {trips.length === 0 && (
               <tr>
-                <td colSpan={10} className="px-6 py-12 text-center text-on-surface-variant text-sm">
+                <td colSpan={11} className="px-6 py-12 text-center text-on-surface-variant text-sm">
                   Nenhum lançamento encontrado com os filtros selecionados
                 </td>
               </tr>
@@ -768,6 +777,18 @@ export function TripsPage() {
                             receipt
                           </span>
                         )}
+                      </div>
+                    ) : (
+                      <span className="text-on-surface-variant">—</span>
+                    )}
+                  </td>
+                  <td className="px-6 py-4 text-sm font-bold text-on-surface">
+                    {row.has_commission && row.commission_value ? (
+                      <div className="flex items-center gap-1">
+                        <span>{formatBRL(row.commission_value)}</span>
+                        <span className="material-symbols-outlined text-xs text-primary">
+                          percent
+                        </span>
                       </div>
                     ) : (
                       <span className="text-on-surface-variant">—</span>
@@ -1040,7 +1061,7 @@ export function TripsPage() {
                     icon="receipt"
                     value={field.value ? 'true' : 'false'}
                     onChange={(v) => field.onChange(v === 'true')}
-                    onEnterSelect={() => handleSubmit(onEnterSubmit as any)()}
+                    onEnterSelect={() => commissionSelectRef.current?.open()}
                     options={[
                       {
                         value: 'false',
@@ -1053,6 +1074,36 @@ export function TripsPage() {
                         label: `Com imposto (${appSettings.taxRate}%)`,
                         displayLabel: `Com imposto (${appSettings.taxRate}%)`,
                         searchableLabel: `com imposto ${appSettings.taxRate}`,
+                      },
+                    ]}
+                  />
+                )}
+              />
+
+              {/* Commission section */}
+              <Controller
+                name="has_commission"
+                control={control}
+                render={({ field }) => (
+                  <Select
+                    ref={commissionSelectRef}
+                    label="Comissão"
+                    icon="percent"
+                    value={field.value ? 'true' : 'false'}
+                    onChange={(v) => field.onChange(v === 'true')}
+                    onEnterSelect={() => handleSubmit(onEnterSubmit as any)()}
+                    options={[
+                      {
+                        value: 'false',
+                        label: 'Sem comissão',
+                        displayLabel: 'Sem comissão',
+                        searchableLabel: 'sem comissao',
+                      },
+                      {
+                        value: 'true',
+                        label: `Com comissão (${appSettings.commissionRate}%)`,
+                        displayLabel: `Com comissão (${appSettings.commissionRate}%)`,
+                        searchableLabel: `com comissao ${appSettings.commissionRate}`,
                       },
                     ]}
                   />
