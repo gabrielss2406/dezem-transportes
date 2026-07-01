@@ -110,6 +110,7 @@ export function TripsPage() {
   const [deleteTarget, setDeleteTarget] = useState<Trip | null>(null)
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false)
   const [showTruckBreakdown, setShowTruckBreakdown] = useState(false)
+  const [showDriverBreakdown, setShowDriverBreakdown] = useState(false)
   const [filters, setFilters] = useState({
     startDate: '',
     endDate: '',
@@ -330,6 +331,19 @@ export function TripsPage() {
         }
       }
       acc[t.truck_id].count++
+      return acc
+    }, {}),
+  ).sort((a, b) => b.count - a.count)
+
+  const perDriver = Object.values(
+    trips.reduce<Record<number, { name: string; count: number }>>((acc, t) => {
+      if (!acc[t.driver_id]) {
+        acc[t.driver_id] = {
+          name: t.driver_name ?? String(t.driver_id),
+          count: 0,
+        }
+      }
+      acc[t.driver_id].count++
       return acc
     }, {}),
   ).sort((a, b) => b.count - a.count)
@@ -594,37 +608,80 @@ export function TripsPage() {
         ))}
       </div>
 
-      {/* Per-truck breakdown */}
-      {perTruck.length > 1 && (
-        <div className="mb-10">
-          <button
-            type="button"
-            onClick={() => setShowTruckBreakdown((v) => !v)}
-            className="flex items-center gap-1.5 text-xs text-on-surface-variant hover:text-on-surface transition-colors mb-3"
-          >
-            <span className="material-symbols-outlined text-sm">
-              {showTruckBreakdown ? 'expand_less' : 'expand_more'}
-            </span>
-            {showTruckBreakdown ? 'Ocultar por caminhão' : 'Ver por caminhão'}
-          </button>
+      {/* Breakdown section */}
+      <div className={showTruckBreakdown || showDriverBreakdown ? 'mb-10' : 'mb-4'}>
+        <div className="mb-4 flex items-center justify-between">
+          <h3 className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant">
+            Lançamentos: {trips.length}
+          </h3>
+        </div>
 
-          {showTruckBreakdown && (
-            <div className="flex flex-wrap gap-2">
-              {perTruck.map(({ license_plate, count }) => (
-                <div
-                  key={license_plate}
-                  className="flex items-center gap-2 px-3 py-1.5 bg-surface-container-low rounded-lg border border-outline-variant/10 text-sm"
-                >
-                  <span className="font-mono font-bold text-primary">{license_plate}</span>
-                  <span className="text-on-surface-variant text-xs">
-                    {count} lançamento{count !== 1 ? 's' : ''}
-                  </span>
+        <div className="grid grid-cols-2 gap-6">
+          {/* Per-truck breakdown */}
+          {perTruck.length > 1 && (
+            <div>
+              <button
+                type="button"
+                onClick={() => setShowTruckBreakdown((v) => !v)}
+                className="flex items-center gap-1.5 text-xs text-on-surface-variant hover:text-on-surface transition-colors mb-3"
+              >
+                <span className="material-symbols-outlined text-sm">
+                  {showTruckBreakdown ? 'expand_less' : 'expand_more'}
+                </span>
+                {showTruckBreakdown ? 'Ocultar por caminhão' : 'Ver por caminhão'}
+              </button>
+
+              {showTruckBreakdown && (
+                <div className="flex flex-wrap gap-2">
+                  {perTruck.map(({ license_plate, count }) => (
+                    <div
+                      key={license_plate}
+                      className="flex items-center gap-2 px-3 py-1.5 bg-surface-container-low rounded-lg border border-outline-variant/10 text-sm"
+                    >
+                      <span className="font-mono font-bold text-primary">{license_plate}</span>
+                      <span className="text-on-surface-variant text-xs">
+                        {count} lançamento{count !== 1 ? 's' : ''}
+                      </span>
+                    </div>
+                  ))}
                 </div>
-              ))}
+              )}
+            </div>
+          )}
+
+          {/* Per-driver breakdown */}
+          {perDriver.length > 1 && (
+            <div>
+              <button
+                type="button"
+                onClick={() => setShowDriverBreakdown((v) => !v)}
+                className="flex items-center gap-1.5 text-xs text-on-surface-variant hover:text-on-surface transition-colors mb-3"
+              >
+                <span className="material-symbols-outlined text-sm">
+                  {showDriverBreakdown ? 'expand_less' : 'expand_more'}
+                </span>
+                {showDriverBreakdown ? 'Ocultar por motorista' : 'Ver por motorista'}
+              </button>
+
+              {showDriverBreakdown && (
+                <div className="flex flex-wrap gap-2">
+                  {perDriver.map(({ name, count }) => (
+                    <div
+                      key={name}
+                      className="flex items-center gap-2 px-3 py-1.5 bg-surface-container-low rounded-lg border border-outline-variant/10 text-sm"
+                    >
+                      <span className="font-bold text-on-surface">{name}</span>
+                      <span className="text-on-surface-variant text-xs">
+                        {count} lançamento{count !== 1 ? 's' : ''}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>
-      )}
+      </div>
 
       {/* Table */}
       <div className="bg-surface-container rounded-xl overflow-hidden border border-outline-variant/10 shadow-sm">
