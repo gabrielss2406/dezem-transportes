@@ -1,33 +1,79 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useCallback, useEffect, useState } from 'react'
-import { useForm } from 'react-hook-form'
+import { useCallback, useEffect, useId, useState } from 'react'
+import { Controller, useForm } from 'react-hook-form'
 import { z } from 'zod'
+import { appSettingsSchema } from '../../../shared/schemas'
+import type { AppSettings } from '../../../shared/types'
 import { PageHeader } from '../components/PageHeader'
-import { Button, ConfirmModal, Input, Toast, useToast } from '../components/ui'
+import { Button, ConfirmModal, CurrencyInput, Input, Toast, useToast } from '../components/ui'
 import { BackupSettings } from './BackupSettings'
 
-// Section component for styling
 const formSchema = z.object({
   label: z.string().min(1, 'O rótulo é obrigatório'),
 })
 type FormData = z.infer<typeof formSchema>
 
-// Section component for styling
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+interface TabItem {
+  id: string
+  label: string
+  icon: string
+}
+
+interface SectionProps {
+  title: string
+  subtitle?: string
+  icon?: string
+  children: React.ReactNode
+}
+
+function Section({ title, subtitle, icon, children }: SectionProps) {
   return (
-    <div className="bg-surface-container-low p-8 rounded-xl border border-outline-variant/10">
-      <h2 className="text-lg font-bold font-headline text-on-surface mb-6">{title}</h2>
+    <div className="bg-surface-container-low p-6 rounded-xl border border-outline-variant/10">
+      <div className="flex items-center gap-3 mb-4">
+        {icon && <span className="material-symbols-outlined text-xl text-primary">{icon}</span>}
+        <div className="flex-1">
+          <h3 className="text-base font-bold text-on-surface">{title}</h3>
+          {subtitle && <p className="text-xs text-on-surface-variant">{subtitle}</p>}
+        </div>
+      </div>
       <div className="space-y-4">{children}</div>
     </div>
   )
 }
 
-// Generic component to manage dynamic types
+function TabBar({
+  tabs,
+  activeTab,
+  onChange,
+}: { tabs: TabItem[]; activeTab: string; onChange: (id: string) => void }) {
+  return (
+    <div className="flex gap-1 border-b border-outline-variant/20 mb-8">
+      {tabs.map((tab) => (
+        <button
+          key={tab.id}
+          type="button"
+          onClick={() => onChange(tab.id)}
+          className={`flex items-center gap-2 px-4 py-3 font-medium text-sm border-b-2 transition-colors ${
+            activeTab === tab.id
+              ? 'border-primary text-primary'
+              : 'border-transparent text-on-surface-variant hover:text-on-surface'
+          }`}
+        >
+          <span className="material-symbols-outlined text-lg">{tab.icon}</span>
+          {tab.label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
 function DynamicTypeManager({
   title,
+  icon,
   api,
 }: {
   title: string
+  icon: string
   api: {
     list: () => Promise<any[]>
     create: (data: { value: string; label: string }) => Promise<{ id?: number }>
@@ -36,6 +82,7 @@ function DynamicTypeManager({
 }) {
   const [items, setItems] = useState<any[]>([])
   const [deleteTarget, setDeleteTarget] = useState<number | null>(null)
+  const [expanded, setExpanded] = useState(false)
   const { toast, show } = useToast()
 
   const {
@@ -99,107 +146,260 @@ function DynamicTypeManager({
 
   if (!api) {
     return (
-      <Section title={title}>
-        <div className="bg-error-container text-on-error-container p-4 rounded-lg text-sm">
-          <strong>Erro:</strong> A API para "{title}" não foi encontrada. Pode ser necessário
-          reiniciar a aplicação.
-        </div>
-      </Section>
+      <div className="bg-error-container text-on-error-container p-4 rounded-lg text-sm">
+        <strong>Erro:</strong> A API para "{title}" não foi encontrada. Reinicie a aplicação.
+      </div>
     )
   }
 
   return (
-    <Section title={title}>
+    <div className="bg-surface-container-low p-4 rounded-xl border border-outline-variant/10">
       {toast && <Toast message={toast.message} type={toast.type} />}
-      <div className="space-y-3 max-h-60 overflow-y-auto pr-2">
-        {items.map((item) => (
-          <div
-            key={item.id}
-            className="flex items-center justify-between bg-surface-container p-3 rounded-lg"
-          >
-            <div>
-              <p className="font-bold text-on-surface text-sm">{item.label}</p>
-              <p className="text-xs text-on-surface-variant font-mono">{item.value}</p>
-            </div>
-            <button
-              type="button"
-              onClick={() => setDeleteTarget(item.id)}
-              disabled={item.is_deletable === 0}
-              className="p-2 text-on-surface-variant rounded-full disabled:text-outline-variant/30 disabled:cursor-not-allowed hover:text-error enabled:hover:bg-error/10"
-              title={item.is_deletable === 0 ? 'Este item padrão não pode ser excluído' : 'Excluir'}
-            >
-              <span className="material-symbols-outlined text-xl">delete</span>
-            </button>
+      <button
+        type="button"
+        onClick={() => setExpanded(!expanded)}
+        className="w-full flex items-center justify-between mb-4"
+      >
+        <div className="flex items-center gap-3">
+          <span className="material-symbols-outlined text-primary">{icon}</span>
+          <div className="text-left">
+            <p className="font-bold text-on-surface text-sm">{title}</p>
+            <p className="text-xs text-on-surface-variant">{items.length} itens</p>
           </div>
-        ))}
-      </div>
+        </div>
+        <span
+          className={`material-symbols-outlined transition-transform ${expanded ? 'rotate-180' : ''}`}
+        >
+          expand_more
+        </span>
+      </button>
 
-      <div className="border-t border-outline-variant/20 pt-6">
-        <p className="text-sm font-bold text-on-surface mb-3">Adicionar Novo</p>
-        <form onSubmit={handleSubmit(onSubmit)} className="flex items-start gap-4">
-          <Input
-            placeholder="Rótulo..."
-            {...register('label')}
-            error={errors.label?.message}
-            className="flex-1"
-          />
-          <Button type="submit" size="sm" className="h-11">
-            Adicionar
-          </Button>
-        </form>
-      </div>
+      {expanded && (
+        <div className="space-y-3">
+          <div className="space-y-2 max-h-48 overflow-y-auto">
+            {items.length === 0 ? (
+              <p className="text-xs text-on-surface-variant italic p-2">Nenhum item ainda</p>
+            ) : (
+              items.map((item) => (
+                <div
+                  key={item.id}
+                  className="flex items-center justify-between bg-surface-container p-2.5 rounded text-sm"
+                >
+                  <div className="flex-1 min-w-0">
+                    <p className="font-bold text-on-surface truncate">{item.label}</p>
+                    <p className="text-xs text-on-surface-variant font-mono truncate">
+                      {item.value}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setDeleteTarget(item.id)}
+                    disabled={item.is_deletable === 0}
+                    className="ml-2 p-1 text-on-surface-variant rounded disabled:text-outline-variant/30 disabled:cursor-not-allowed hover:text-error enabled:hover:bg-error/10 flex-shrink-0"
+                    title={item.is_deletable === 0 ? 'Padrão (não pode ser excluído)' : 'Excluir'}
+                  >
+                    <span className="material-symbols-outlined text-lg">delete</span>
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
+
+          <div className="border-t border-outline-variant/20 pt-3">
+            <form onSubmit={handleSubmit(onSubmit)} className="flex gap-2">
+              <Input
+                placeholder="Novo item..."
+                {...register('label')}
+                error={errors.label?.message}
+                className="flex-1"
+              />
+              <Button type="submit" size="sm" className="h-9">
+                <span className="material-symbols-outlined">add</span>
+              </Button>
+            </form>
+          </div>
+        </div>
+      )}
 
       {deleteTarget !== null && (
         <ConfirmModal
-          message={`Tem certeza que deseja excluir este item de ${title.toLowerCase()}?`}
+          message="Tem certeza que deseja excluir este item?"
           onConfirm={handleConfirmDelete}
           onCancel={() => setDeleteTarget(null)}
         />
       )}
+    </div>
+  )
+}
+
+function TaxSettings() {
+  const [settings, setSettings] = useState<AppSettings>({ taxRate: 0, taxFixed: 0 })
+  const [loading, setLoading] = useState(true)
+  const { toast, show } = useToast()
+
+  const taxRateId = useId()
+  const taxFixedId = useId()
+
+  const {
+    handleSubmit,
+    formState: { errors },
+    reset,
+    control,
+  } = useForm<AppSettings>({
+    resolver: zodResolver(appSettingsSchema),
+    defaultValues: settings,
+  })
+
+  useEffect(() => {
+    window.api.settings.getApp().then((data) => {
+      setSettings(data)
+      reset(data)
+      setLoading(false)
+    })
+  }, [reset])
+
+  const onSubmit = async (data: AppSettings) => {
+    try {
+      await window.api.settings.saveApp(data)
+      setSettings(data)
+      show('Impostos salvos com sucesso!')
+    } catch (error: any) {
+      show(error.message || 'Erro ao salvar.', 'error')
+    }
+  }
+
+  if (loading) {
+    return <div className="text-on-surface-variant text-sm">Carregando...</div>
+  }
+
+  return (
+    <Section title="Configuração de Impostos" icon="receipt_long">
+      {toast && <Toast message={toast.message} type={toast.type} />}
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+        <div>
+          <label htmlFor={taxRateId} className="block text-sm font-bold text-on-surface mb-2">
+            Alíquota Percentual (%)
+          </label>
+          <Controller
+            name="taxRate"
+            control={control}
+            render={({ field }) => (
+              <Input
+                id={taxRateId}
+                type="number"
+                step="0.01"
+                min="0"
+                max="100"
+                placeholder="0"
+                value={field.value}
+                onChange={field.onChange}
+                error={errors.taxRate?.message}
+              />
+            )}
+          />
+          <p className="text-xs text-on-surface-variant mt-1">Percentual sobre cada viagem</p>
+        </div>
+
+        <div>
+          <label htmlFor={taxFixedId} className="block text-sm font-bold text-on-surface mb-2">
+            Valor Fixo (R$)
+          </label>
+          <Controller
+            name="taxFixed"
+            control={control}
+            render={({ field }) => (
+              <CurrencyInput
+                id={taxFixedId}
+                placeholder="0"
+                value={field.value}
+                onChange={field.onChange}
+                error={errors.taxFixed?.message}
+              />
+            )}
+          />
+          <p className="text-xs text-on-surface-variant mt-1">Valor fixo em reais por viagem</p>
+        </div>
+
+        <Button type="submit" className="w-full">
+          Salvar
+        </Button>
+      </form>
     </Section>
   )
 }
 
-// Main Settings Page Component
 interface SettingsPageProps {
   theme: 'light' | 'dark'
   onToggleTheme: () => void
 }
 
 export function SettingsPage({ theme, onToggleTheme }: SettingsPageProps) {
+  const [activeTab, setActiveTab] = useState('geral')
+
+  const tabs: TabItem[] = [
+    { id: 'geral', label: 'Geral', icon: 'settings' },
+    { id: 'dados', label: 'Dados Mestres', icon: 'storage' },
+    { id: 'backup', label: 'Backup', icon: 'backup' },
+  ]
+
   return (
-    <div className="p-12 max-w-7xl mx-auto">
+    <div className="p-8 max-w-4xl mx-auto">
       <PageHeader
         pretitle="Administração"
         title="Configurações"
-        subtitle="Ajuste as configurações gerais do sistema."
+        subtitle="Gerencie as configurações do sistema"
       />
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 mt-10 items-start">
-        <DynamicTypeManager title="Tipos de Fornecedor" api={window.api['supplier-types']} />
-        <DynamicTypeManager title="Categorias de Custo" api={window.api['cost-categories']} />
-        <BackupSettings />
+      <div className="mt-10">
+        <TabBar tabs={tabs} activeTab={activeTab} onChange={setActiveTab} />
 
-        <Section title="Tema e Aparência">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="font-bold text-on-surface">Tema</p>
-              <p className="text-on-surface-variant text-sm capitalize">
-                Atualmente: {theme === 'dark' ? 'Escuro' : 'Claro'}
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={onToggleTheme}
-              className="flex items-center gap-3 px-5 py-2.5 rounded-lg font-bold text-sm text-on-surface-variant bg-surface-container-high hover:text-on-surface transition-colors"
-            >
-              <span className="material-symbols-outlined text-xl">
-                {theme === 'dark' ? 'light_mode' : 'dark_mode'}
-              </span>
-              <span>Mudar para tema {theme === 'dark' ? 'Claro' : 'Escuro'}</span>
-            </button>
+        {/* ABA: GERAL */}
+        {activeTab === 'geral' && (
+          <div className="space-y-6">
+            <Section title="Tema e Aparência" icon="palette">
+              <div className="flex items-center justify-between p-4 bg-surface-container rounded-lg">
+                <div>
+                  <p className="font-bold text-on-surface">Modo Escuro</p>
+                  <p className="text-xs text-on-surface-variant">
+                    Atualmente: {theme === 'dark' ? 'Ativado' : 'Desativado'}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={onToggleTheme}
+                  className="px-4 py-2 rounded-lg font-bold text-sm bg-primary text-on-primary hover:bg-primary/90 transition-colors"
+                >
+                  {theme === 'dark' ? 'Claro' : 'Escuro'}
+                </button>
+              </div>
+            </Section>
+
+            <TaxSettings />
           </div>
-        </Section>
+        )}
+
+        {/* ABA: DADOS MESTRES */}
+        {activeTab === 'dados' && (
+          <div className="space-y-6">
+            <DynamicTypeManager
+              title="Tipos de Fornecedor"
+              icon="business"
+              api={window.api['supplier-types']}
+            />
+            <DynamicTypeManager
+              title="Categorias de Custo"
+              icon="category"
+              api={window.api['cost-categories']}
+            />
+          </div>
+        )}
+
+        {/* ABA: BACKUP */}
+        {activeTab === 'backup' && (
+          <div>
+            <BackupSettings />
+          </div>
+        )}
       </div>
     </div>
   )

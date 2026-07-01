@@ -33,6 +33,7 @@ interface TripFormData {
   price_charged: number
   km_driven: number
   observation?: string
+  has_percentage_tax?: boolean
   fuel_stops?: any[]
 }
 
@@ -49,6 +50,7 @@ const EMPTY: TripFormData = {
   price_charged: 0,
   km_driven: 0,
   observation: '',
+  has_percentage_tax: false,
   fuel_stops: [],
 }
 
@@ -102,11 +104,13 @@ export function TripsPage() {
   const [modal, setModal] = useState(false)
   const [editing, setEditing] = useState<Trip | null>(null)
   const [hasOverweight, setHasOverweight] = useState(false)
+  const [appSettings, setAppSettings] = useState({ taxRate: 0, taxFixed: 0 })
   const [stopSearchId, setStopSearchId] = useState<string | number>('')
   const [pendingData, setPendingData] = useState<any>(null)
   const [deleteTarget, setDeleteTarget] = useState<Trip | null>(null)
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false)
   const [showTruckBreakdown, setShowTruckBreakdown] = useState(false)
+  const [showDriverBreakdown, setShowDriverBreakdown] = useState(false)
   const [filters, setFilters] = useState({
     startDate: '',
     endDate: '',
@@ -129,6 +133,7 @@ export function TripsPage() {
   const weightInputRef = useRef<HTMLInputElement>(null)
   const priceInputRef = useRef<HTMLInputElement>(null)
   const kmInputRef = useRef<HTMLInputElement>(null)
+  const taxSelectRef = useRef<SelectRef>(null)
 
   useEffect(() => {
     if (location.state?.openModal) {
@@ -176,13 +181,14 @@ export function TripsPage() {
   }, [selectedCustomerId, selectedProductId, currentWeight, currentOverweight, editing, setValue])
 
   const load = useCallback(async () => {
-    const [t, tr, d, p, c, s] = await Promise.all([
+    const [t, tr, d, p, c, s, settings] = await Promise.all([
       window.api.trips.list(filters),
       window.api.trucks.list(),
       window.api.drivers.list(),
       window.api.products.list(),
       window.api.customers.list(),
       window.api.suppliers.list(),
+      window.api.settings.getApp(),
     ])
     setTrips(t)
     setTrucks(tr)
@@ -190,6 +196,7 @@ export function TripsPage() {
     setProducts(p)
     setCustomers(c)
     setSuppliers(s)
+    setAppSettings(settings)
   }, [filters])
 
   useEffect(() => {
@@ -268,6 +275,7 @@ export function TripsPage() {
         price_charged: row.price_charged,
         km_driven: row.km_driven,
         observation: row.observation ?? '',
+        has_percentage_tax: !!row.has_percentage_tax,
         fuel_stops: fuelStops,
       })
       setHasOverweight(!!(row.overweight_ton && row.overweight_ton > 0))
@@ -303,6 +311,14 @@ export function TripsPage() {
   }
 
   const totalRevenue = trips.reduce((s, t) => s + t.price_charged, 0)
+  const totalTaxes = trips.reduce((s, t) => {
+    let tax = 0
+    if (t.has_percentage_tax) {
+      tax += (t.price_charged * appSettings.taxRate) / 100
+    }
+    return s + tax
+  }, 0)
+  const totalNetRevenue = totalRevenue - totalTaxes
   const totalKm = trips.reduce((s, t) => s + t.km_driven, 0)
   const totalTon = trips.reduce((s, t) => s + t.weight_ton + (t.overweight_ton || 0), 0)
 
@@ -315,6 +331,19 @@ export function TripsPage() {
         }
       }
       acc[t.truck_id].count++
+      return acc
+    }, {}),
+  ).sort((a, b) => b.count - a.count)
+
+  const perDriver = Object.values(
+    trips.reduce<Record<number, { name: string; count: number }>>((acc, t) => {
+      if (!acc[t.driver_id]) {
+        acc[t.driver_id] = {
+          name: t.driver_name ?? String(t.driver_id),
+          count: 0,
+        }
+      }
+      acc[t.driver_id].count++
       return acc
     }, {}),
   ).sort((a, b) => b.count - a.count)
@@ -343,20 +372,31 @@ export function TripsPage() {
             'Peso',
             'Km',
             'Valor',
+            'Imposto',
             'Cliente',
           ]
-          const data = trips.map((trip) => [
-            formatDate(trip.date),
-            trip.truck_license_plate ?? '—',
-            trip.driver_name ?? '—',
-            trip.product_name ?? '—',
-            trip.overweight_ton
-              ? `${trip.weight_ton} + ${trip.overweight_ton} ton (excesso)`
-              : `${trip.weight_ton} ton`,
-            `${trip.km_driven} km`,
-            formatBRL(trip.price_charged),
-            trip.customer_name ?? '—',
-          ])
+          const data = trips.map((trip) => {
+            const tripTax = (() => {
+              let tax = 0
+              if (trip.has_percentage_tax) {
+                tax += (trip.price_charged * appSettings.taxRate) / 100
+              }
+              return tax
+            })()
+            return [
+              formatDate(trip.date),
+              trip.truck_license_plate ?? '—',
+              trip.driver_name ?? '—',
+              trip.product_name ?? '—',
+              trip.overweight_ton
+                ? `${trip.weight_ton} + ${trip.overweight_ton} ton (excesso)`
+                : `${trip.weight_ton} ton`,
+              `${trip.km_driven} km`,
+              formatBRL(trip.price_charged),
+              formatBRL(tripTax),
+              trip.customer_name ?? '—',
+            ]
+          })
 
           // Resolver nomes dos filtros
           const filterParts: string[] = []
@@ -543,9 +583,11 @@ export function TripsPage() {
       </div>
 
       {/* KPI row */}
-      <div className="grid grid-cols-3 gap-6 mb-10">
+      <div className="grid grid-cols-3 lg:grid-cols-5 gap-6 mb-10">
         {[
-          { label: 'Receita Total', value: formatBRL(totalRevenue), icon: 'payments' },
+          { label: 'Receita Bruta', value: formatBRL(totalRevenue), icon: 'payments' },
+          { label: 'Total de Impostos', value: formatBRL(totalTaxes), icon: 'receipt' },
+          { label: 'Receita Líquida', value: formatBRL(totalNetRevenue), icon: 'trending_up' },
           { label: 'Km Total', value: `${totalKm.toFixed(0)} km`, icon: 'route' },
           { label: 'Tonelagem Total', value: `${totalTon} ton`, icon: 'scale' },
         ].map(({ label, value, icon }) => (
@@ -566,37 +608,80 @@ export function TripsPage() {
         ))}
       </div>
 
-      {/* Per-truck breakdown */}
-      {perTruck.length > 1 && (
-        <div className="mb-10">
-          <button
-            type="button"
-            onClick={() => setShowTruckBreakdown((v) => !v)}
-            className="flex items-center gap-1.5 text-xs text-on-surface-variant hover:text-on-surface transition-colors mb-3"
-          >
-            <span className="material-symbols-outlined text-sm">
-              {showTruckBreakdown ? 'expand_less' : 'expand_more'}
-            </span>
-            {showTruckBreakdown ? 'Ocultar por caminhão' : 'Ver por caminhão'}
-          </button>
+      {/* Breakdown section */}
+      <div className={showTruckBreakdown || showDriverBreakdown ? 'mb-10' : 'mb-4'}>
+        <div className="mb-4 flex items-center justify-between">
+          <h3 className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant">
+            Lançamentos: {trips.length}
+          </h3>
+        </div>
 
-          {showTruckBreakdown && (
-            <div className="flex flex-wrap gap-2">
-              {perTruck.map(({ license_plate, count }) => (
-                <div
-                  key={license_plate}
-                  className="flex items-center gap-2 px-3 py-1.5 bg-surface-container-low rounded-lg border border-outline-variant/10 text-sm"
-                >
-                  <span className="font-mono font-bold text-primary">{license_plate}</span>
-                  <span className="text-on-surface-variant text-xs">
-                    {count} lançamento{count !== 1 ? 's' : ''}
-                  </span>
+        <div className="grid grid-cols-2 gap-6">
+          {/* Per-truck breakdown */}
+          {perTruck.length > 1 && (
+            <div>
+              <button
+                type="button"
+                onClick={() => setShowTruckBreakdown((v) => !v)}
+                className="flex items-center gap-1.5 text-xs text-on-surface-variant hover:text-on-surface transition-colors mb-3"
+              >
+                <span className="material-symbols-outlined text-sm">
+                  {showTruckBreakdown ? 'expand_less' : 'expand_more'}
+                </span>
+                {showTruckBreakdown ? 'Ocultar por caminhão' : 'Ver por caminhão'}
+              </button>
+
+              {showTruckBreakdown && (
+                <div className="flex flex-wrap gap-2">
+                  {perTruck.map(({ license_plate, count }) => (
+                    <div
+                      key={license_plate}
+                      className="flex items-center gap-2 px-3 py-1.5 bg-surface-container-low rounded-lg border border-outline-variant/10 text-sm"
+                    >
+                      <span className="font-mono font-bold text-primary">{license_plate}</span>
+                      <span className="text-on-surface-variant text-xs">
+                        {count} lançamento{count !== 1 ? 's' : ''}
+                      </span>
+                    </div>
+                  ))}
                 </div>
-              ))}
+              )}
+            </div>
+          )}
+
+          {/* Per-driver breakdown */}
+          {perDriver.length > 1 && (
+            <div>
+              <button
+                type="button"
+                onClick={() => setShowDriverBreakdown((v) => !v)}
+                className="flex items-center gap-1.5 text-xs text-on-surface-variant hover:text-on-surface transition-colors mb-3"
+              >
+                <span className="material-symbols-outlined text-sm">
+                  {showDriverBreakdown ? 'expand_less' : 'expand_more'}
+                </span>
+                {showDriverBreakdown ? 'Ocultar por motorista' : 'Ver por motorista'}
+              </button>
+
+              {showDriverBreakdown && (
+                <div className="flex flex-wrap gap-2">
+                  {perDriver.map(({ name, count }) => (
+                    <div
+                      key={name}
+                      className="flex items-center gap-2 px-3 py-1.5 bg-surface-container-low rounded-lg border border-outline-variant/10 text-sm"
+                    >
+                      <span className="font-bold text-on-surface">{name}</span>
+                      <span className="text-on-surface-variant text-xs">
+                        {count} lançamento{count !== 1 ? 's' : ''}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>
-      )}
+      </div>
 
       {/* Table */}
       <div className="bg-surface-container rounded-xl overflow-hidden border border-outline-variant/10 shadow-sm">
@@ -611,6 +696,7 @@ export function TripsPage() {
                 'Peso',
                 'Km',
                 'Valor',
+                'Imposto',
                 'Cliente',
                 '',
               ].map((h) => (
@@ -626,68 +712,91 @@ export function TripsPage() {
           <tbody className="divide-y divide-outline-variant/10">
             {trips.length === 0 && (
               <tr>
-                <td colSpan={9} className="px-6 py-12 text-center text-on-surface-variant text-sm">
+                <td colSpan={10} className="px-6 py-12 text-center text-on-surface-variant text-sm">
                   Nenhum lançamento encontrado com os filtros selecionados
                 </td>
               </tr>
             )}
-            {trips.map((row, i) => (
-              <tr
-                key={row.id}
-                className={`hover:bg-surface-bright/5 transition-colors group ${i % 2 === 1 ? 'bg-surface-container-lowest/30' : ''}`}
-              >
-                <td className="px-6 py-4 text-sm text-on-surface-variant">
-                  {formatDate(row.date)}
-                </td>
-                <td className="px-6 py-4 text-sm font-mono font-bold text-primary">
-                  {row.truck_license_plate}
-                </td>
-                <td className="px-6 py-4 text-sm text-on-surface">{row.driver_name}</td>
-                <td className="px-6 py-4 text-sm text-on-surface">{row.product_name}</td>
-                <td className="px-6 py-4 text-sm text-on-surface-variant">
-                  {row.weight_ton} ton
-                  {row.overweight_ton ? (
-                    <div className="mt-1">
-                      <Badge label={`+${row.overweight_ton} ton excesso`} color="amber" />
+            {trips.map((row, i) => {
+              const tripTax = (() => {
+                let tax = 0
+                if (row.has_percentage_tax) {
+                  tax += (row.price_charged * appSettings.taxRate) / 100
+                }
+                return tax
+              })()
+              return (
+                <tr
+                  key={row.id}
+                  className={`hover:bg-surface-bright/5 transition-colors group ${i % 2 === 1 ? 'bg-surface-container-lowest/30' : ''}`}
+                >
+                  <td className="px-6 py-4 text-sm text-on-surface-variant">
+                    {formatDate(row.date)}
+                  </td>
+                  <td className="px-6 py-4 text-sm font-mono font-bold text-primary">
+                    {row.truck_license_plate}
+                  </td>
+                  <td className="px-6 py-4 text-sm text-on-surface">{row.driver_name}</td>
+                  <td className="px-6 py-4 text-sm text-on-surface">{row.product_name}</td>
+                  <td className="px-6 py-4 text-sm text-on-surface-variant">
+                    {row.weight_ton} ton
+                    {row.overweight_ton ? (
+                      <div className="mt-1">
+                        <Badge label={`+${row.overweight_ton} ton excesso`} color="amber" />
+                      </div>
+                    ) : null}
+                  </td>
+                  <td className="px-6 py-4 text-sm text-on-surface-variant">
+                    {row.km_driven} km
+                    {row.fuel_stops_count
+                      ? row.fuel_stops_count > 0 && (
+                          <div className="mt-1">
+                            <Badge label={`${row.fuel_stops_count} paradas`} color="amber" />
+                          </div>
+                        )
+                      : null}
+                  </td>
+                  <td className="px-6 py-4 text-sm font-bold text-on-surface">
+                    {formatBRL(row.price_charged)}
+                  </td>
+                  <td className="px-6 py-4 text-sm font-bold text-on-surface">
+                    {tripTax > 0 ? (
+                      <div className="flex items-center gap-1">
+                        <span>{formatBRL(tripTax)}</span>
+                        {row.has_percentage_tax && (
+                          <span className="material-symbols-outlined text-xs text-primary">
+                            receipt
+                          </span>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="text-on-surface-variant">—</span>
+                    )}
+                  </td>
+                  <td className="px-6 py-4 text-sm text-on-surface-variant">
+                    {row.customer_name ?? '—'}
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button
+                        type="button"
+                        onClick={() => edit(row)}
+                        className="p-2 text-on-surface-variant hover:text-primary hover:bg-primary/10 rounded-lg transition-all"
+                      >
+                        <span className="material-symbols-outlined text-xl">edit</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setDeleteTarget(row)}
+                        className="p-2 text-on-surface-variant hover:text-error hover:bg-error/10 rounded-lg transition-all"
+                      >
+                        <span className="material-symbols-outlined text-xl">delete</span>
+                      </button>
                     </div>
-                  ) : null}
-                </td>
-                <td className="px-6 py-4 text-sm text-on-surface-variant">
-                  {row.km_driven} km
-                  {row.fuel_stops_count
-                    ? row.fuel_stops_count > 0 && (
-                        <div className="mt-1">
-                          <Badge label={`${row.fuel_stops_count} paradas`} color="amber" />
-                        </div>
-                      )
-                    : null}
-                </td>
-                <td className="px-6 py-4 text-sm font-bold text-on-surface">
-                  {formatBRL(row.price_charged)}
-                </td>
-                <td className="px-6 py-4 text-sm text-on-surface-variant">
-                  {row.customer_name ?? '—'}
-                </td>
-                <td className="px-6 py-4">
-                  <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button
-                      type="button"
-                      onClick={() => edit(row)}
-                      className="p-2 text-on-surface-variant hover:text-primary hover:bg-primary/10 rounded-lg transition-all"
-                    >
-                      <span className="material-symbols-outlined text-xl">edit</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setDeleteTarget(row)}
-                      className="p-2 text-on-surface-variant hover:text-error hover:bg-error/10 rounded-lg transition-all"
-                    >
-                      <span className="material-symbols-outlined text-xl">delete</span>
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
+                  </td>
+                </tr>
+              )
+            })}
           </tbody>
         </table>
       </div>
@@ -841,19 +950,37 @@ export function TripsPage() {
               <Controller
                 name="weight_ton"
                 control={control}
-                render={({ field }) => (
-                  <Input
-                    ref={weightInputRef}
-                    label="Peso (ton)"
-                    type="number"
-                    step="0.01"
-                    placeholder="0,00"
-                    value={field.value}
-                    onChange={field.onChange}
-                    error={errors.weight_ton?.message}
-                    onKeyDown={(e) => e.key === 'Enter' && priceInputRef.current?.focus()}
-                  />
-                )}
+                render={({ field }) => {
+                  const selectedTruck = trucks.find((t) => t.id === watch('truck_id'))
+                  const capacity = selectedTruck?.capacity_ton || 0
+                  const totalWeight =
+                    Number(field.value || 0) + Number(watch('overweight_ton') || 0)
+                  const exceeds = capacity > 0 && totalWeight > capacity
+
+                  return (
+                    <div>
+                      <Input
+                        ref={weightInputRef}
+                        label="Peso (ton)"
+                        type="number"
+                        step="0.01"
+                        placeholder="0,00"
+                        value={field.value}
+                        onChange={field.onChange}
+                        error={errors.weight_ton?.message}
+                        onKeyDown={(e) => e.key === 'Enter' && priceInputRef.current?.focus()}
+                      />
+                      {capacity > 0 && (
+                        <p
+                          className={`text-xs mt-1 ${exceeds ? 'text-amber-600 font-bold' : 'text-on-surface-variant'}`}
+                        >
+                          Capacidade: {capacity} ton | Total: {totalWeight.toFixed(2)} ton
+                          {exceeds && ' ⚠️ Sobrecarga!'}
+                        </p>
+                      )}
+                    </div>
+                  )
+                }}
               />
 
               <Controller
@@ -886,7 +1013,7 @@ export function TripsPage() {
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
                         e.preventDefault()
-                        handleSubmit(onEnterSubmit as any)()
+                        taxSelectRef.current?.open()
                       }
                     }}
                   />
@@ -901,6 +1028,36 @@ export function TripsPage() {
                   error={errors.observation?.message}
                 />
               </div>
+
+              {/* Tax section */}
+              <Controller
+                name="has_percentage_tax"
+                control={control}
+                render={({ field }) => (
+                  <Select
+                    ref={taxSelectRef}
+                    label="Imposto"
+                    icon="receipt"
+                    value={field.value ? 'true' : 'false'}
+                    onChange={(v) => field.onChange(v === 'true')}
+                    onEnterSelect={() => handleSubmit(onEnterSubmit as any)()}
+                    options={[
+                      {
+                        value: 'false',
+                        label: 'Sem imposto',
+                        displayLabel: 'Sem imposto',
+                        searchableLabel: 'sem imposto',
+                      },
+                      {
+                        value: 'true',
+                        label: `Com imposto (${appSettings.taxRate}%)`,
+                        displayLabel: `Com imposto (${appSettings.taxRate}%)`,
+                        searchableLabel: `com imposto ${appSettings.taxRate}`,
+                      },
+                    ]}
+                  />
+                )}
+              />
 
               {/* Overweight toggle */}
               <div className="col-span-2 pt-1">

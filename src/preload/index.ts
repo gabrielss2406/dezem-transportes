@@ -126,6 +126,13 @@ contextBridge.exposeInMainWorld('api', {
       return () => ipcRenderer.removeListener('backup-status-update', listener)
     },
   },
+
+  // Settings
+  settings: {
+    getApp: () => ipcRenderer.invoke('settings:get-app'),
+    saveApp: (data: unknown) => ipcRenderer.invoke('settings:save-app', data),
+  },
+
   // PDF
   exportPdf: (data: PdfExportData) => ipcRenderer.invoke('export-pdf', data),
 })
