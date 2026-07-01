@@ -1,6 +1,6 @@
 export interface AppSettings {
   taxRate: number
-  taxFixed: number
+  commissionRate: number
 }
 
 export interface BackupConfig {

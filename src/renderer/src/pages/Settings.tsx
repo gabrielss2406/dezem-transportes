@@ -5,7 +5,7 @@ import { z } from 'zod'
 import { appSettingsSchema } from '../../../shared/schemas'
 import type { AppSettings } from '../../../shared/types'
 import { PageHeader } from '../components/PageHeader'
-import { Button, ConfirmModal, CurrencyInput, Input, Toast, useToast } from '../components/ui'
+import { Button, ConfirmModal, Input, Toast, useToast } from '../components/ui'
 import { BackupSettings } from './BackupSettings'
 
 const formSchema = z.object({
@@ -233,12 +233,15 @@ function DynamicTypeManager({
 }
 
 function TaxSettings() {
-  const [settings, setSettings] = useState<AppSettings>({ taxRate: 0, taxFixed: 0 })
+  const [settings, setSettings] = useState<AppSettings>({
+    taxRate: 0,
+    commissionRate: 0,
+  })
   const [loading, setLoading] = useState(true)
   const { toast, show } = useToast()
 
   const taxRateId = useId()
-  const taxFixedId = useId()
+  const commissionRateId = useId()
 
   const {
     handleSubmit,
@@ -262,7 +265,7 @@ function TaxSettings() {
     try {
       await window.api.settings.saveApp(data)
       setSettings(data)
-      show('Impostos salvos com sucesso!')
+      show('Configurações salvas com sucesso!')
     } catch (error: any) {
       show(error.message || 'Erro ao salvar.', 'error')
     }
@@ -273,7 +276,7 @@ function TaxSettings() {
   }
 
   return (
-    <Section title="Configuração de Impostos" icon="receipt_long">
+    <Section title="Impostos e Comissão" icon="receipt_long">
       {toast && <Toast message={toast.message} type={toast.type} />}
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
         <div>
@@ -301,23 +304,32 @@ function TaxSettings() {
         </div>
 
         <div>
-          <label htmlFor={taxFixedId} className="block text-sm font-bold text-on-surface mb-2">
-            Valor Fixo (R$)
+          <label
+            htmlFor={commissionRateId}
+            className="block text-sm font-bold text-on-surface mb-2"
+          >
+            Comissão dos Motoristas (%)
           </label>
           <Controller
-            name="taxFixed"
+            name="commissionRate"
             control={control}
             render={({ field }) => (
-              <CurrencyInput
-                id={taxFixedId}
+              <Input
+                id={commissionRateId}
+                type="number"
+                step="0.01"
+                min="0"
+                max="100"
                 placeholder="0"
                 value={field.value}
                 onChange={field.onChange}
-                error={errors.taxFixed?.message}
+                error={errors.commissionRate?.message}
               />
             )}
           />
-          <p className="text-xs text-on-surface-variant mt-1">Valor fixo em reais por viagem</p>
+          <p className="text-xs text-on-surface-variant mt-1">
+            Percentual aplicado sobre viagens com comissão habilitada
+          </p>
         </div>
 
         <Button type="submit" className="w-full">

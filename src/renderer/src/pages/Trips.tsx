@@ -4,6 +4,7 @@ import { Controller, useFieldArray, useForm } from 'react-hook-form'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { tripSchema } from '../../../shared/schemas'
 import { PageHeader } from '../components/PageHeader'
+import { SupplierCombobox } from '../components/SupplierCombobox'
 import {
   Badge,
   Button,
@@ -34,6 +35,7 @@ interface TripFormData {
   km_driven: number
   observation?: string
   has_percentage_tax?: boolean
+  has_commission?: boolean
   fuel_stops?: any[]
 }
 
@@ -51,6 +53,7 @@ const EMPTY: TripFormData = {
   km_driven: 0,
   observation: '',
   has_percentage_tax: false,
+  has_commission: true,
   fuel_stops: [],
 }
 
@@ -104,13 +107,15 @@ export function TripsPage() {
   const [modal, setModal] = useState(false)
   const [editing, setEditing] = useState<Trip | null>(null)
   const [hasOverweight, setHasOverweight] = useState(false)
-  const [appSettings, setAppSettings] = useState({ taxRate: 0, taxFixed: 0 })
-  const [stopSearchId, setStopSearchId] = useState<string | number>('')
+  const [appSettings, setAppSettings] = useState({ taxRate: 0, commissionRate: 0 })
   const [pendingData, setPendingData] = useState<any>(null)
   const [deleteTarget, setDeleteTarget] = useState<Trip | null>(null)
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false)
   const [showTruckBreakdown, setShowTruckBreakdown] = useState(false)
   const [showDriverBreakdown, setShowDriverBreakdown] = useState(false)
+  const [deductionView, setDeductionView] = useState<'tax' | 'commission'>('tax')
+  const [noPriceRegistered, setNoPriceRegistered] = useState(false)
+  const [manualUnitPrice, setManualUnitPrice] = useState<number | null>(null)
   const [filters, setFilters] = useState({
     startDate: '',
     endDate: '',
@@ -131,9 +136,11 @@ export function TripsPage() {
   const productSelectRef = useRef<SelectRef>(null)
   const customerSelectRef = useRef<SelectRef>(null)
   const weightInputRef = useRef<HTMLInputElement>(null)
+  const unitPriceInputRef = useRef<HTMLInputElement>(null)
   const priceInputRef = useRef<HTMLInputElement>(null)
   const kmInputRef = useRef<HTMLInputElement>(null)
   const taxSelectRef = useRef<SelectRef>(null)
+  const commissionSelectRef = useRef<SelectRef>(null)
 
   useEffect(() => {
     if (location.state?.openModal) {
@@ -150,6 +157,7 @@ export function TripsPage() {
     control,
     watch,
     setValue,
+    getValues,
   } = useForm<TripFormData>({
     resolver: zodResolver(tripSchema) as any,
     defaultValues: { ...EMPTY },
@@ -166,19 +174,74 @@ export function TripsPage() {
   const currentWeight = watch('weight_ton')
   const currentOverweight = watch('overweight_ton')
 
+  const priceLookupKeyRef = useRef<string | null>(null)
+
   useEffect(() => {
-    if (selectedCustomerId && selectedProductId && !editing) {
+    const key = `${selectedProductId}-${selectedCustomerId}`
+    if (priceLookupKeyRef.current !== key) {
+      priceLookupKeyRef.current = key
+      setManualUnitPrice(null)
+    }
+    if (!selectedProductId) {
+      setNoPriceRegistered(false)
+      return
+    }
+    const weight = Number(currentWeight) || 0
+    const overweight = Number(currentOverweight) || 0
+    const readyToShowManualField = !!selectedCustomerId && weight > 0
+    const applyUnitPrice = (unitPrice: number) => {
+      setNoPriceRegistered(false)
+      if (!editing) {
+        setValue('price_charged', unitPrice * (weight + overweight))
+      }
+    }
+    const fallbackToProductPrice = () => {
+      const product = products.find((p) => p.id === Number(selectedProductId))
+      if (product?.unit_value) {
+        applyUnitPrice(product.unit_value)
+        return
+      }
+      setNoPriceRegistered(readyToShowManualField)
+      if (editing && readyToShowManualField && manualUnitPrice === null) {
+        const existingPrice = Number(getValues('price_charged')) || 0
+        if (existingPrice > 0) {
+          setManualUnitPrice(existingPrice / (weight + overweight))
+        }
+      }
+    }
+    if (selectedCustomerId) {
       window.api.customerPrices
         .getPrice(Number(selectedCustomerId), Number(selectedProductId))
         .then((res) => {
           if (res?.price) {
-            const weight = Number(currentWeight) || 0
-            const overweight = Number(currentOverweight) || 0
-            setValue('price_charged', res.price * (weight + overweight))
+            applyUnitPrice(res.price)
+          } else {
+            fallbackToProductPrice()
           }
         })
+    } else {
+      fallbackToProductPrice()
     }
-  }, [selectedCustomerId, selectedProductId, currentWeight, currentOverweight, editing, setValue])
+  }, [
+    selectedCustomerId,
+    selectedProductId,
+    currentWeight,
+    currentOverweight,
+    editing,
+    setValue,
+    products,
+    manualUnitPrice,
+    getValues,
+  ])
+
+  useEffect(() => {
+    if (!noPriceRegistered || manualUnitPrice == null) {
+      return
+    }
+    const weight = Number(currentWeight) || 0
+    const overweight = Number(currentOverweight) || 0
+    setValue('price_charged', manualUnitPrice * (weight + overweight))
+  }, [manualUnitPrice, noPriceRegistered, currentWeight, currentOverweight, setValue])
 
   const load = useCallback(async () => {
     const [t, tr, d, p, c, s, settings] = await Promise.all([
@@ -218,10 +281,50 @@ export function TripsPage() {
     } else {
       setEditing(null)
       reset(EMPTY)
-      setStopSearchId('')
       setHasOverweight(false)
+      setNoPriceRegistered(false)
+      setManualUnitPrice(null)
     }
   }, [modal, editing, reset])
+
+  const resolvePendingFuelStopSuppliers = async (): Promise<boolean> => {
+    const fuelStops: any[] = getValues('fuel_stops' as any) || []
+    const createdCache: Record<string, number> = {}
+
+    for (let i = 0; i < fuelStops.length; i++) {
+      const stop = fuelStops[i]
+      if (stop.supplier_id) {
+        continue
+      }
+
+      const name = (stop.pendingSupplierName || '').trim()
+      if (!name) {
+        show('Selecione ou digite um fornecedor para todas as paradas', 'error')
+        return false
+      }
+
+      const normalized = name.toLowerCase()
+      const existing = suppliers.find((s) => s.name.trim().toLowerCase() === normalized)
+      if (existing) {
+        setValue(`fuel_stops.${i}.supplier_id` as any, existing.id)
+        continue
+      }
+      if (createdCache[normalized]) {
+        setValue(`fuel_stops.${i}.supplier_id` as any, createdCache[normalized])
+        continue
+      }
+
+      const created = await window.api.suppliers.create({ name, type: 'other' })
+      if ('ok' in created && created.ok === false) {
+        show('Erro ao criar fornecedor', 'error')
+        return false
+      }
+      createdCache[normalized] = created.id
+      setSuppliers((prev) => [...prev, { id: created.id, name, type: 'other' } as any])
+      setValue(`fuel_stops.${i}.supplier_id` as any, created.id)
+    }
+    return true
+  }
 
   const save = async (data: TripFormData) => {
     try {
@@ -276,6 +379,7 @@ export function TripsPage() {
         km_driven: row.km_driven,
         observation: row.observation ?? '',
         has_percentage_tax: !!row.has_percentage_tax,
+        has_commission: !!row.has_commission,
         fuel_stops: fuelStops,
       })
       setHasOverweight(!!(row.overweight_ton && row.overweight_ton > 0))
@@ -306,19 +410,26 @@ export function TripsPage() {
     const supplier = suppliers.find((s) => String(s.id) === String(supplierId))
     if (supplier) {
       append({ supplier_id: supplier.id, value: 0, liters: null, km_driven: 0 })
-      setStopSearchId('') // Reset selection
     }
   }
 
-  const totalRevenue = trips.reduce((s, t) => s + t.price_charged, 0)
-  const totalTaxes = trips.reduce((s, t) => {
-    let tax = 0
-    if (t.has_percentage_tax) {
-      tax += (t.price_charged * appSettings.taxRate) / 100
+  const handleAddPendingStop = (name: string) => {
+    if (!name.trim()) {
+      return
     }
-    return s + tax
-  }, 0)
+    append({
+      supplier_id: undefined,
+      pendingSupplierName: name.trim(),
+      value: 0,
+      liters: null,
+      km_driven: 0,
+    } as any)
+  }
+
+  const totalRevenue = trips.reduce((s, t) => s + t.price_charged, 0)
+  const totalTaxes = trips.reduce((s, t) => s + (t.tax_value || 0), 0)
   const totalNetRevenue = totalRevenue - totalTaxes
+  const totalCommissions = trips.reduce((s, t) => s + (t.commission_value || 0), 0)
   const totalKm = trips.reduce((s, t) => s + t.km_driven, 0)
   const totalTon = trips.reduce((s, t) => s + t.weight_ton + (t.overweight_ton || 0), 0)
 
@@ -372,17 +483,12 @@ export function TripsPage() {
             'Peso',
             'Km',
             'Valor',
-            'Imposto',
+            'Deduções',
             'Cliente',
           ]
           const data = trips.map((trip) => {
-            const tripTax = (() => {
-              let tax = 0
-              if (trip.has_percentage_tax) {
-                tax += (trip.price_charged * appSettings.taxRate) / 100
-              }
-              return tax
-            })()
+            const totalDeductions = (trip.tax_value || 0) + (trip.commission_value || 0)
+            const deducoes = totalDeductions > 0 ? formatBRL(totalDeductions) : '—'
             return [
               formatDate(trip.date),
               trip.truck_license_plate ?? '—',
@@ -393,7 +499,7 @@ export function TripsPage() {
                 : `${trip.weight_ton} ton`,
               `${trip.km_driven} km`,
               formatBRL(trip.price_charged),
-              formatBRL(tripTax),
+              deducoes,
               trip.customer_name ?? '—',
             ]
           })
@@ -586,8 +692,50 @@ export function TripsPage() {
       <div className="grid grid-cols-3 lg:grid-cols-5 gap-6 mb-10">
         {[
           { label: 'Receita Bruta', value: formatBRL(totalRevenue), icon: 'payments' },
-          { label: 'Total de Impostos', value: formatBRL(totalTaxes), icon: 'receipt' },
           { label: 'Receita Líquida', value: formatBRL(totalNetRevenue), icon: 'trending_up' },
+        ].map(({ label, value, icon }) => (
+          <div
+            key={label}
+            className="bg-surface-container-low p-6 rounded-xl flex items-center gap-4 border border-outline-variant/5 shadow-sm"
+          >
+            <div className="w-12 h-12 bg-surface-container rounded-lg flex items-center justify-center shrink-0">
+              <span className="material-symbols-outlined text-primary">{icon}</span>
+            </div>
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant">
+                {label}
+              </p>
+              <p className="text-xl font-black text-on-surface font-headline">{value}</p>
+            </div>
+          </div>
+        ))}
+
+        {/* Impostos / Comissões — card combinado com alternância */}
+        <div className="bg-surface-container-low p-6 rounded-xl flex items-center gap-4 border border-outline-variant/5 shadow-sm relative">
+          <div className="w-12 h-12 bg-surface-container rounded-lg flex items-center justify-center shrink-0">
+            <span className="material-symbols-outlined text-primary">
+              {deductionView === 'tax' ? 'receipt' : 'percent'}
+            </span>
+          </div>
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant">
+              {deductionView === 'tax' ? 'Total de Impostos' : 'Total de Comissões'}
+            </p>
+            <p className="text-xl font-black text-on-surface font-headline">
+              {formatBRL(deductionView === 'tax' ? totalTaxes : totalCommissions)}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setDeductionView((v) => (v === 'tax' ? 'commission' : 'tax'))}
+            title="Alternar entre Impostos e Comissões"
+            className="absolute top-2 right-2 p-1 text-on-surface-variant hover:text-primary hover:bg-primary/10 rounded-md transition-colors"
+          >
+            <span className="material-symbols-outlined text-base">swap_horiz</span>
+          </button>
+        </div>
+
+        {[
           { label: 'Km Total', value: `${totalKm.toFixed(0)} km`, icon: 'route' },
           { label: 'Tonelagem Total', value: `${totalTon} ton`, icon: 'scale' },
         ].map(({ label, value, icon }) => (
@@ -610,77 +758,73 @@ export function TripsPage() {
 
       {/* Breakdown section */}
       <div className={showTruckBreakdown || showDriverBreakdown ? 'mb-10' : 'mb-4'}>
-        <div className="mb-4 flex items-center justify-between">
+        <div className="flex items-center gap-6 mb-4">
           <h3 className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant">
             Lançamentos: {trips.length}
           </h3>
-        </div>
 
-        <div className="grid grid-cols-2 gap-6">
-          {/* Per-truck breakdown */}
+          {/* Per-truck breakdown button */}
           {perTruck.length > 1 && (
-            <div>
-              <button
-                type="button"
-                onClick={() => setShowTruckBreakdown((v) => !v)}
-                className="flex items-center gap-1.5 text-xs text-on-surface-variant hover:text-on-surface transition-colors mb-3"
-              >
-                <span className="material-symbols-outlined text-sm">
-                  {showTruckBreakdown ? 'expand_less' : 'expand_more'}
-                </span>
-                {showTruckBreakdown ? 'Ocultar por caminhão' : 'Ver por caminhão'}
-              </button>
-
-              {showTruckBreakdown && (
-                <div className="flex flex-wrap gap-2">
-                  {perTruck.map(({ license_plate, count }) => (
-                    <div
-                      key={license_plate}
-                      className="flex items-center gap-2 px-3 py-1.5 bg-surface-container-low rounded-lg border border-outline-variant/10 text-sm"
-                    >
-                      <span className="font-mono font-bold text-primary">{license_plate}</span>
-                      <span className="text-on-surface-variant text-xs">
-                        {count} lançamento{count !== 1 ? 's' : ''}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+            <button
+              type="button"
+              onClick={() => setShowTruckBreakdown((v) => !v)}
+              className="flex items-center gap-1.5 text-xs text-on-surface-variant hover:text-on-surface transition-colors"
+            >
+              <span className="material-symbols-outlined text-sm">
+                {showTruckBreakdown ? 'expand_less' : 'expand_more'}
+              </span>
+              {showTruckBreakdown ? 'Ocultar por caminhão' : 'Ver por caminhão'}
+            </button>
           )}
 
-          {/* Per-driver breakdown */}
+          {/* Per-driver breakdown button */}
           {perDriver.length > 1 && (
-            <div>
-              <button
-                type="button"
-                onClick={() => setShowDriverBreakdown((v) => !v)}
-                className="flex items-center gap-1.5 text-xs text-on-surface-variant hover:text-on-surface transition-colors mb-3"
-              >
-                <span className="material-symbols-outlined text-sm">
-                  {showDriverBreakdown ? 'expand_less' : 'expand_more'}
-                </span>
-                {showDriverBreakdown ? 'Ocultar por motorista' : 'Ver por motorista'}
-              </button>
-
-              {showDriverBreakdown && (
-                <div className="flex flex-wrap gap-2">
-                  {perDriver.map(({ name, count }) => (
-                    <div
-                      key={name}
-                      className="flex items-center gap-2 px-3 py-1.5 bg-surface-container-low rounded-lg border border-outline-variant/10 text-sm"
-                    >
-                      <span className="font-bold text-on-surface">{name}</span>
-                      <span className="text-on-surface-variant text-xs">
-                        {count} lançamento{count !== 1 ? 's' : ''}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+            <button
+              type="button"
+              onClick={() => setShowDriverBreakdown((v) => !v)}
+              className="flex items-center gap-1.5 text-xs text-on-surface-variant hover:text-on-surface transition-colors"
+            >
+              <span className="material-symbols-outlined text-sm">
+                {showDriverBreakdown ? 'expand_less' : 'expand_more'}
+              </span>
+              {showDriverBreakdown ? 'Ocultar por motorista' : 'Ver por motorista'}
+            </button>
           )}
         </div>
+
+        {/* Per-truck breakdown content */}
+        {showTruckBreakdown && perTruck.length > 1 && (
+          <div className="flex flex-wrap gap-2 mb-4">
+            {perTruck.map(({ license_plate, count }) => (
+              <div
+                key={license_plate}
+                className="flex items-center gap-2 px-3 py-1.5 bg-surface-container-low rounded-lg border border-outline-variant/10 text-sm"
+              >
+                <span className="font-mono font-bold text-primary">{license_plate}</span>
+                <span className="text-on-surface-variant text-xs">
+                  {count} lançamento{count !== 1 ? 's' : ''}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Per-driver breakdown content */}
+        {showDriverBreakdown && perDriver.length > 1 && (
+          <div className="flex flex-wrap gap-2">
+            {perDriver.map(({ name, count }) => (
+              <div
+                key={name}
+                className="flex items-center gap-2 px-3 py-1.5 bg-surface-container-low rounded-lg border border-outline-variant/10 text-sm"
+              >
+                <span className="font-bold text-on-surface">{name}</span>
+                <span className="text-on-surface-variant text-xs">
+                  {count} lançamento{count !== 1 ? 's' : ''}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Table */}
@@ -696,7 +840,7 @@ export function TripsPage() {
                 'Peso',
                 'Km',
                 'Valor',
-                'Imposto',
+                'Deduções',
                 'Cliente',
                 '',
               ].map((h) => (
@@ -718,13 +862,6 @@ export function TripsPage() {
               </tr>
             )}
             {trips.map((row, i) => {
-              const tripTax = (() => {
-                let tax = 0
-                if (row.has_percentage_tax) {
-                  tax += (row.price_charged * appSettings.taxRate) / 100
-                }
-                return tax
-              })()
               return (
                 <tr
                   key={row.id}
@@ -760,18 +897,14 @@ export function TripsPage() {
                     {formatBRL(row.price_charged)}
                   </td>
                   <td className="px-6 py-4 text-sm font-bold text-on-surface">
-                    {tripTax > 0 ? (
-                      <div className="flex items-center gap-1">
-                        <span>{formatBRL(tripTax)}</span>
-                        {row.has_percentage_tax && (
-                          <span className="material-symbols-outlined text-xs text-primary">
-                            receipt
-                          </span>
-                        )}
-                      </div>
-                    ) : (
-                      <span className="text-on-surface-variant">—</span>
-                    )}
+                    {(() => {
+                      const totalDeductions = (row.tax_value || 0) + (row.commission_value || 0)
+                      return totalDeductions > 0 ? (
+                        formatBRL(totalDeductions)
+                      ) : (
+                        <span className="text-on-surface-variant">—</span>
+                      )
+                    })()}
                   </td>
                   <td className="px-6 py-4 text-sm text-on-surface-variant">
                     {row.customer_name ?? '—'}
@@ -968,7 +1101,13 @@ export function TripsPage() {
                         value={field.value}
                         onChange={field.onChange}
                         error={errors.weight_ton?.message}
-                        onKeyDown={(e) => e.key === 'Enter' && priceInputRef.current?.focus()}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault()
+                            const next = noPriceRegistered ? unitPriceInputRef : priceInputRef
+                            next.current?.focus()
+                          }
+                        }}
                       />
                       {capacity > 0 && (
                         <p
@@ -982,6 +1121,22 @@ export function TripsPage() {
                   )
                 }}
               />
+
+              {noPriceRegistered && (
+                <div className="col-span-2 border border-amber-500/30 bg-amber-500/5 rounded-xl p-4 space-y-3 animate-in fade-in slide-in-from-top-1 duration-200">
+                  <p className="text-xs text-amber-700">
+                    Nenhum preço cadastrado para esse produto/cliente. Informe o valor unitário para
+                    calcular o valor cobrado automaticamente.
+                  </p>
+                  <CurrencyInput
+                    ref={unitPriceInputRef}
+                    label="Valor Unitário (R$/ton)"
+                    value={manualUnitPrice ?? ''}
+                    onChange={(v) => setManualUnitPrice(v === 0 ? null : v)}
+                    onKeyDown={(e) => e.key === 'Enter' && priceInputRef.current?.focus()}
+                  />
+                </div>
+              )}
 
               <Controller
                 name="price_charged"
@@ -1040,7 +1195,7 @@ export function TripsPage() {
                     icon="receipt"
                     value={field.value ? 'true' : 'false'}
                     onChange={(v) => field.onChange(v === 'true')}
-                    onEnterSelect={() => handleSubmit(onEnterSubmit as any)()}
+                    onEnterSelect={() => commissionSelectRef.current?.open()}
                     options={[
                       {
                         value: 'false',
@@ -1053,6 +1208,42 @@ export function TripsPage() {
                         label: `Com imposto (${appSettings.taxRate}%)`,
                         displayLabel: `Com imposto (${appSettings.taxRate}%)`,
                         searchableLabel: `com imposto ${appSettings.taxRate}`,
+                      },
+                    ]}
+                  />
+                )}
+              />
+
+              {/* Commission section */}
+              <Controller
+                name="has_commission"
+                control={control}
+                render={({ field }) => (
+                  <Select
+                    ref={commissionSelectRef}
+                    label="Comissão"
+                    icon="percent"
+                    value={field.value ? 'true' : 'false'}
+                    onChange={(v) => field.onChange(v === 'true')}
+                    onEnterSelect={async () => {
+                      const ok = await resolvePendingFuelStopSuppliers()
+                      if (!ok) {
+                        return
+                      }
+                      handleSubmit(onEnterSubmit as any)()
+                    }}
+                    options={[
+                      {
+                        value: 'false',
+                        label: 'Sem comissão',
+                        displayLabel: 'Sem comissão',
+                        searchableLabel: 'sem comissao',
+                      },
+                      {
+                        value: 'true',
+                        label: `Com comissão (${appSettings.commissionRate}%)`,
+                        displayLabel: `Com comissão (${appSettings.commissionRate}%)`,
+                        searchableLabel: `com comissao ${appSettings.commissionRate}`,
                       },
                     ]}
                   />
@@ -1139,26 +1330,20 @@ export function TripsPage() {
               </h3>
 
               <div className="mb-6">
-                <Select
+                <SupplierCombobox
+                  key={fields.length}
                   placeholder="Pesquisar local/fornecedor para adicionar..."
-                  value={stopSearchId}
-                  onChange={handleAddStop}
-                  options={suppliers.map((s) => ({
-                    value: s.id,
-                    label: (
-                      <div className="flex items-center justify-between w-full">
-                        <div className="flex items-center gap-2">
-                          <span className="material-symbols-outlined text-sm opacity-60">
-                            {typeIcon[s.type] || 'handshake'}
-                          </span>
-                          <span>{s.name}</span>
-                        </div>
-                        <Badge label={s.type} color={s.type === 'gas_station' ? 'amber' : 'gray'} />
-                      </div>
-                    ),
-                    displayLabel: s.name,
-                    searchableLabel: `${s.name} ${s.customId || ''}`,
-                  }))}
+                  suppliers={suppliers}
+                  onChange={(id) => {
+                    if (id) {
+                      handleAddStop(id)
+                    }
+                  }}
+                  onPendingChange={(name) => {
+                    if (name) {
+                      handleAddPendingStop(name)
+                    }
+                  }}
                 />
               </div>
 
@@ -1176,8 +1361,13 @@ export function TripsPage() {
                             {supplier ? typeIcon[supplier.type] : 'location_on'}
                           </span>
                           <span className="text-xs font-bold text-on-surface uppercase tracking-wider">
-                            {supplier?.name || 'Local'}
+                            {supplier?.name || field.pendingSupplierName || 'Local'}
                           </span>
+                          {!supplier && field.pendingSupplierName && (
+                            <span className="text-[9px] px-1.5 py-0.5 bg-primary/10 text-primary rounded">
+                              novo
+                            </span>
+                          )}
                         </div>
                         <button
                           type="button"
@@ -1266,7 +1456,13 @@ export function TripsPage() {
               </Button>
               <button
                 type="button"
-                onClick={handleSubmit(onSubmit as any)}
+                onClick={async () => {
+                  const ok = await resolvePendingFuelStopSuppliers()
+                  if (!ok) {
+                    return
+                  }
+                  handleSubmit(onSubmit as any)()
+                }}
                 className="flex items-center gap-3 px-8 py-3 bg-primary text-on-primary font-extrabold rounded transition-all hover:brightness-110 active:scale-95 shadow-lg shadow-primary/20"
               >
                 {editing ? 'Salvar Alterações' : 'Salvar Lançamento'}

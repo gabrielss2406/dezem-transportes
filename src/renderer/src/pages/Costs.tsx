@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Controller, useForm } from 'react-hook-form'
 import { costSchema } from '../../../shared/schemas'
 import { PageHeader } from '../components/PageHeader'
+import { SupplierCombobox } from '../components/SupplierCombobox'
 import {
   Button,
   ConfirmModal,
@@ -54,8 +55,13 @@ export function CostsPage() {
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [drivers, setDrivers] = useState<Driver[]>([])
   const [modal, setModal] = useState(false)
+  const [editing, setEditing] = useState<Cost | null>(null)
+  const [pendingSupplierName, setPendingSupplierName] = useState<string | null>(null)
   const [filterCategory, setFilterCategory] = useState('')
   const [filterTruckId, setFilterTruckId] = useState('')
+  const [filterDriverId, setFilterDriverId] = useState('')
+  const [filterStartDate, setFilterStartDate] = useState('')
+  const [filterEndDate, setFilterEndDate] = useState('')
   const [pendingData, setPendingData] = useState<any>(null)
   const [deleteTarget, setDeleteTarget] = useState<Cost | null>(null)
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false)
@@ -83,7 +89,12 @@ export function CostsPage() {
 
   const load = useCallback(async () => {
     const [c, cc, tr, s, d] = await Promise.all([
-      window.api.costs.list({ truck_id: filterTruckId || undefined }),
+      window.api.costs.list({
+        truck_id: filterTruckId || undefined,
+        driver_id: filterDriverId || undefined,
+        startDate: filterStartDate || undefined,
+        endDate: filterEndDate || undefined,
+      }),
       window.api['cost-categories'].list(),
       window.api.trucks.list(),
       window.api.suppliers.list(),
@@ -94,7 +105,7 @@ export function CostsPage() {
     setTrucks(tr)
     setSuppliers(s)
     setDrivers(d)
-  }, [filterTruckId])
+  }, [filterTruckId, filterDriverId, filterStartDate, filterEndDate])
 
   useEffect(() => {
     load()
@@ -107,17 +118,54 @@ export function CostsPage() {
         window.focus()
         categorySelectRef.current?.open()
       }, 200)
+      if (editing) {
+        reset({
+          ...editing,
+          description: editing.description ?? '',
+        } as any)
+        setPendingSupplierName(null)
+      }
     } else {
       reset(EMPTY)
+      setEditing(null)
     }
-  }, [modal, reset])
+  }, [modal, reset, editing])
 
   const save = async (data: CostFormData) => {
     try {
-      await window.api.costs.create(data as any)
-      show('Custo lançado!')
+      let finalData = data
+      if (!data.supplier_id && pendingSupplierName) {
+        const normalized = pendingSupplierName.trim().toLowerCase()
+        const existing = suppliers.find((s) => s.name.trim().toLowerCase() === normalized)
+        if (existing) {
+          finalData = { ...data, supplier_id: existing.id }
+        } else {
+          const created = await window.api.suppliers.create({
+            name: pendingSupplierName.trim(),
+            type: 'other',
+          })
+          if ('ok' in created && created.ok === false) {
+            show('Erro ao criar fornecedor', 'error')
+            return
+          }
+          setSuppliers((prev) => [
+            ...prev,
+            { id: created.id, name: pendingSupplierName.trim(), type: 'other' } as any,
+          ])
+          finalData = { ...data, supplier_id: created.id }
+        }
+        setPendingSupplierName(null)
+      }
+      if (editing) {
+        await window.api.costs.update(editing.id, finalData as any)
+        show('Custo atualizado!')
+      } else {
+        await window.api.costs.create(finalData as any)
+        show('Custo lançado!')
+      }
       setModal(false)
       setPendingData(null)
+      setEditing(null)
       load()
     } catch (e: any) {
       setPendingData(null)
@@ -164,7 +212,21 @@ export function CostsPage() {
   }
 
   const total = costs.reduce((s, c) => s + c.value, 0)
-  const filtered = filterCategory ? costs.filter((c) => c.category === filterCategory) : costs
+  const filtered = costs.filter((c) => {
+    if (filterCategory && c.category !== filterCategory) {
+      return false
+    }
+    if (filterDriverId && String(c.driver_id) !== String(filterDriverId)) {
+      return false
+    }
+    if (filterStartDate && c.date < filterStartDate) {
+      return false
+    }
+    if (filterEndDate && c.date > filterEndDate) {
+      return false
+    }
+    return true
+  })
 
   return (
     <div className="p-12 max-w-7xl mx-auto">
@@ -209,8 +271,14 @@ export function CostsPage() {
       <div className="grid grid-cols-12 gap-8 items-start">
         {/* Table */}
         <div className="col-span-12 space-y-6">
-          {/* Truck filter */}
-          <div className="flex items-end gap-4">
+          {/* Filters */}
+          <div className="flex flex-wrap items-end gap-4">
+            <div className="w-40">
+              <DatePicker label="De" value={filterStartDate} onChange={setFilterStartDate} />
+            </div>
+            <div className="w-40">
+              <DatePicker label="Até" value={filterEndDate} onChange={setFilterEndDate} />
+            </div>
             <div className="w-52">
               <Select
                 label="Caminhão"
@@ -228,6 +296,27 @@ export function CostsPage() {
                   ),
                   displayLabel: t.license_plate,
                   searchableLabel: `${t.license_plate} ${t.customId || ''}`,
+                }))}
+                optional
+              />
+            </div>
+            <div className="w-52">
+              <Select
+                label="Motorista"
+                value={filterDriverId}
+                onChange={(v) => setFilterDriverId(v as string)}
+                options={drivers.map((d) => ({
+                  value: d.id,
+                  label: (
+                    <div className="flex justify-between">
+                      <span>{d.name}</span>
+                      {d.customId && (
+                        <span className="text-on-surface-variant/50">#{d.customId}</span>
+                      )}
+                    </div>
+                  ),
+                  displayLabel: d.name,
+                  searchableLabel: `${d.name} ${d.customId || ''}`,
                 }))}
                 optional
               />
@@ -321,7 +410,17 @@ export function CostsPage() {
                         {formatBRL(row.value)}
                       </td>
                       <td className="px-6 py-4">
-                        <div className="flex justify-end opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditing(row)
+                              setModal(true)
+                            }}
+                            className="p-2 text-on-surface-variant hover:text-primary hover:bg-primary/10 rounded-lg transition-all"
+                          >
+                            <span className="material-symbols-outlined text-xl">edit</span>
+                          </button>
                           <button
                             type="button"
                             onClick={() => setDeleteTarget(row)}
@@ -341,7 +440,11 @@ export function CostsPage() {
       </div>
 
       {modal && (
-        <Modal title="Novo Custo" onClose={() => setModal(false)} onEscape={handleEscape}>
+        <Modal
+          title={editing ? 'Editar Custo' : 'Novo Custo'}
+          onClose={() => setModal(false)}
+          onEscape={handleEscape}
+        >
           <div className="grid grid-cols-2 gap-4">
             <div className="col-span-2">
               <Controller
@@ -430,27 +533,16 @@ export function CostsPage() {
               name="supplier_id"
               control={control}
               render={({ field }) => (
-                <Select
-                  ref={supplierSelectRef}
+                <SupplierCombobox
+                  ref={supplierSelectRef as any}
                   label="Fornecedor"
                   optional
                   value={field.value}
                   onChange={field.onChange}
+                  onPendingChange={setPendingSupplierName}
                   onEnterSelect={() => driverSelectRef.current?.open()}
                   error={errors.supplier_id?.message}
-                  options={suppliers.map((s) => ({
-                    value: s.id,
-                    label: (
-                      <div className="flex justify-between">
-                        <span>{s.name}</span>
-                        {s.customId && (
-                          <span className="text-on-surface-variant/50">#{s.customId}</span>
-                        )}
-                      </div>
-                    ),
-                    displayLabel: s.name,
-                    searchableLabel: `${s.name} ${s.customId || ''}`,
-                  }))}
+                  suppliers={suppliers}
                 />
               )}
             />
@@ -509,7 +601,9 @@ export function CostsPage() {
             <Button variant="ghost" onClick={() => setModal(false)}>
               Cancelar
             </Button>
-            <Button onClick={handleSubmit(onSubmit as any)}>Salvar Custo</Button>
+            <Button onClick={handleSubmit(onSubmit as any)}>
+              {editing ? 'Salvar Alterações' : 'Salvar Custo'}
+            </Button>
           </div>
         </Modal>
       )}
