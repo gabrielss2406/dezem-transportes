@@ -59,6 +59,9 @@ export function CostsPage() {
   const [pendingSupplierName, setPendingSupplierName] = useState<string | null>(null)
   const [filterCategory, setFilterCategory] = useState('')
   const [filterTruckId, setFilterTruckId] = useState('')
+  const [filterDriverId, setFilterDriverId] = useState('')
+  const [filterStartDate, setFilterStartDate] = useState('')
+  const [filterEndDate, setFilterEndDate] = useState('')
   const [pendingData, setPendingData] = useState<any>(null)
   const [deleteTarget, setDeleteTarget] = useState<Cost | null>(null)
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false)
@@ -86,7 +89,12 @@ export function CostsPage() {
 
   const load = useCallback(async () => {
     const [c, cc, tr, s, d] = await Promise.all([
-      window.api.costs.list({ truck_id: filterTruckId || undefined }),
+      window.api.costs.list({
+        truck_id: filterTruckId || undefined,
+        driver_id: filterDriverId || undefined,
+        startDate: filterStartDate || undefined,
+        endDate: filterEndDate || undefined,
+      }),
       window.api['cost-categories'].list(),
       window.api.trucks.list(),
       window.api.suppliers.list(),
@@ -97,7 +105,7 @@ export function CostsPage() {
     setTrucks(tr)
     setSuppliers(s)
     setDrivers(d)
-  }, [filterTruckId])
+  }, [filterTruckId, filterDriverId, filterStartDate, filterEndDate])
 
   useEffect(() => {
     load()
@@ -204,7 +212,21 @@ export function CostsPage() {
   }
 
   const total = costs.reduce((s, c) => s + c.value, 0)
-  const filtered = filterCategory ? costs.filter((c) => c.category === filterCategory) : costs
+  const filtered = costs.filter((c) => {
+    if (filterCategory && c.category !== filterCategory) {
+      return false
+    }
+    if (filterDriverId && String(c.driver_id) !== String(filterDriverId)) {
+      return false
+    }
+    if (filterStartDate && c.date < filterStartDate) {
+      return false
+    }
+    if (filterEndDate && c.date > filterEndDate) {
+      return false
+    }
+    return true
+  })
 
   return (
     <div className="p-12 max-w-7xl mx-auto">
@@ -249,8 +271,14 @@ export function CostsPage() {
       <div className="grid grid-cols-12 gap-8 items-start">
         {/* Table */}
         <div className="col-span-12 space-y-6">
-          {/* Truck filter */}
-          <div className="flex items-end gap-4">
+          {/* Filters */}
+          <div className="flex flex-wrap items-end gap-4">
+            <div className="w-40">
+              <DatePicker label="De" value={filterStartDate} onChange={setFilterStartDate} />
+            </div>
+            <div className="w-40">
+              <DatePicker label="Até" value={filterEndDate} onChange={setFilterEndDate} />
+            </div>
             <div className="w-52">
               <Select
                 label="Caminhão"
@@ -268,6 +296,27 @@ export function CostsPage() {
                   ),
                   displayLabel: t.license_plate,
                   searchableLabel: `${t.license_plate} ${t.customId || ''}`,
+                }))}
+                optional
+              />
+            </div>
+            <div className="w-52">
+              <Select
+                label="Motorista"
+                value={filterDriverId}
+                onChange={(v) => setFilterDriverId(v as string)}
+                options={drivers.map((d) => ({
+                  value: d.id,
+                  label: (
+                    <div className="flex justify-between">
+                      <span>{d.name}</span>
+                      {d.customId && (
+                        <span className="text-on-surface-variant/50">#{d.customId}</span>
+                      )}
+                    </div>
+                  ),
+                  displayLabel: d.name,
+                  searchableLabel: `${d.name} ${d.customId || ''}`,
                 }))}
                 optional
               />

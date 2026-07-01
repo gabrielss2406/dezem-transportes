@@ -758,77 +758,73 @@ export function TripsPage() {
 
       {/* Breakdown section */}
       <div className={showTruckBreakdown || showDriverBreakdown ? 'mb-10' : 'mb-4'}>
-        <div className="mb-4 flex items-center justify-between">
+        <div className="flex items-center gap-6 mb-4">
           <h3 className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant">
             Lançamentos: {trips.length}
           </h3>
-        </div>
 
-        <div className="grid grid-cols-2 gap-6">
-          {/* Per-truck breakdown */}
+          {/* Per-truck breakdown button */}
           {perTruck.length > 1 && (
-            <div>
-              <button
-                type="button"
-                onClick={() => setShowTruckBreakdown((v) => !v)}
-                className="flex items-center gap-1.5 text-xs text-on-surface-variant hover:text-on-surface transition-colors mb-3"
-              >
-                <span className="material-symbols-outlined text-sm">
-                  {showTruckBreakdown ? 'expand_less' : 'expand_more'}
-                </span>
-                {showTruckBreakdown ? 'Ocultar por caminhão' : 'Ver por caminhão'}
-              </button>
-
-              {showTruckBreakdown && (
-                <div className="flex flex-wrap gap-2">
-                  {perTruck.map(({ license_plate, count }) => (
-                    <div
-                      key={license_plate}
-                      className="flex items-center gap-2 px-3 py-1.5 bg-surface-container-low rounded-lg border border-outline-variant/10 text-sm"
-                    >
-                      <span className="font-mono font-bold text-primary">{license_plate}</span>
-                      <span className="text-on-surface-variant text-xs">
-                        {count} lançamento{count !== 1 ? 's' : ''}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+            <button
+              type="button"
+              onClick={() => setShowTruckBreakdown((v) => !v)}
+              className="flex items-center gap-1.5 text-xs text-on-surface-variant hover:text-on-surface transition-colors"
+            >
+              <span className="material-symbols-outlined text-sm">
+                {showTruckBreakdown ? 'expand_less' : 'expand_more'}
+              </span>
+              {showTruckBreakdown ? 'Ocultar por caminhão' : 'Ver por caminhão'}
+            </button>
           )}
 
-          {/* Per-driver breakdown */}
+          {/* Per-driver breakdown button */}
           {perDriver.length > 1 && (
-            <div>
-              <button
-                type="button"
-                onClick={() => setShowDriverBreakdown((v) => !v)}
-                className="flex items-center gap-1.5 text-xs text-on-surface-variant hover:text-on-surface transition-colors mb-3"
-              >
-                <span className="material-symbols-outlined text-sm">
-                  {showDriverBreakdown ? 'expand_less' : 'expand_more'}
-                </span>
-                {showDriverBreakdown ? 'Ocultar por motorista' : 'Ver por motorista'}
-              </button>
-
-              {showDriverBreakdown && (
-                <div className="flex flex-wrap gap-2">
-                  {perDriver.map(({ name, count }) => (
-                    <div
-                      key={name}
-                      className="flex items-center gap-2 px-3 py-1.5 bg-surface-container-low rounded-lg border border-outline-variant/10 text-sm"
-                    >
-                      <span className="font-bold text-on-surface">{name}</span>
-                      <span className="text-on-surface-variant text-xs">
-                        {count} lançamento{count !== 1 ? 's' : ''}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+            <button
+              type="button"
+              onClick={() => setShowDriverBreakdown((v) => !v)}
+              className="flex items-center gap-1.5 text-xs text-on-surface-variant hover:text-on-surface transition-colors"
+            >
+              <span className="material-symbols-outlined text-sm">
+                {showDriverBreakdown ? 'expand_less' : 'expand_more'}
+              </span>
+              {showDriverBreakdown ? 'Ocultar por motorista' : 'Ver por motorista'}
+            </button>
           )}
         </div>
+
+        {/* Per-truck breakdown content */}
+        {showTruckBreakdown && perTruck.length > 1 && (
+          <div className="flex flex-wrap gap-2 mb-4">
+            {perTruck.map(({ license_plate, count }) => (
+              <div
+                key={license_plate}
+                className="flex items-center gap-2 px-3 py-1.5 bg-surface-container-low rounded-lg border border-outline-variant/10 text-sm"
+              >
+                <span className="font-mono font-bold text-primary">{license_plate}</span>
+                <span className="text-on-surface-variant text-xs">
+                  {count} lançamento{count !== 1 ? 's' : ''}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Per-driver breakdown content */}
+        {showDriverBreakdown && perDriver.length > 1 && (
+          <div className="flex flex-wrap gap-2">
+            {perDriver.map(({ name, count }) => (
+              <div
+                key={name}
+                className="flex items-center gap-2 px-3 py-1.5 bg-surface-container-low rounded-lg border border-outline-variant/10 text-sm"
+              >
+                <span className="font-bold text-on-surface">{name}</span>
+                <span className="text-on-surface-variant text-xs">
+                  {count} lançamento{count !== 1 ? 's' : ''}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Table */}
