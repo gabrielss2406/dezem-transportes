@@ -113,6 +113,9 @@ export function TripsPage() {
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false)
   const [showTruckBreakdown, setShowTruckBreakdown] = useState(false)
   const [showDriverBreakdown, setShowDriverBreakdown] = useState(false)
+  const [deductionView, setDeductionView] = useState<'tax' | 'commission'>('tax')
+  const [noPriceRegistered, setNoPriceRegistered] = useState(false)
+  const [manualUnitPrice, setManualUnitPrice] = useState<number | null>(null)
   const [filters, setFilters] = useState({
     startDate: '',
     endDate: '',
@@ -133,6 +136,7 @@ export function TripsPage() {
   const productSelectRef = useRef<SelectRef>(null)
   const customerSelectRef = useRef<SelectRef>(null)
   const weightInputRef = useRef<HTMLInputElement>(null)
+  const unitPriceInputRef = useRef<HTMLInputElement>(null)
   const priceInputRef = useRef<HTMLInputElement>(null)
   const kmInputRef = useRef<HTMLInputElement>(null)
   const taxSelectRef = useRef<SelectRef>(null)
@@ -153,6 +157,7 @@ export function TripsPage() {
     control,
     watch,
     setValue,
+    getValues,
   } = useForm<TripFormData>({
     resolver: zodResolver(tripSchema) as any,
     defaultValues: { ...EMPTY },
@@ -169,19 +174,74 @@ export function TripsPage() {
   const currentWeight = watch('weight_ton')
   const currentOverweight = watch('overweight_ton')
 
+  const priceLookupKeyRef = useRef<string | null>(null)
+
   useEffect(() => {
-    if (selectedCustomerId && selectedProductId && !editing) {
+    const key = `${selectedProductId}-${selectedCustomerId}`
+    if (priceLookupKeyRef.current !== key) {
+      priceLookupKeyRef.current = key
+      setManualUnitPrice(null)
+    }
+    if (!selectedProductId) {
+      setNoPriceRegistered(false)
+      return
+    }
+    const weight = Number(currentWeight) || 0
+    const overweight = Number(currentOverweight) || 0
+    const readyToShowManualField = !!selectedCustomerId && weight > 0
+    const applyUnitPrice = (unitPrice: number) => {
+      setNoPriceRegistered(false)
+      if (!editing) {
+        setValue('price_charged', unitPrice * (weight + overweight))
+      }
+    }
+    const fallbackToProductPrice = () => {
+      const product = products.find((p) => p.id === Number(selectedProductId))
+      if (product?.unit_value) {
+        applyUnitPrice(product.unit_value)
+        return
+      }
+      setNoPriceRegistered(readyToShowManualField)
+      if (editing && readyToShowManualField && manualUnitPrice === null) {
+        const existingPrice = Number(getValues('price_charged')) || 0
+        if (existingPrice > 0) {
+          setManualUnitPrice(existingPrice / (weight + overweight))
+        }
+      }
+    }
+    if (selectedCustomerId) {
       window.api.customerPrices
         .getPrice(Number(selectedCustomerId), Number(selectedProductId))
         .then((res) => {
           if (res?.price) {
-            const weight = Number(currentWeight) || 0
-            const overweight = Number(currentOverweight) || 0
-            setValue('price_charged', res.price * (weight + overweight))
+            applyUnitPrice(res.price)
+          } else {
+            fallbackToProductPrice()
           }
         })
+    } else {
+      fallbackToProductPrice()
     }
-  }, [selectedCustomerId, selectedProductId, currentWeight, currentOverweight, editing, setValue])
+  }, [
+    selectedCustomerId,
+    selectedProductId,
+    currentWeight,
+    currentOverweight,
+    editing,
+    setValue,
+    products,
+    manualUnitPrice,
+    getValues,
+  ])
+
+  useEffect(() => {
+    if (!noPriceRegistered || manualUnitPrice == null) {
+      return
+    }
+    const weight = Number(currentWeight) || 0
+    const overweight = Number(currentOverweight) || 0
+    setValue('price_charged', manualUnitPrice * (weight + overweight))
+  }, [manualUnitPrice, noPriceRegistered, currentWeight, currentOverweight, setValue])
 
   const load = useCallback(async () => {
     const [t, tr, d, p, c, s, settings] = await Promise.all([
@@ -223,6 +283,8 @@ export function TripsPage() {
       reset(EMPTY)
       setStopSearchId('')
       setHasOverweight(false)
+      setNoPriceRegistered(false)
+      setManualUnitPrice(null)
     }
   }, [modal, editing, reset])
 
@@ -315,13 +377,7 @@ export function TripsPage() {
   }
 
   const totalRevenue = trips.reduce((s, t) => s + t.price_charged, 0)
-  const totalTaxes = trips.reduce((s, t) => {
-    let tax = 0
-    if (t.has_percentage_tax) {
-      tax += (t.price_charged * appSettings.taxRate) / 100
-    }
-    return s + tax
-  }, 0)
+  const totalTaxes = trips.reduce((s, t) => s + (t.tax_value || 0), 0)
   const totalNetRevenue = totalRevenue - totalTaxes
   const totalCommissions = trips.reduce((s, t) => s + (t.commission_value || 0), 0)
   const totalKm = trips.reduce((s, t) => s + t.km_driven, 0)
@@ -377,18 +433,12 @@ export function TripsPage() {
             'Peso',
             'Km',
             'Valor',
-            'Imposto',
-            'Comissão',
+            'Deduções',
             'Cliente',
           ]
           const data = trips.map((trip) => {
-            const tripTax = (() => {
-              let tax = 0
-              if (trip.has_percentage_tax) {
-                tax += (trip.price_charged * appSettings.taxRate) / 100
-              }
-              return tax
-            })()
+            const totalDeductions = (trip.tax_value || 0) + (trip.commission_value || 0)
+            const deducoes = totalDeductions > 0 ? formatBRL(totalDeductions) : '—'
             return [
               formatDate(trip.date),
               trip.truck_license_plate ?? '—',
@@ -399,8 +449,7 @@ export function TripsPage() {
                 : `${trip.weight_ton} ton`,
               `${trip.km_driven} km`,
               formatBRL(trip.price_charged),
-              formatBRL(tripTax),
-              formatBRL(trip.commission_value || 0),
+              deducoes,
               trip.customer_name ?? '—',
             ]
           })
@@ -593,9 +642,50 @@ export function TripsPage() {
       <div className="grid grid-cols-3 lg:grid-cols-5 gap-6 mb-10">
         {[
           { label: 'Receita Bruta', value: formatBRL(totalRevenue), icon: 'payments' },
-          { label: 'Total de Impostos', value: formatBRL(totalTaxes), icon: 'receipt' },
           { label: 'Receita Líquida', value: formatBRL(totalNetRevenue), icon: 'trending_up' },
-          { label: 'Total de Comissões', value: formatBRL(totalCommissions), icon: 'percent' },
+        ].map(({ label, value, icon }) => (
+          <div
+            key={label}
+            className="bg-surface-container-low p-6 rounded-xl flex items-center gap-4 border border-outline-variant/5 shadow-sm"
+          >
+            <div className="w-12 h-12 bg-surface-container rounded-lg flex items-center justify-center shrink-0">
+              <span className="material-symbols-outlined text-primary">{icon}</span>
+            </div>
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant">
+                {label}
+              </p>
+              <p className="text-xl font-black text-on-surface font-headline">{value}</p>
+            </div>
+          </div>
+        ))}
+
+        {/* Impostos / Comissões — card combinado com alternância */}
+        <div className="bg-surface-container-low p-6 rounded-xl flex items-center gap-4 border border-outline-variant/5 shadow-sm relative">
+          <div className="w-12 h-12 bg-surface-container rounded-lg flex items-center justify-center shrink-0">
+            <span className="material-symbols-outlined text-primary">
+              {deductionView === 'tax' ? 'receipt' : 'percent'}
+            </span>
+          </div>
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant">
+              {deductionView === 'tax' ? 'Total de Impostos' : 'Total de Comissões'}
+            </p>
+            <p className="text-xl font-black text-on-surface font-headline">
+              {formatBRL(deductionView === 'tax' ? totalTaxes : totalCommissions)}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setDeductionView((v) => (v === 'tax' ? 'commission' : 'tax'))}
+            title="Alternar entre Impostos e Comissões"
+            className="absolute top-2 right-2 p-1 text-on-surface-variant hover:text-primary hover:bg-primary/10 rounded-md transition-colors"
+          >
+            <span className="material-symbols-outlined text-base">swap_horiz</span>
+          </button>
+        </div>
+
+        {[
           { label: 'Km Total', value: `${totalKm.toFixed(0)} km`, icon: 'route' },
           { label: 'Tonelagem Total', value: `${totalTon} ton`, icon: 'scale' },
         ].map(({ label, value, icon }) => (
@@ -704,8 +794,7 @@ export function TripsPage() {
                 'Peso',
                 'Km',
                 'Valor',
-                'Imposto',
-                'Comissão',
+                'Deduções',
                 'Cliente',
                 '',
               ].map((h) => (
@@ -721,19 +810,12 @@ export function TripsPage() {
           <tbody className="divide-y divide-outline-variant/10">
             {trips.length === 0 && (
               <tr>
-                <td colSpan={11} className="px-6 py-12 text-center text-on-surface-variant text-sm">
+                <td colSpan={10} className="px-6 py-12 text-center text-on-surface-variant text-sm">
                   Nenhum lançamento encontrado com os filtros selecionados
                 </td>
               </tr>
             )}
             {trips.map((row, i) => {
-              const tripTax = (() => {
-                let tax = 0
-                if (row.has_percentage_tax) {
-                  tax += (row.price_charged * appSettings.taxRate) / 100
-                }
-                return tax
-              })()
               return (
                 <tr
                   key={row.id}
@@ -769,30 +851,14 @@ export function TripsPage() {
                     {formatBRL(row.price_charged)}
                   </td>
                   <td className="px-6 py-4 text-sm font-bold text-on-surface">
-                    {tripTax > 0 ? (
-                      <div className="flex items-center gap-1">
-                        <span>{formatBRL(tripTax)}</span>
-                        {row.has_percentage_tax && (
-                          <span className="material-symbols-outlined text-xs text-primary">
-                            receipt
-                          </span>
-                        )}
-                      </div>
-                    ) : (
-                      <span className="text-on-surface-variant">—</span>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 text-sm font-bold text-on-surface">
-                    {row.has_commission && row.commission_value ? (
-                      <div className="flex items-center gap-1">
-                        <span>{formatBRL(row.commission_value)}</span>
-                        <span className="material-symbols-outlined text-xs text-primary">
-                          percent
-                        </span>
-                      </div>
-                    ) : (
-                      <span className="text-on-surface-variant">—</span>
-                    )}
+                    {(() => {
+                      const totalDeductions = (row.tax_value || 0) + (row.commission_value || 0)
+                      return totalDeductions > 0 ? (
+                        formatBRL(totalDeductions)
+                      ) : (
+                        <span className="text-on-surface-variant">—</span>
+                      )
+                    })()}
                   </td>
                   <td className="px-6 py-4 text-sm text-on-surface-variant">
                     {row.customer_name ?? '—'}
@@ -989,7 +1055,13 @@ export function TripsPage() {
                         value={field.value}
                         onChange={field.onChange}
                         error={errors.weight_ton?.message}
-                        onKeyDown={(e) => e.key === 'Enter' && priceInputRef.current?.focus()}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault()
+                            const next = noPriceRegistered ? unitPriceInputRef : priceInputRef
+                            next.current?.focus()
+                          }
+                        }}
                       />
                       {capacity > 0 && (
                         <p
@@ -1003,6 +1075,22 @@ export function TripsPage() {
                   )
                 }}
               />
+
+              {noPriceRegistered && (
+                <div className="col-span-2 border border-amber-500/30 bg-amber-500/5 rounded-xl p-4 space-y-3 animate-in fade-in slide-in-from-top-1 duration-200">
+                  <p className="text-xs text-amber-700">
+                    Nenhum preço cadastrado para esse produto/cliente. Informe o valor unitário para
+                    calcular o valor cobrado automaticamente.
+                  </p>
+                  <CurrencyInput
+                    ref={unitPriceInputRef}
+                    label="Valor Unitário (R$/ton)"
+                    value={manualUnitPrice ?? ''}
+                    onChange={(v) => setManualUnitPrice(v === 0 ? null : v)}
+                    onKeyDown={(e) => e.key === 'Enter' && priceInputRef.current?.focus()}
+                  />
+                </div>
+              )}
 
               <Controller
                 name="price_charged"

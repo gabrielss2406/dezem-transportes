@@ -12,6 +12,7 @@ export interface Product {
   id: number
   customId?: number
   name: string
+  unit_value?: number | null
 }
 
 export interface CustomerPrice {
@@ -90,6 +91,7 @@ export interface Trip {
   km_driven: number
   observation?: string
   has_percentage_tax?: boolean
+  tax_value?: number
   has_commission?: boolean
   commission_value?: number
   fuel_stops?: FuelStop[]

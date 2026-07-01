@@ -3,15 +3,26 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Controller, useForm } from 'react-hook-form'
 import { productSchema } from '../../../../shared/schemas'
 import { PageHeader } from '../../components/PageHeader'
-import { Button, Input, Modal, Select, Table, Toast, useToast } from '../../components/ui'
+import {
+  Button,
+  CurrencyInput,
+  Input,
+  Modal,
+  Select,
+  Table,
+  Toast,
+  useToast,
+} from '../../components/ui'
 import type { Product } from '../../lib/types'
+import { formatBRL } from '../../lib/utils'
 
 interface ProductFormData {
   name: string
   customId?: number
+  unit_value?: number | null
 }
 
-const EMPTY: ProductFormData = { name: '', customId: undefined }
+const EMPTY: ProductFormData = { name: '', customId: undefined, unit_value: null }
 
 function ConfirmModal({
   message,
@@ -60,6 +71,7 @@ export function ProductsPage() {
 
   const customIdRef = useRef<HTMLInputElement>(null)
   const nameRef = useRef<HTMLInputElement>(null)
+  const unitValueRef = useRef<HTMLInputElement>(null)
 
   const {
     handleSubmit,
@@ -186,6 +198,7 @@ export function ProductsPage() {
     reset({
       name: row.name,
       customId: row.customId ?? undefined,
+      unit_value: row.unit_value ?? null,
     })
     setModal(true)
   }
@@ -265,7 +278,7 @@ export function ProductsPage() {
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-surface-container-high">
-              {['ID', 'Nome do Produto', ''].map((h) => (
+              {['ID', 'Nome do Produto', 'Valor Unitário', ''].map((h) => (
                 <th
                   key={h}
                   className="px-8 py-5 text-[10px] font-black uppercase tracking-widest text-on-surface-variant"
@@ -278,7 +291,7 @@ export function ProductsPage() {
           <tbody className="divide-y divide-outline-variant/10">
             {rows.length === 0 && (
               <tr>
-                <td colSpan={3} className="px-8 py-12 text-center text-on-surface-variant text-sm">
+                <td colSpan={4} className="px-8 py-12 text-center text-on-surface-variant text-sm">
                   Nenhum produto encontrado
                 </td>
               </tr>
@@ -300,6 +313,9 @@ export function ProductsPage() {
                     </div>
                     <span className="font-bold text-on-surface text-sm">{row.name}</span>
                   </div>
+                </td>
+                <td className="px-8 py-5 text-sm text-on-surface-variant">
+                  {row.unit_value ? formatBRL(row.unit_value) : '—'}
                 </td>
                 <td className="px-8 py-5">
                   <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -403,6 +419,21 @@ export function ProductsPage() {
                   value={field.value}
                   onChange={field.onChange}
                   error={errors.name?.message}
+                  onKeyDown={(e) => e.key === 'Enter' && unitValueRef.current?.focus()}
+                />
+              )}
+            />
+            <Controller
+              name="unit_value"
+              control={control}
+              render={({ field }) => (
+                <CurrencyInput
+                  ref={unitValueRef}
+                  label="Valor Unitário (R$/ton)"
+                  optional
+                  value={field.value ?? ''}
+                  onChange={(v) => field.onChange(v === 0 ? null : v)}
+                  error={errors.unit_value?.message}
                   onKeyDown={(e) => e.key === 'Enter' && handleSubmit(onEnterSubmit as any)()}
                 />
               )}
