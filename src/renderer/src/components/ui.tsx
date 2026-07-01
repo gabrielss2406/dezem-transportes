@@ -48,6 +48,13 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
       ...props,
     }
 
+    const handleFocus = (e: React.FocusEvent<HTMLInputElement>) => {
+      if (props.type === 'number') {
+        e.target.select()
+      }
+      props.onFocus?.(e)
+    }
+
     return (
       <div className="flex flex-col gap-1.5">
         {label && (
@@ -67,7 +74,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
             inputRef={ref as any}
           />
         ) : (
-          <input {...commonProps} ref={ref} />
+          <input {...commonProps} ref={ref} onFocus={handleFocus} />
         )}
         {error && <span className="text-xs text-error">{error}</span>}
       </div>
