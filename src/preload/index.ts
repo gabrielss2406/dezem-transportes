@@ -99,6 +99,7 @@ contextBridge.exposeInMainWorld('api', {
   costs: {
     list: (filters?: any) => ipcRenderer.invoke('costs:list', filters),
     create: (data: any) => ipcRenderer.invoke('costs:create', data),
+    update: (id: number, data: any) => ipcRenderer.invoke('costs:update', id, data),
     delete: (id: number) => ipcRenderer.invoke('costs:delete', id),
     issueMonthlySalaries: (monthYear: string) =>
       ipcRenderer.invoke('costs:issueMonthlySalaries', monthYear),

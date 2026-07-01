@@ -4,6 +4,7 @@ import { Controller, useFieldArray, useForm } from 'react-hook-form'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { tripSchema } from '../../../shared/schemas'
 import { PageHeader } from '../components/PageHeader'
+import { SupplierCombobox } from '../components/SupplierCombobox'
 import {
   Badge,
   Button,
@@ -107,7 +108,6 @@ export function TripsPage() {
   const [editing, setEditing] = useState<Trip | null>(null)
   const [hasOverweight, setHasOverweight] = useState(false)
   const [appSettings, setAppSettings] = useState({ taxRate: 0, commissionRate: 0 })
-  const [stopSearchId, setStopSearchId] = useState<string | number>('')
   const [pendingData, setPendingData] = useState<any>(null)
   const [deleteTarget, setDeleteTarget] = useState<Trip | null>(null)
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false)
@@ -281,12 +281,50 @@ export function TripsPage() {
     } else {
       setEditing(null)
       reset(EMPTY)
-      setStopSearchId('')
       setHasOverweight(false)
       setNoPriceRegistered(false)
       setManualUnitPrice(null)
     }
   }, [modal, editing, reset])
+
+  const resolvePendingFuelStopSuppliers = async (): Promise<boolean> => {
+    const fuelStops: any[] = getValues('fuel_stops' as any) || []
+    const createdCache: Record<string, number> = {}
+
+    for (let i = 0; i < fuelStops.length; i++) {
+      const stop = fuelStops[i]
+      if (stop.supplier_id) {
+        continue
+      }
+
+      const name = (stop.pendingSupplierName || '').trim()
+      if (!name) {
+        show('Selecione ou digite um fornecedor para todas as paradas', 'error')
+        return false
+      }
+
+      const normalized = name.toLowerCase()
+      const existing = suppliers.find((s) => s.name.trim().toLowerCase() === normalized)
+      if (existing) {
+        setValue(`fuel_stops.${i}.supplier_id` as any, existing.id)
+        continue
+      }
+      if (createdCache[normalized]) {
+        setValue(`fuel_stops.${i}.supplier_id` as any, createdCache[normalized])
+        continue
+      }
+
+      const created = await window.api.suppliers.create({ name, type: 'other' })
+      if ('ok' in created && created.ok === false) {
+        show('Erro ao criar fornecedor', 'error')
+        return false
+      }
+      createdCache[normalized] = created.id
+      setSuppliers((prev) => [...prev, { id: created.id, name, type: 'other' } as any])
+      setValue(`fuel_stops.${i}.supplier_id` as any, created.id)
+    }
+    return true
+  }
 
   const save = async (data: TripFormData) => {
     try {
@@ -372,8 +410,20 @@ export function TripsPage() {
     const supplier = suppliers.find((s) => String(s.id) === String(supplierId))
     if (supplier) {
       append({ supplier_id: supplier.id, value: 0, liters: null, km_driven: 0 })
-      setStopSearchId('') // Reset selection
     }
+  }
+
+  const handleAddPendingStop = (name: string) => {
+    if (!name.trim()) {
+      return
+    }
+    append({
+      supplier_id: undefined,
+      pendingSupplierName: name.trim(),
+      value: 0,
+      liters: null,
+      km_driven: 0,
+    } as any)
   }
 
   const totalRevenue = trips.reduce((s, t) => s + t.price_charged, 0)
@@ -1179,7 +1229,13 @@ export function TripsPage() {
                     icon="percent"
                     value={field.value ? 'true' : 'false'}
                     onChange={(v) => field.onChange(v === 'true')}
-                    onEnterSelect={() => handleSubmit(onEnterSubmit as any)()}
+                    onEnterSelect={async () => {
+                      const ok = await resolvePendingFuelStopSuppliers()
+                      if (!ok) {
+                        return
+                      }
+                      handleSubmit(onEnterSubmit as any)()
+                    }}
                     options={[
                       {
                         value: 'false',
@@ -1278,26 +1334,20 @@ export function TripsPage() {
               </h3>
 
               <div className="mb-6">
-                <Select
+                <SupplierCombobox
+                  key={fields.length}
                   placeholder="Pesquisar local/fornecedor para adicionar..."
-                  value={stopSearchId}
-                  onChange={handleAddStop}
-                  options={suppliers.map((s) => ({
-                    value: s.id,
-                    label: (
-                      <div className="flex items-center justify-between w-full">
-                        <div className="flex items-center gap-2">
-                          <span className="material-symbols-outlined text-sm opacity-60">
-                            {typeIcon[s.type] || 'handshake'}
-                          </span>
-                          <span>{s.name}</span>
-                        </div>
-                        <Badge label={s.type} color={s.type === 'gas_station' ? 'amber' : 'gray'} />
-                      </div>
-                    ),
-                    displayLabel: s.name,
-                    searchableLabel: `${s.name} ${s.customId || ''}`,
-                  }))}
+                  suppliers={suppliers}
+                  onChange={(id) => {
+                    if (id) {
+                      handleAddStop(id)
+                    }
+                  }}
+                  onPendingChange={(name) => {
+                    if (name) {
+                      handleAddPendingStop(name)
+                    }
+                  }}
                 />
               </div>
 
@@ -1315,8 +1365,13 @@ export function TripsPage() {
                             {supplier ? typeIcon[supplier.type] : 'location_on'}
                           </span>
                           <span className="text-xs font-bold text-on-surface uppercase tracking-wider">
-                            {supplier?.name || 'Local'}
+                            {supplier?.name || field.pendingSupplierName || 'Local'}
                           </span>
+                          {!supplier && field.pendingSupplierName && (
+                            <span className="text-[9px] px-1.5 py-0.5 bg-primary/10 text-primary rounded">
+                              novo
+                            </span>
+                          )}
                         </div>
                         <button
                           type="button"
@@ -1405,7 +1460,13 @@ export function TripsPage() {
               </Button>
               <button
                 type="button"
-                onClick={handleSubmit(onSubmit as any)}
+                onClick={async () => {
+                  const ok = await resolvePendingFuelStopSuppliers()
+                  if (!ok) {
+                    return
+                  }
+                  handleSubmit(onSubmit as any)()
+                }}
                 className="flex items-center gap-3 px-8 py-3 bg-primary text-on-primary font-extrabold rounded transition-all hover:brightness-110 active:scale-95 shadow-lg shadow-primary/20"
               >
                 {editing ? 'Salvar Alterações' : 'Salvar Lançamento'}
