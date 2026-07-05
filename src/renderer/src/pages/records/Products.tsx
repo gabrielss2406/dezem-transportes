@@ -3,22 +3,26 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Controller, useForm } from 'react-hook-form'
 import { productSchema } from '../../../../shared/schemas'
 import { PageHeader } from '../../components/PageHeader'
-import { Button, Input, Modal, Select, Table, Toast, useToast } from '../../components/ui'
+import {
+  Button,
+  CurrencyInput,
+  Input,
+  Modal,
+  Select,
+  Table,
+  Toast,
+  useToast,
+} from '../../components/ui'
 import type { Product } from '../../lib/types'
-
-const UNITS = [
-  { value: 'ton', label: 'Tonelada (ton)' },
-  { value: 'm3', label: 'Metro cúbico (m³)' },
-  { value: 'un', label: 'Unidade' },
-]
+import { formatBRL } from '../../lib/utils'
 
 interface ProductFormData {
   name: string
-  unit?: string
   customId?: number
+  unit_value?: number | null
 }
 
-const EMPTY: ProductFormData = { name: '', unit: 'ton', customId: undefined }
+const EMPTY: ProductFormData = { name: '', customId: undefined, unit_value: null }
 
 function ConfirmModal({
   message,
@@ -67,7 +71,7 @@ export function ProductsPage() {
 
   const customIdRef = useRef<HTMLInputElement>(null)
   const nameRef = useRef<HTMLInputElement>(null)
-  const unitSelectRef = useRef<any>(null)
+  const unitValueRef = useRef<HTMLInputElement>(null)
 
   const {
     handleSubmit,
@@ -193,8 +197,8 @@ export function ProductsPage() {
     setEditing(row)
     reset({
       name: row.name,
-      unit: row.unit,
       customId: row.customId ?? undefined,
+      unit_value: row.unit_value ?? null,
     })
     setModal(true)
   }
@@ -253,38 +257,28 @@ export function ProductsPage() {
         </div>
       </PageHeader>
 
-      <div className="grid grid-cols-3 gap-6 mb-10">
-        {[
-          { label: 'Total de Produtos', value: rows.length, icon: 'inventory_2' },
-          {
-            label: 'Unid. Tonelada',
-            value: rows.filter((r) => r.unit === 'ton').length,
-            icon: 'scale',
-          },
-          {
-            label: 'Outras Unidades',
-            value: rows.filter((r) => r.unit !== 'ton').length,
-            icon: 'straighten',
-          },
-        ].map(({ label, value, icon }) => (
-          <div
-            key={label}
-            className="bg-surface-container-low p-6 rounded-lg relative overflow-hidden group"
-          >
-            <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-              <span className="material-symbols-outlined text-6xl text-primary">{icon}</span>
+      <div className="grid grid-cols-1 gap-6 mb-10">
+        {[{ label: 'Total de Produtos', value: rows.length, icon: 'inventory_2' }].map(
+          ({ label, value, icon }) => (
+            <div
+              key={label}
+              className="bg-surface-container-low p-6 rounded-lg relative overflow-hidden group"
+            >
+              <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                <span className="material-symbols-outlined text-6xl text-primary">{icon}</span>
+              </div>
+              <p className="text-on-surface-variant text-sm mb-1">{label}</p>
+              <p className="text-4xl font-black font-headline text-on-surface">{value}</p>
             </div>
-            <p className="text-on-surface-variant text-sm mb-1">{label}</p>
-            <p className="text-4xl font-black font-headline text-on-surface">{value}</p>
-          </div>
-        ))}
+          ),
+        )}
       </div>
 
       <div className="bg-surface-container rounded-xl overflow-hidden border border-outline-variant/10">
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-surface-container-high">
-              {['ID', 'Nome do Produto', 'Unidade', ''].map((h) => (
+              {['ID', 'Nome do Produto', 'Valor Unitário', ''].map((h) => (
                 <th
                   key={h}
                   className="px-8 py-5 text-[10px] font-black uppercase tracking-widest text-on-surface-variant"
@@ -302,60 +296,55 @@ export function ProductsPage() {
                 </td>
               </tr>
             )}
-            {rows.map((row, i) => {
-              const unitLabel = UNITS.find((u) => u.value === row.unit)?.label ?? row.unit
-              return (
-                <tr
-                  key={row.id}
-                  className={`hover:bg-surface-bright/5 transition-colors group ${i % 2 === 1 ? 'bg-surface-container-lowest/30' : ''}`}
-                >
-                  <td className="px-8 py-5 font-mono text-sm text-on-surface-variant">
-                    {row.customId || '—'}
-                  </td>
-                  <td className="px-8 py-5">
-                    <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 rounded bg-surface-container-lowest flex items-center justify-center shrink-0">
-                        <span className="material-symbols-outlined text-primary/50 group-hover:text-primary transition-colors">
-                          grain
-                        </span>
-                      </div>
-                      <span className="font-bold text-on-surface text-sm">{row.name}</span>
+            {rows.map((row, i) => (
+              <tr
+                key={row.id}
+                className={`hover:bg-surface-bright/5 transition-colors group ${i % 2 === 1 ? 'bg-surface-container-lowest/30' : ''}`}
+              >
+                <td className="px-8 py-5 font-mono text-sm text-on-surface-variant">
+                  {row.customId || '—'}
+                </td>
+                <td className="px-8 py-5">
+                  <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 rounded bg-surface-container-lowest flex items-center justify-center shrink-0">
+                      <span className="material-symbols-outlined text-primary/50 group-hover:text-primary transition-colors">
+                        grain
+                      </span>
                     </div>
-                  </td>
-                  <td className="px-8 py-5">
-                    <span className="bg-surface-container-highest text-on-surface-variant text-[10px] font-black uppercase px-2.5 py-1 rounded">
-                      {unitLabel}
-                    </span>
-                  </td>
-                  <td className="px-8 py-5">
-                    <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button
-                        type="button"
-                        onClick={() => setPricesModal(row)}
-                        className="p-2 text-outline hover:text-tertiary hover:bg-tertiary/10 rounded-lg transition-all"
-                        title="Ver Preços"
-                      >
-                        <span className="material-symbols-outlined text-xl">price_check</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => edit(row)}
-                        className="p-2 text-outline hover:text-primary hover:bg-primary/10 rounded-lg transition-all"
-                      >
-                        <span className="material-symbols-outlined text-xl">edit</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setDeleteTarget(row)}
-                        className="p-2 text-outline hover:text-error hover:bg-error/10 rounded-lg transition-all"
-                      >
-                        <span className="material-symbols-outlined text-xl">delete</span>
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              )
-            })}
+                    <span className="font-bold text-on-surface text-sm">{row.name}</span>
+                  </div>
+                </td>
+                <td className="px-8 py-5 text-sm text-on-surface-variant">
+                  {row.unit_value ? formatBRL(row.unit_value) : '—'}
+                </td>
+                <td className="px-8 py-5">
+                  <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button
+                      type="button"
+                      onClick={() => setPricesModal(row)}
+                      className="p-2 text-outline hover:text-tertiary hover:bg-tertiary/10 rounded-lg transition-all"
+                      title="Ver Preços"
+                    >
+                      <span className="material-symbols-outlined text-xl">price_check</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => edit(row)}
+                      className="p-2 text-outline hover:text-primary hover:bg-primary/10 rounded-lg transition-all"
+                    >
+                      <span className="material-symbols-outlined text-xl">edit</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setDeleteTarget(row)}
+                      className="p-2 text-outline hover:text-error hover:bg-error/10 rounded-lg transition-all"
+                    >
+                      <span className="material-symbols-outlined text-xl">delete</span>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))}
           </tbody>
         </table>
 
@@ -430,22 +419,22 @@ export function ProductsPage() {
                   value={field.value}
                   onChange={field.onChange}
                   error={errors.name?.message}
-                  onKeyDown={(e) => e.key === 'Enter' && unitSelectRef.current?.open()}
+                  onKeyDown={(e) => e.key === 'Enter' && unitValueRef.current?.focus()}
                 />
               )}
             />
             <Controller
-              name="unit"
+              name="unit_value"
               control={control}
               render={({ field }) => (
-                <Select
-                  ref={unitSelectRef}
-                  label="Unidade"
-                  value={field.value}
-                  onChange={field.onChange}
-                  onEnterSelect={() => handleSubmit(onEnterSubmit as any)()}
-                  error={errors.unit?.message}
-                  options={UNITS}
+                <CurrencyInput
+                  ref={unitValueRef}
+                  label="Valor Unitário (R$/ton)"
+                  optional
+                  value={field.value ?? ''}
+                  onChange={(v) => field.onChange(v === 0 ? null : v)}
+                  error={errors.unit_value?.message}
+                  onKeyDown={(e) => e.key === 'Enter' && handleSubmit(onEnterSubmit as any)()}
                 />
               )}
             />

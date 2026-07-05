@@ -40,7 +40,7 @@ const modules = [
   },
   {
     num: '06',
-    title: 'Nova Viagem',
+    title: 'Novo Lançamento',
     tag: 'Escalonamento',
     path: '/trips',
     img: 'https://lh3.googleusercontent.com/aida-public/AB6AXuAWPPKJ5w2doVVzW3GvOvR1mkOk_zMawdsJhhN-yP1dFUXDixaoeTGJKgp2oFfp1wsqblpxPwPDPnNgYZHoszNmqAtlsYnArjr4A50GdCNLJFDB4wgeLyCWciQ4Gm-G4zevJmcGvK-kB3XK0MNxzd0cZnKQhYF4myE9_wRRsysvy2TRLun7-UxG7XZcmAKZ1SLa1T9LPT-gLSsP74L9nwZvqDOCZeV21fOVoIWqXZchS2oFUZQw9-xf3o1ho8-EhlM-XoDVOKuw_Us',

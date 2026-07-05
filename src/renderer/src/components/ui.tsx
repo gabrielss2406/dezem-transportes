@@ -48,6 +48,13 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
       ...props,
     }
 
+    const handleFocus = (e: React.FocusEvent<HTMLInputElement>) => {
+      if (props.type === 'number') {
+        e.target.select()
+      }
+      props.onFocus?.(e)
+    }
+
     return (
       <div className="flex flex-col gap-1.5">
         {label && (
@@ -67,7 +74,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
             inputRef={ref as any}
           />
         ) : (
-          <input {...commonProps} ref={ref} />
+          <input {...commonProps} ref={ref} onFocus={handleFocus} />
         )}
         {error && <span className="text-xs text-error">{error}</span>}
       </div>
@@ -220,6 +227,7 @@ export const Select = forwardRef<SelectRef, SelectProps>(
   ) => {
     const [isOpen, setIsOpen] = useState(false)
     const [searchTerm, setSearchTerm] = useState('')
+    const [highlightedIndex, setHighlightedIndex] = useState(0)
     const containerRef = useRef<HTMLDivElement>(null)
     const buttonRef = useRef<HTMLButtonElement>(null)
     const searchInputRef = useRef<HTMLInputElement>(null)
@@ -338,6 +346,7 @@ export const Select = forwardRef<SelectRef, SelectProps>(
           }
         }, 50)
         setSearchTerm('')
+        setHighlightedIndex(0)
       }
       return () => {
         window.removeEventListener('resize', updateCoords)
@@ -420,11 +429,22 @@ export const Select = forwardRef<SelectRef, SelectProps>(
                   ref={searchInputRef}
                   type="text"
                   value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onChange={(e) => {
+                    setSearchTerm(e.target.value)
+                    setHighlightedIndex(0)
+                  }}
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter' && filteredOptions.length > 0) {
+                    if (e.key === 'ArrowDown') {
                       e.preventDefault()
-                      onChange?.(filteredOptions[0].value)
+                      setHighlightedIndex((prev) =>
+                        prev < filteredOptions.length - 1 ? prev + 1 : prev,
+                      )
+                    } else if (e.key === 'ArrowUp') {
+                      e.preventDefault()
+                      setHighlightedIndex((prev) => (prev > 0 ? prev - 1 : 0))
+                    } else if (e.key === 'Enter' && filteredOptions.length > 0) {
+                      e.preventDefault()
+                      onChange?.(filteredOptions[highlightedIndex].value)
                       setIsOpen(false)
                       setSearchTerm('')
                       onEnterSelect?.()
@@ -454,7 +474,7 @@ export const Select = forwardRef<SelectRef, SelectProps>(
                     Nenhuma opção encontrada
                   </div>
                 ) : (
-                  filteredOptions.map((option) => (
+                  filteredOptions.map((option, index) => (
                     <button
                       key={option.value}
                       type="button"
@@ -464,10 +484,12 @@ export const Select = forwardRef<SelectRef, SelectProps>(
                         onChange?.(option.value)
                         setIsOpen(false)
                       }}
-                      className={`w-full text-left px-4 py-2.5 text-sm transition-colors hover:bg-primary/10 ${
-                        String(value) === String(option.value)
-                          ? 'bg-primary/20 text-primary font-bold'
-                          : 'text-on-surface'
+                      className={`w-full text-left px-4 py-2.5 text-sm transition-colors ${
+                        index === highlightedIndex
+                          ? 'bg-primary/30 text-primary font-semibold'
+                          : String(value) === String(option.value)
+                            ? 'bg-primary/20 text-primary font-bold'
+                            : 'hover:bg-primary/10 text-on-surface'
                       }`}
                     >
                       {option.label}

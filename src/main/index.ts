@@ -1,10 +1,6 @@
+import fs from 'fs'
 import { join } from 'path'
-import * as dotenv from 'dotenv'
-// Load environment variables as early as possible
-dotenv.config()
-
-import fs from 'fs' // Adicionar import do fs
-import path from 'path' // Adicionar import do path
+import path from 'path'
 import { BrowserWindow, app, ipcMain, shell } from 'electron'
 
 import type { PdfExportData } from '../shared/types' // Adicionar import de PdfExportData
@@ -22,6 +18,7 @@ import { registerDriverHandlers } from './modules/drivers/drivers.handlers'
 import { registerFuelHandlers } from './modules/fuel/fuel.handlers'
 import { registerMaintenanceHandlers } from './modules/maintenance/maintenance.handlers'
 import { registerProductHandlers } from './modules/products/products.handlers'
+import { registerSettingsHandlers } from './modules/settings/settings.handlers'
 import { registerSupplierTypesHandlers } from './modules/supplier-types/supplier-types.handlers'
 import { registerSupplierHandlers } from './modules/suppliers/suppliers.handlers'
 import { registerTripHandlers } from './modules/trips/trips.handlers'
@@ -72,6 +69,7 @@ app.whenReady().then(() => {
   registerDashboardHandlers()
   registerDriverHandlers()
   registerProductHandlers()
+  registerSettingsHandlers()
   registerSupplierHandlers()
   registerSupplierTypesHandlers()
   registerFuelHandlers()

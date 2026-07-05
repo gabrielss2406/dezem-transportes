@@ -112,6 +112,7 @@ contextBridge.exposeInMainWorld('api', {
   costs: {
     list: (filters?: any) => ipcRenderer.invoke('costs:list', filters),
     create: (data: any) => ipcRenderer.invoke('costs:create', data),
+    update: (id: number, data: any) => ipcRenderer.invoke('costs:update', id, data),
     delete: (id: number) => ipcRenderer.invoke('costs:delete', id),
     issueMonthlySalaries: (monthYear: string) =>
       ipcRenderer.invoke('costs:issueMonthlySalaries', monthYear),
@@ -146,6 +147,13 @@ contextBridge.exposeInMainWorld('api', {
       return () => ipcRenderer.removeListener('backup-status-update', listener)
     },
   },
+
+  // Settings
+  settings: {
+    getApp: () => ipcRenderer.invoke('settings:get-app'),
+    saveApp: (data: unknown) => ipcRenderer.invoke('settings:save-app', data),
+  },
+
   // PDF
   exportPdf: (data: PdfExportData) => ipcRenderer.invoke('export-pdf', data),
 })

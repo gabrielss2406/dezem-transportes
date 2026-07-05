@@ -43,7 +43,7 @@ export function setupDatabase(): void {
       id         INTEGER PRIMARY KEY AUTOINCREMENT,
       customId   INTEGER UNIQUE,
       name       TEXT NOT NULL,
-      unit       TEXT NOT NULL DEFAULT 'ton',
+      unit_value REAL DEFAULT NULL,
       created_at TEXT DEFAULT (datetime('now'))
     );
 
@@ -79,7 +79,7 @@ export function setupDatabase(): void {
       id               INTEGER PRIMARY KEY AUTOINCREMENT,
       customId         INTEGER UNIQUE,
       license_plate    TEXT NOT NULL UNIQUE,
-      model            TEXT NOT NULL,
+      model            TEXT,
       year             INTEGER,
       capacity_ton     REAL,
       current_odometer REAL NOT NULL DEFAULT 0,
@@ -237,6 +237,46 @@ export function setupDatabase(): void {
     db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_trips_ticket_number ON trips(ticket_number)')
   }
 
+  // Migration: Add tax fields to trips if missing
+  if (!tripInfo.some((col) => col.name === 'has_percentage_tax')) {
+    db.exec('ALTER TABLE trips ADD COLUMN has_percentage_tax INTEGER NOT NULL DEFAULT 0')
+  }
+  if (!tripInfo.some((col) => col.name === 'tax_value')) {
+    db.exec('ALTER TABLE trips ADD COLUMN tax_value REAL NOT NULL DEFAULT 0')
+    // Backfill: freeze the tax value for already-taxed trips using the rate configured today,
+    // so existing trips don't suddenly show "no tax" until edited.
+    const settingsRow = db
+      .prepare('SELECT value FROM settings WHERE key = ?')
+      .get('app_settings') as { value: string } | undefined
+    let currentTaxRate = 0
+    if (settingsRow) {
+      try {
+        currentTaxRate = JSON.parse(settingsRow.value).taxRate || 0
+      } catch {
+        currentTaxRate = 0
+      }
+    }
+    if (currentTaxRate > 0) {
+      db.prepare(
+        'UPDATE trips SET tax_value = price_charged * ? / 100 WHERE has_percentage_tax = 1',
+      ).run(currentTaxRate)
+    }
+  }
+
+  // Migration: Add commission fields to trips if missing
+  if (!tripInfo.some((col) => col.name === 'has_commission')) {
+    db.exec('ALTER TABLE trips ADD COLUMN has_commission INTEGER NOT NULL DEFAULT 0')
+  }
+  if (!tripInfo.some((col) => col.name === 'commission_value')) {
+    db.exec('ALTER TABLE trips ADD COLUMN commission_value REAL NOT NULL DEFAULT 0')
+  }
+
+  // Migration: Add unit_value to products if missing
+  const productInfo = db.pragma('table_info(products)') as { name: string }[]
+  if (!productInfo.some((col) => col.name === 'unit_value')) {
+    db.exec('ALTER TABLE products ADD COLUMN unit_value REAL DEFAULT NULL')
+  }
+
   // Migration: Add is_deletable to supplier_types if it doesn't exist
   const supplierTypeInfo = db.pragma('table_info(supplier_types)') as { name: string }[]
   if (!supplierTypeInfo.some((col) => col.name === 'is_deletable')) {
@@ -253,6 +293,50 @@ export function setupDatabase(): void {
   }
   if (!truckInfo.some((col) => col.name === 'contractor_id')) {
     db.exec('ALTER TABLE trucks ADD COLUMN contractor_id INTEGER REFERENCES contractors(id)')
+  }
+
+  // Migration: Make model column nullable in trucks table
+  const modelColumn = (truckInfo as any[]).find((col) => col.name === 'model')
+  if (modelColumn && modelColumn.notnull === 1) {
+    try {
+      // SQLite requires recreating the table to change a column constraint
+      // Temporarily disable foreign keys to avoid constraint violations during migration
+      const fkState = db.pragma('foreign_keys', { simple: true })
+      db.pragma('foreign_keys = OFF')
+
+      db.exec(`
+        BEGIN TRANSACTION;
+        CREATE TABLE trucks_new AS SELECT * FROM trucks;
+        DROP TABLE trucks;
+        CREATE TABLE trucks (
+          id               INTEGER PRIMARY KEY AUTOINCREMENT,
+          customId         INTEGER UNIQUE,
+          license_plate    TEXT NOT NULL UNIQUE,
+          model            TEXT,
+          year             INTEGER,
+          capacity_ton     REAL,
+          current_odometer REAL NOT NULL DEFAULT 0,
+          is_outsourced    INTEGER NOT NULL DEFAULT 0,
+          contractor_id    INTEGER REFERENCES contractors(id),
+          created_at       TEXT DEFAULT (datetime('now'))
+        );
+        INSERT INTO trucks SELECT
+          id, customId, license_plate, model, year, capacity_ton,
+          current_odometer, COALESCE(is_outsourced, 0), contractor_id, created_at
+        FROM trucks_new;
+        DROP TABLE trucks_new;
+        COMMIT;
+      `)
+
+      // Restore original foreign_keys state
+      if (fkState) {
+        db.pragma('foreign_keys = ON')
+      }
+    } catch (error) {
+      // Ensure foreign_keys is restored even on error
+      db.pragma('foreign_keys = ON')
+      throw error
+    }
   }
 
   // Migration: Add is_outsourced and contractor_id to drivers if missing

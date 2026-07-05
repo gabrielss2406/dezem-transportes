@@ -53,7 +53,7 @@ export const productSchema = z.object({
     z.number().int().positive().optional(),
   ),
   name: z.string().min(2, 'Nome deve ter pelo menos 2 caracteres').max(100),
-  unit: z.string().max(10).optional(),
+  unit_value: optionalNumber(1000000, 'Valor máximo de R$ 1.000.000'),
 })
 
 export const supplierSchema = z.object({
@@ -81,7 +81,10 @@ export const truckSchema = z.object({
       .length(7, 'Placa deve ter 7 caracteres')
       .regex(/^[A-Z]{3}[0-9][A-Z0-9][0-9]{2}$/, 'Placa inválida (use ABC1D23 ou ABC-1234)'),
   ),
-  model: z.string().min(2, 'Modelo deve ter pelo menos 2 caracteres').max(50),
+  model: z.preprocess(
+    (val) => (val === '' || val === null || val === undefined ? undefined : val),
+    z.string().max(50).optional().nullable(),
+  ),
   year: z.preprocess(
     (val) => (val === '' || val === null ? null : Number(val)),
     z
@@ -173,12 +176,14 @@ export const tripSchema = z.object({
   product_id: requiredNumber(999999999, 'ID inválido'),
   customer_id: optionalNumber(999999999, 'ID inválido'),
   supplier_id: optionalNumber(999999999, 'ID inválido'), // Keep for backward compatibility or main supplier
-  weight_ton: requiredNumber(100, 'Peso máximo de 100 toneladas'),
-  overweight_ton: optionalNumber(100, 'Excesso máximo de 100 toneladas'),
+  weight_ton: requiredNumber(999999, 'Peso máximo de 999.999 toneladas'),
+  overweight_ton: optionalNumber(999999, 'Excesso máximo de 999.999 toneladas'),
   overweight_observation: z.string().max(500).optional().nullable(),
   price_charged: requiredNumber(1000000, 'Valor máximo de R$ 1.000.000'),
   km_driven: requiredNumber(10000, 'KM máximo de 10.000'),
   observation: z.string().max(500).optional(),
+  has_percentage_tax: z.boolean().optional(),
+  has_commission: z.boolean().optional(),
   fuel_stops: z.array(fuelStopSchema).optional(),
 })
 
@@ -218,6 +223,17 @@ export const customerPriceSchema = z.object({
 
 export const loginSchema = z.object({
   password: z.string().min(1, 'Senha é obrigatória'),
+})
+
+export const appSettingsSchema = z.object({
+  taxRate: z.preprocess(
+    (val) => (val === '' || val === null || val === undefined ? 0 : Number(val)),
+    z.number().min(0).max(100, 'Máximo de 100%'),
+  ),
+  commissionRate: z.preprocess(
+    (val) => (val === '' || val === null || val === undefined ? 0 : Number(val)),
+    z.number().min(0).max(100, 'Máximo de 100%'),
+  ),
 })
 
 export const backupConfigSchema = z.object({

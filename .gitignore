@@ -5,7 +5,9 @@ release/
 out/
 *.db
 .env
+.env.production
 .env.local
 .claude/settings.local.json
 stitch_dezem_transportes_login/
 CLAUDE.md
+.claude

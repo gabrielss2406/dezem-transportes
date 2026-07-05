@@ -72,6 +72,7 @@ function ConfirmModal({
 
 export function DriversPage() {
   const [rows, setRows] = useState<Driver[]>([])
+  const [allDrivers, setAllDrivers] = useState<Driver[]>([])
   const [trucks, setTrucks] = useState<Truck[]>([])
   const [contractors, setContractors] = useState<Contractor[]>([])
   const [modal, setModal] = useState(false)
@@ -119,14 +120,16 @@ export function DriversPage() {
       ...appliedFilters,
       is_outsourced: view === 'outsourced',
     }
-    const [d, t, c] = await Promise.all([
+    const [d, t, c, all] = await Promise.all([
       window.api.drivers.list(listFilters),
       window.api.trucks.list(),
       window.api.contractors.list(),
+      window.api.drivers.list({}),
     ])
     setRows(d)
     setTrucks(t)
     setContractors(c)
+    setAllDrivers(all)
   }, [appliedFilters, view])
 
   useEffect(() => {
@@ -134,13 +137,13 @@ export function DriversPage() {
   }, [load])
 
   const findNextAvailableId = useCallback(() => {
-    const usedIds = new Set(rows.map((r) => r.customId).filter((id): id is number => !!id))
+    const usedIds = new Set(allDrivers.map((r) => r.customId).filter((id): id is number => !!id))
     let nextId = 1
     while (usedIds.has(nextId)) {
       nextId++
     }
     return nextId
-  }, [rows])
+  }, [allDrivers])
 
   useEffect(() => {
     if (modal) {
@@ -239,9 +242,9 @@ export function DriversPage() {
     }
   }
 
-  // Trucks filtered to current view for assignment (internal trucks for internal drivers, all trucks for outsourced)
+  // Trucks filtered based on form field, not view tab (so toggle within a form works correctly)
   const availableTrucks =
-    view === 'outsourced'
+    isOutsourcedValue === 1
       ? trucks.filter((t) => t.is_outsourced === 1)
       : trucks.filter((t) => !t.is_outsourced)
 

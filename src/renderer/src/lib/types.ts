@@ -12,7 +12,7 @@ export interface Product {
   id: number
   customId?: number
   name: string
-  unit: string
+  unit_value?: number | null
 }
 
 export interface CustomerPrice {
@@ -42,7 +42,7 @@ export interface Truck {
   id: number
   customId?: number
   license_plate: string
-  model: string
+  model?: string
   year?: number
   capacity_ton?: number
   current_odometer: number
@@ -106,6 +106,10 @@ export interface Trip {
   price_charged: number
   km_driven: number
   observation?: string
+  has_percentage_tax?: boolean
+  tax_value?: number
+  has_commission?: boolean
+  commission_value?: number
   fuel_stops?: FuelStop[]
   fuel_stops_count?: number
   // joins
@@ -309,6 +313,15 @@ declare global {
           callback: (status: import('../../../shared/types').BackupStatus) => void,
         ): () => void
       }
+      settings: {
+        getApp(): Promise<import('../../../shared/types').AppSettings>
+        saveApp(data: import('../../../shared/types').AppSettings): Promise<{ ok: boolean }>
+      }
+      exportPdf(data: import('../../../shared/types').PdfExportData): Promise<{
+        success: boolean
+        path?: string
+        error?: string
+      }>
     }
   }
 }

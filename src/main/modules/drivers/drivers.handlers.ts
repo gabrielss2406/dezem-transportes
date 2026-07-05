@@ -44,6 +44,13 @@ export function registerDriverHandlers(): void {
   })
 
   createValidatedHandler('drivers:create', driverSchema, (data) => {
+    let customId = data.customId
+
+    if (!customId) {
+      const maxId = db().prepare('SELECT MAX(customId) as max_id FROM drivers').get() as any
+      customId = (maxId?.max_id || 0) + 1
+    }
+
     const r = db()
       .prepare(
         'INSERT INTO drivers (name, cpf, phone, monthly_salary, truck_id, customId, is_outsourced, contractor_id) VALUES (?,?,?,?,?,?,?,?)',
@@ -54,7 +61,7 @@ export function registerDriverHandlers(): void {
         data.phone,
         data.monthly_salary,
         data.truck_id || null,
-        data.customId,
+        customId,
         data.is_outsourced ?? 0,
         data.contractor_id || null,
       )

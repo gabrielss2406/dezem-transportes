@@ -1,3 +1,8 @@
+export interface AppSettings {
+  taxRate: number
+  commissionRate: number
+}
+
 export interface BackupConfig {
   endpoint: string
   bucket: string
