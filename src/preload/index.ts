@@ -95,6 +95,19 @@ contextBridge.exposeInMainWorld('api', {
     getFuelStops: (tripId: number) => ipcRenderer.invoke('trips:getFuelStops', tripId),
   },
 
+  // Maintenance
+  maintenance: {
+    listTypes: (includeInactive?: boolean) =>
+      ipcRenderer.invoke('maintenance:listTypes', includeInactive),
+    createType: (data: any) => ipcRenderer.invoke('maintenance:createType', data),
+    updateType: (id: number, data: any) => ipcRenderer.invoke('maintenance:updateType', id, data),
+    deleteType: (id: number) => ipcRenderer.invoke('maintenance:deleteType', id),
+    listRecords: (filters?: any) => ipcRenderer.invoke('maintenance:listRecords', filters),
+    createRecord: (data: any) => ipcRenderer.invoke('maintenance:createRecord', data),
+    deleteRecord: (id: number) => ipcRenderer.invoke('maintenance:deleteRecord', id),
+    getStatus: (filters?: any) => ipcRenderer.invoke('maintenance:getStatus', filters),
+  },
+
   // Costs
   costs: {
     list: (filters?: any) => ipcRenderer.invoke('costs:list', filters),
@@ -102,6 +115,13 @@ contextBridge.exposeInMainWorld('api', {
     delete: (id: number) => ipcRenderer.invoke('costs:delete', id),
     issueMonthlySalaries: (monthYear: string) =>
       ipcRenderer.invoke('costs:issueMonthlySalaries', monthYear),
+  },
+
+  // Fuel Records
+  fuel: {
+    list: (filters?: any) => ipcRenderer.invoke('fuel:list', filters),
+    create: (data: any) => ipcRenderer.invoke('fuel:create', data),
+    delete: (id: number) => ipcRenderer.invoke('fuel:delete', id),
   },
 
   // Dashboard

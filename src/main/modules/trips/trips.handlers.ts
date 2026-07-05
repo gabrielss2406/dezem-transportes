@@ -50,6 +50,10 @@ export function registerTripHandlers(): void {
       query += ' AND t.customer_id = ?'
       params.push(filters.customer_id)
     }
+    if (filters.ticket_number) {
+      query += ' AND t.ticket_number LIKE ?'
+      params.push(`%${filters.ticket_number}%`)
+    }
     query += ' ORDER BY t.date DESC'
     return db()
       .prepare(query)
@@ -73,8 +77,8 @@ export function registerTripHandlers(): void {
       const res = db()
         .prepare(
           `
-        INSERT INTO trips (date, truck_id, driver_id, product_id, customer_id, supplier_id, weight_ton, overweight_ton, overweight_observation, price_charged, km_driven, observation)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
+        INSERT INTO trips (date, truck_id, driver_id, product_id, customer_id, supplier_id, weight_ton, overweight_ton, overweight_observation, price_charged, km_driven, observation, ticket_number)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
       `,
         )
         .run(
@@ -90,11 +94,11 @@ export function registerTripHandlers(): void {
           tripData.price_charged,
           tripData.km_driven,
           tripData.observation || null,
+          (tripData as any).ticket_number,
         )
 
       const tripId = res.lastInsertRowid
 
-      // Insert fuel stops
       if (fuel_stops && fuel_stops.length > 0) {
         const insertStop = db().prepare(
           'INSERT INTO trip_fuel_stops (trip_id, supplier_id, value, liters, km_driven) VALUES (?, ?, ?, ?, ?)',
@@ -104,10 +108,6 @@ export function registerTripHandlers(): void {
         }
       }
 
-      // Update truck odometer automatically
-      db()
-        .prepare('UPDATE trucks SET current_odometer = current_odometer + ? WHERE id = ?')
-        .run(tripData.km_driven, tripData.truck_id)
       return res
     })()
     return { id: (r as any).lastInsertRowid }
@@ -116,14 +116,10 @@ export function registerTripHandlers(): void {
   createValidatedHandlerWithId('trips:update', tripSchema, (id, data) => {
     const { fuel_stops, ...tripData } = data
     db().transaction(() => {
-      const oldTrip = db()
-        .prepare('SELECT truck_id, km_driven FROM trips WHERE id = ?')
-        .get(id) as any
-
       db()
         .prepare(
           `UPDATE trips SET date=?, truck_id=?, driver_id=?, product_id=?, customer_id=?,
-            supplier_id=?, weight_ton=?, overweight_ton=?, overweight_observation=?, price_charged=?, km_driven=?, observation=?
+            supplier_id=?, weight_ton=?, overweight_ton=?, overweight_observation=?, price_charged=?, km_driven=?, observation=?, ticket_number=?
           WHERE id=?`,
         )
         .run(
@@ -139,17 +135,9 @@ export function registerTripHandlers(): void {
           tripData.price_charged,
           tripData.km_driven,
           tripData.observation || null,
+          (tripData as any).ticket_number,
           id,
         )
-
-      if (oldTrip) {
-        db()
-          .prepare('UPDATE trucks SET current_odometer = current_odometer - ? WHERE id = ?')
-          .run(oldTrip.km_driven, oldTrip.truck_id)
-      }
-      db()
-        .prepare('UPDATE trucks SET current_odometer = current_odometer + ? WHERE id = ?')
-        .run(tripData.km_driven, tripData.truck_id)
 
       db().prepare('DELETE FROM trip_fuel_stops WHERE trip_id = ?').run(id)
       if (fuel_stops && fuel_stops.length > 0) {

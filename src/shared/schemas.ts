@@ -151,7 +151,22 @@ export const fuelStopSchema = z.object({
   km_driven: optionalNumber(10000, 'KM máximo de 10.000'),
 })
 
+export const fuelRecordSchema = z.object({
+  truck_id: requiredNumber(999999999, 'ID inválido'),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data inválida'),
+  liters: optionalNumber(10000, 'Máximo de 10.000 litros'),
+  value: requiredNumber(1000000, 'Valor máximo de R$ 1.000.000'),
+  odometer_at_service: requiredNumber(9999999, 'KM máximo de 9.999.999'),
+  supplier_id: optionalNumber(999999999, 'ID inválido'),
+  notes: z.string().max(500).optional(),
+})
+
 export const tripSchema = z.object({
+  ticket_number: z
+    .string()
+    .trim()
+    .min(1, 'Número do bilhete é obrigatório')
+    .max(100, 'Número do bilhete muito longo'),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data inválida'),
   truck_id: requiredNumber(999999999, 'ID inválido'),
   driver_id: requiredNumber(999999999, 'ID inválido'),
@@ -165,6 +180,24 @@ export const tripSchema = z.object({
   km_driven: requiredNumber(10000, 'KM máximo de 10.000'),
   observation: z.string().max(500).optional(),
   fuel_stops: z.array(fuelStopSchema).optional(),
+})
+
+export const maintenanceTypeSchema = z.object({
+  name: z.string().trim().min(2, 'Nome deve ter pelo menos 2 caracteres').max(100),
+  description: z.string().max(255).optional(),
+  interval_km: requiredNumber(999999, 'KM máximo de 999.999'),
+  is_active: z.preprocess(
+    (val) => (val === true || val === 1 || val === '1' ? 1 : 0),
+    z.number().int(),
+  ),
+})
+
+export const maintenanceRecordSchema = z.object({
+  truck_id: requiredNumber(999999999, 'ID inválido'),
+  maintenance_type_id: requiredNumber(999999999, 'ID inválido'),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data inválida'),
+  odometer_at_service: requiredNumber(9999999, 'KM máximo de 9.999.999'),
+  notes: z.string().max(500).optional(),
 })
 
 export const costSchema = z.object({

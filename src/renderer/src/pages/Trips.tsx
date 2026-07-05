@@ -21,6 +21,7 @@ import type { Customer, Driver, Product, Supplier, Trip, Truck } from '../lib/ty
 import { formatBRL, formatDate } from '../lib/utils'
 
 interface TripFormData {
+  ticket_number: string
   date: string
   truck_id: number
   driver_id: number
@@ -37,6 +38,7 @@ interface TripFormData {
 }
 
 const EMPTY: TripFormData = {
+  ticket_number: '',
   date: '',
   truck_id: 0,
   driver_id: 0,
@@ -113,6 +115,7 @@ export function TripsPage() {
     driver_id: '',
     product_id: '',
     customer_id: '',
+    ticket_number: '',
   })
   const { toast, show } = useToast()
 
@@ -120,6 +123,7 @@ export function TripsPage() {
   const navigate = useNavigate()
 
   // Refs para navegação por teclado
+  const ticketInputRef = useRef<HTMLInputElement>(null)
   const dateRef = useRef<HTMLInputElement>(null)
   const truckSelectRef = useRef<SelectRef>(null)
   const driverSelectRef = useRef<SelectRef>(null)
@@ -144,6 +148,7 @@ export function TripsPage() {
     control,
     watch,
     setValue,
+    setError,
   } = useForm<TripFormData>({
     resolver: zodResolver(tripSchema) as any,
     defaultValues: { ...EMPTY },
@@ -200,12 +205,7 @@ export function TripsPage() {
     if (modal) {
       setTimeout(() => {
         window.focus()
-        if (!editing) {
-          dateRef.current?.focus()
-        } else {
-          // Se estiver editando, foca no primeiro campo também
-          dateRef.current?.focus()
-        }
+        ticketInputRef.current?.focus()
       }, 200)
     } else {
       setEditing(null)
@@ -213,17 +213,26 @@ export function TripsPage() {
       setStopSearchId('')
       setHasOverweight(false)
     }
-  }, [modal, editing, reset])
+  }, [modal, reset])
 
   const save = async (data: TripFormData) => {
     try {
+      let result: any
       if (editing) {
-        await window.api.trips.update(editing.id, data as any)
-        show('Viagem atualizada!')
+        result = await window.api.trips.update(editing.id, data as any)
       } else {
-        await window.api.trips.create(data as any)
-        show('Viagem registrada!')
+        result = await window.api.trips.create(data as any)
       }
+      if (result?.ok === false) {
+        setPendingData(null)
+        if (result.errors?.ticket_number) {
+          setError('ticket_number', { message: result.errors.ticket_number })
+        } else {
+          show(result.errors?.form || 'Erro ao salvar', 'error')
+        }
+        return
+      }
+      show(editing ? 'Viagem atualizada!' : 'Viagem registrada!')
       setModal(false)
       setPendingData(null)
       load()
@@ -255,6 +264,7 @@ export function TripsPage() {
     try {
       const fuelStops = await window.api.trips.getFuelStops(row.id)
       reset({
+        ticket_number: row.ticket_number ?? '',
         date: row.date,
         truck_id: row.truck_id,
         driver_id: row.driver_id,
@@ -322,6 +332,7 @@ export function TripsPage() {
         secondaryActionLabel="Exportar para PDF"
         onSecondaryAction={async () => {
           const headers = [
+            'Bilhete',
             'Data',
             'Caminhão',
             'Motorista',
@@ -332,6 +343,7 @@ export function TripsPage() {
             'Cliente',
           ]
           const data = trips.map((trip) => [
+            trip.ticket_number || '—',
             formatDate(trip.date),
             trip.truck_license_plate ?? '—',
             trip.driver_name ?? '—',
@@ -427,6 +439,14 @@ export function TripsPage() {
       {/* Filters */}
       <div className="bg-surface-container-low p-4 rounded-xl mb-10 border border-outline-variant/10 shadow-sm">
         <div className="flex flex-wrap items-end gap-4">
+          <div className="flex-1 min-w-[150px]">
+            <Input
+              label="Nº Bilhete"
+              value={filters.ticket_number}
+              onChange={(e) => setFilters((f) => ({ ...f, ticket_number: e.target.value }))}
+              placeholder="Buscar bilhete..."
+            />
+          </div>
           <div className="flex-1 min-w-[150px]">
             <DatePicker
               label="Início"
@@ -558,6 +578,7 @@ export function TripsPage() {
           <thead>
             <tr className="bg-surface-container-high">
               {[
+                'Bilhete',
                 'Data',
                 'Caminhão',
                 'Motorista',
@@ -580,7 +601,7 @@ export function TripsPage() {
           <tbody className="divide-y divide-outline-variant/10">
             {trips.length === 0 && (
               <tr>
-                <td colSpan={9} className="px-6 py-12 text-center text-on-surface-variant text-sm">
+                <td colSpan={10} className="px-6 py-12 text-center text-on-surface-variant text-sm">
                   Nenhuma viagem encontrada com os filtros selecionados
                 </td>
               </tr>
@@ -590,6 +611,9 @@ export function TripsPage() {
                 key={row.id}
                 className={`hover:bg-surface-bright/5 transition-colors group ${i % 2 === 1 ? 'bg-surface-container-lowest/30' : ''}`}
               >
+                <td className="px-6 py-4 text-sm font-mono font-semibold text-on-surface">
+                  {row.ticket_number || '—'}
+                </td>
                 <td className="px-6 py-4 text-sm text-on-surface-variant">
                   {formatDate(row.date)}
                 </td>
@@ -655,6 +679,22 @@ export function TripsPage() {
         >
           <div className="space-y-6">
             <div className="grid grid-cols-2 gap-5">
+              <div className="col-span-2">
+                <Input
+                  ref={ticketInputRef}
+                  label="Número do Bilhete"
+                  placeholder="Ex: NF-001, PO-2024-001..."
+                  {...register('ticket_number')}
+                  error={errors.ticket_number?.message}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                      dateRef.current?.focus()
+                    }
+                  }}
+                />
+              </div>
+
               <Controller
                 name="date"
                 control={control}

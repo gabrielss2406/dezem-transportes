@@ -11,6 +11,7 @@ const navItems = [
   { path: '/suppliers', label: 'Fornecedores', icon: 'handshake' },
   { path: '/contractors', label: 'Terceirizados', icon: 'group_add' },
   { path: '/trips', label: 'Viagens', icon: 'route' },
+  { path: '/maintenance', label: 'Manutenção', icon: 'build' },
   { path: '/costs', label: 'Custos', icon: 'payments' },
   { path: '/settings', label: 'Configurações', icon: 'settings' },
 ]

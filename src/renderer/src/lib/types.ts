@@ -76,8 +76,24 @@ export interface FuelStop {
   km_driven: number
 }
 
+export interface FuelRecord {
+  id: number
+  truck_id: number
+  date: string
+  liters?: number | null
+  value: number
+  odometer_at_service: number
+  supplier_id?: number | null
+  notes?: string | null
+  created_at?: string
+  truck_license_plate?: string
+  truck_model?: string
+  supplier_name?: string
+}
+
 export interface Trip {
   id: number
+  ticket_number: string
   date: string
   truck_id: number
   driver_id: number
@@ -98,6 +114,50 @@ export interface Trip {
   driver_name?: string
   product_name?: string
   customer_name?: string
+}
+
+export interface MaintenanceType {
+  id: number
+  name: string
+  description?: string
+  interval_km: number
+  is_active: number
+  is_deletable: number
+}
+
+export interface MaintenanceRecord {
+  id: number
+  truck_id: number
+  maintenance_type_id: number
+  date: string
+  odometer_at_service: number
+  notes?: string
+  created_at?: string
+  // joins
+  truck_license_plate?: string
+  truck_model?: string
+  type_name?: string
+  interval_km?: number
+}
+
+export interface TruckMaintenanceTypeStatus {
+  type_id: number
+  type_name: string
+  interval_km: number
+  last_record_id: number | null
+  last_date: string | null
+  odometer_at_service: number | null
+  km_since_last: number | null
+  km_remaining: number | null
+  status: 'ok' | 'due_soon' | 'overdue' | 'never'
+}
+
+export interface TruckMaintenanceStatus {
+  truck_id: number
+  truck_license_plate: string
+  truck_model: string
+  current_odometer: number
+  types: TruckMaintenanceTypeStatus[]
 }
 
 export interface Cost {
@@ -211,6 +271,21 @@ declare global {
         update(id: number, data: any): Promise<{ ok: boolean }>
         delete(id: number): Promise<{ ok: boolean }>
         getFuelStops(tripId: number): Promise<FuelStop[]>
+      }
+      fuel: {
+        list(filters?: any): Promise<FuelRecord[]>
+        create(data: any): Promise<{ id?: number; ok?: boolean; errors?: any }>
+        delete(id: number): Promise<{ ok: boolean }>
+      }
+      maintenance: {
+        listTypes(includeInactive?: boolean): Promise<MaintenanceType[]>
+        createType(data: any): Promise<{ id: number; ok?: boolean; errors?: any }>
+        updateType(id: number, data: any): Promise<{ ok: boolean; errors?: any }>
+        deleteType(id: number): Promise<{ ok: boolean; error?: string }>
+        listRecords(filters?: any): Promise<MaintenanceRecord[]>
+        createRecord(data: any): Promise<{ id: number; ok?: boolean; errors?: any }>
+        deleteRecord(id: number): Promise<{ ok: boolean }>
+        getStatus(filters?: any): Promise<TruckMaintenanceStatus[]>
       }
       costs: {
         list(filters?: any): Promise<Cost[]>
