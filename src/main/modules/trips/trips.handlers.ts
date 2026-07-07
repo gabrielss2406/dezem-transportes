@@ -6,6 +6,7 @@ import {
   createValidatedHandler,
   createValidatedHandlerWithId,
 } from '../../lib/utils'
+import { getAppSettings } from '../settings/app-settings'
 
 export function registerTripHandlers(): void {
   const db = () => getDb()
@@ -73,12 +74,18 @@ export function registerTripHandlers(): void {
 
   createValidatedHandler('trips:create', tripSchema, (data) => {
     const { fuel_stops, ...tripData } = data
+    const hasTax = !!(tripData as any).has_percentage_tax
+    const taxValue = hasTax ? (tripData.price_charged * getAppSettings().taxRate) / 100 : 0
+    const hasCommission = !!(tripData as any).has_commission
+    const commissionValue = hasCommission
+      ? (tripData.price_charged * getAppSettings().commissionRate) / 100
+      : 0
     const r = db().transaction(() => {
       const res = db()
         .prepare(
           `
-        INSERT INTO trips (date, truck_id, driver_id, product_id, customer_id, supplier_id, weight_ton, overweight_ton, overweight_observation, price_charged, km_driven, observation, ticket_number)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
+        INSERT INTO trips (date, truck_id, driver_id, product_id, customer_id, supplier_id, weight_ton, overweight_ton, overweight_observation, price_charged, km_driven, observation, ticket_number, has_percentage_tax, tax_value, has_commission, commission_value)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
       `,
         )
         .run(
@@ -95,6 +102,10 @@ export function registerTripHandlers(): void {
           tripData.km_driven,
           tripData.observation || null,
           (tripData as any).ticket_number,
+          hasTax ? 1 : 0,
+          taxValue,
+          hasCommission ? 1 : 0,
+          commissionValue,
         )
 
       const tripId = res.lastInsertRowid
@@ -115,11 +126,17 @@ export function registerTripHandlers(): void {
 
   createValidatedHandlerWithId('trips:update', tripSchema, (id, data) => {
     const { fuel_stops, ...tripData } = data
+    const hasTax = !!(tripData as any).has_percentage_tax
+    const taxValue = hasTax ? (tripData.price_charged * getAppSettings().taxRate) / 100 : 0
+    const hasCommission = !!(tripData as any).has_commission
+    const commissionValue = hasCommission
+      ? (tripData.price_charged * getAppSettings().commissionRate) / 100
+      : 0
     db().transaction(() => {
       db()
         .prepare(
           `UPDATE trips SET date=?, truck_id=?, driver_id=?, product_id=?, customer_id=?,
-            supplier_id=?, weight_ton=?, overweight_ton=?, overweight_observation=?, price_charged=?, km_driven=?, observation=?, ticket_number=?
+            supplier_id=?, weight_ton=?, overweight_ton=?, overweight_observation=?, price_charged=?, km_driven=?, observation=?, ticket_number=?, has_percentage_tax=?, tax_value=?, has_commission=?, commission_value=?
           WHERE id=?`,
         )
         .run(
@@ -136,6 +153,10 @@ export function registerTripHandlers(): void {
           tripData.km_driven,
           tripData.observation || null,
           (tripData as any).ticket_number,
+          hasTax ? 1 : 0,
+          taxValue,
+          hasCommission ? 1 : 0,
+          commissionValue,
           id,
         )
 
