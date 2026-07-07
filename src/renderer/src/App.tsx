@@ -5,6 +5,7 @@ import { CostsPage } from './pages/Costs'
 import { DashboardPage } from './pages/Dashboard'
 import { DesignSystemPage } from './pages/DesignSystem'
 import { LoginPage } from './pages/Login'
+import { MaintenancePage } from './pages/Maintenance'
 import { OverviewPage } from './pages/Overview'
 import { PriceManagementPage } from './pages/PriceManagement'
 import { SettingsPage } from './pages/Settings'
@@ -64,6 +65,7 @@ function AppRoutes() {
                   element={<OverviewPage onNavigate={(path) => navigate(path)} />}
                 />
                 <Route path="/trips" element={<TripsPage />} />
+                <Route path="/maintenance" element={<MaintenancePage />} />
                 <Route path="/prices" element={<PriceManagementPage />} />
                 <Route path="/costs" element={<CostsPage />} />{' '}
                 <Route path="/trucks" element={<TrucksPage />} />

@@ -153,6 +153,19 @@ export function setupDatabase(): void {
       created_at    TEXT    DEFAULT (datetime('now'))
     );
 
+    -- Fuel Records (standalone refueling records, source of odometer truth)
+    CREATE TABLE IF NOT EXISTS fuel_records (
+      id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+      truck_id            INTEGER NOT NULL REFERENCES trucks(id),
+      date                TEXT NOT NULL,
+      liters              REAL,
+      value               REAL NOT NULL DEFAULT 0,
+      odometer_at_service REAL NOT NULL,
+      supplier_id         INTEGER REFERENCES suppliers(id),
+      notes               TEXT,
+      created_at          TEXT DEFAULT (datetime('now'))
+    );
+
     -- Customer Prices
     CREATE TABLE IF NOT EXISTS customer_prices (
       customer_id INTEGER NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
@@ -167,6 +180,28 @@ export function setupDatabase(): void {
       value TEXT NOT NULL
     );
 
+    -- Maintenance Types (oil change, tire rotation, etc.)
+    CREATE TABLE IF NOT EXISTS maintenance_types (
+      id           INTEGER PRIMARY KEY AUTOINCREMENT,
+      name         TEXT NOT NULL,
+      description  TEXT,
+      interval_km  REAL NOT NULL DEFAULT 1000,
+      is_active    INTEGER NOT NULL DEFAULT 1,
+      is_deletable INTEGER NOT NULL DEFAULT 1,
+      created_at   TEXT DEFAULT (datetime('now'))
+    );
+
+    -- Maintenance Records (history per truck)
+    CREATE TABLE IF NOT EXISTS maintenance_records (
+      id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+      truck_id            INTEGER NOT NULL REFERENCES trucks(id),
+      maintenance_type_id INTEGER NOT NULL REFERENCES maintenance_types(id),
+      date                TEXT NOT NULL,
+      odometer_at_service REAL NOT NULL,
+      notes               TEXT,
+      created_at          TEXT DEFAULT (datetime('now'))
+    );
+
     -- Indexes for performance on frequent queries
     CREATE INDEX IF NOT EXISTS idx_trips_date      ON trips(date);
     CREATE INDEX IF NOT EXISTS idx_trips_truck     ON trips(truck_id);
@@ -176,6 +211,10 @@ export function setupDatabase(): void {
     CREATE INDEX IF NOT EXISTS idx_trip_fuel_stops_trip_id  ON trip_fuel_stops(trip_id);
     CREATE INDEX IF NOT EXISTS idx_customer_prices_customer_id ON customer_prices(customer_id);
     CREATE INDEX IF NOT EXISTS idx_customer_prices_product_id ON customer_prices(product_id);
+    CREATE INDEX IF NOT EXISTS idx_maintenance_records_truck ON maintenance_records(truck_id);
+    CREATE INDEX IF NOT EXISTS idx_maintenance_records_type  ON maintenance_records(maintenance_type_id);
+    CREATE INDEX IF NOT EXISTS idx_fuel_records_truck ON fuel_records(truck_id);
+    CREATE INDEX IF NOT EXISTS idx_fuel_records_date  ON fuel_records(date);
   `)
 
   // Seed: default admin user if none exists
@@ -192,6 +231,10 @@ export function setupDatabase(): void {
   }
   if (!tripInfo.some((col) => col.name === 'overweight_observation')) {
     db.exec('ALTER TABLE trips ADD COLUMN overweight_observation TEXT DEFAULT NULL')
+  }
+  if (!tripInfo.some((col) => col.name === 'ticket_number')) {
+    db.exec('ALTER TABLE trips ADD COLUMN ticket_number TEXT')
+    db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_trips_ticket_number ON trips(ticket_number)')
   }
 
   // Migration: Add tax fields to trips if missing
@@ -354,6 +397,35 @@ export function setupDatabase(): void {
       { value: 'salary', label: 'Salário', is_deletable: 0 },
       { value: 'toll', label: 'Pedágio', is_deletable: 0 },
       { value: 'others', label: 'Outros', is_deletable: 0 },
+    ])
+  }
+
+  // Seed: default maintenance types if none exist
+  const maintenanceTypeCount = (
+    db.prepare('SELECT COUNT(*) as c FROM maintenance_types').get() as any
+  ).c
+  if (maintenanceTypeCount === 0) {
+    const stmt = db.prepare(
+      'INSERT INTO maintenance_types (name, description, interval_km, is_deletable) VALUES (?, ?, ?, ?)',
+    )
+    const transaction = db.transaction((types) => {
+      for (const type of types) {
+        stmt.run(type.name, type.description, type.interval_km, type.is_deletable)
+      }
+    })
+    transaction([
+      {
+        name: 'Troca de Óleo',
+        description: 'Troca de óleo do motor',
+        interval_km: 1000,
+        is_deletable: 0,
+      },
+      {
+        name: 'Rodízio de Pneus',
+        description: 'Rodízio e verificação dos pneus',
+        interval_km: 5000,
+        is_deletable: 0,
+      },
     ])
   }
 

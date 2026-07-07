@@ -15,6 +15,8 @@ import { registerCustomerPricesHandlers } from './modules/customer-prices/custom
 import { registerCustomerHandlers } from './modules/customers/customers.handlers'
 import { registerDashboardHandlers } from './modules/dashboard/dashboard.handlers'
 import { registerDriverHandlers } from './modules/drivers/drivers.handlers'
+import { registerFuelHandlers } from './modules/fuel/fuel.handlers'
+import { registerMaintenanceHandlers } from './modules/maintenance/maintenance.handlers'
 import { registerProductHandlers } from './modules/products/products.handlers'
 import { registerSettingsHandlers } from './modules/settings/settings.handlers'
 import { registerSupplierTypesHandlers } from './modules/supplier-types/supplier-types.handlers'
@@ -70,6 +72,8 @@ app.whenReady().then(() => {
   registerSettingsHandlers()
   registerSupplierHandlers()
   registerSupplierTypesHandlers()
+  registerFuelHandlers()
+  registerMaintenanceHandlers()
   registerTripHandlers()
   registerTruckHandlers()
   registerBackupHandlers()

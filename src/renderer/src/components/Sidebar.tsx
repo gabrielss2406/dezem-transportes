@@ -10,7 +10,8 @@ const navItems = [
   { path: '/prices', label: 'Tabela de Preços', icon: 'request_quote' },
   { path: '/suppliers', label: 'Fornecedores', icon: 'handshake' },
   { path: '/contractors', label: 'Terceirizados', icon: 'group_add' },
-  { path: '/trips', label: 'Lançamentos', icon: 'route' },
+  { path: '/trips', label: 'Viagens', icon: 'route' },
+  { path: '/maintenance', label: 'Manutenção', icon: 'build' },
   { path: '/costs', label: 'Custos', icon: 'payments' },
   { path: '/settings', label: 'Configurações', icon: 'settings' },
 ]
@@ -89,7 +90,7 @@ export function Sidebar({ onLogout }: SidebarProps) {
           onClick={() => navigate('/trips', { state: { openModal: true } })}
           className="w-full py-3 bg-primary text-on-primary font-bold rounded text-sm shadow-lg shadow-primary/20 hover:brightness-110 active:scale-95 transition-all"
         >
-          Novo Lançamento
+          Nova Viagem
         </button>
         <button
           type="button"
