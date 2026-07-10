@@ -62,7 +62,12 @@ function AppRoutes() {
                 <Route path="/" element={<DashboardPage />} />
                 <Route
                   path="/overview"
-                  element={<OverviewPage onNavigate={(path) => navigate(path)} />}
+                  element={
+                    <OverviewPage
+                      user={user}
+                      onNavigate={(path, state) => navigate(path, { state })}
+                    />
+                  }
                 />
                 <Route path="/trips" element={<TripsPage />} />
                 <Route path="/maintenance" element={<MaintenancePage />} />

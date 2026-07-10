@@ -1,6 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Controller, useForm } from 'react-hook-form'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { costSchema, fuelRecordSchema } from '../../../shared/schemas'
 import { PageHeader } from '../components/PageHeader'
 import {
@@ -92,6 +93,16 @@ export function CostsPage() {
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [drivers, setDrivers] = useState<Driver[]>([])
   const { toast, show } = useToast()
+
+  const location = useLocation()
+  const navigate = useNavigate()
+
+  useEffect(() => {
+    if (location.state?.openModal) {
+      setCostModal(true)
+      navigate(location.pathname, { replace: true, state: {} })
+    }
+  }, [location, navigate])
 
   // ── Cost form ──
   const categorySelectRef = useRef<SelectRef>(null)
