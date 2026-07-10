@@ -489,6 +489,100 @@ export function DashboardPage() {
             )}
           </div>
 
+          {/* Top Clientes e Por Tipo de Carga */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            {/* Top Clientes */}
+            <div className="bg-surface-container rounded-2xl overflow-hidden border border-outline-variant/10">
+              <div className="p-8 pb-4">
+                <SectionHeader title="Top Clientes" icon="groups" />
+              </div>
+              <table className="w-full text-left">
+                <thead>
+                  <tr className="bg-surface-container-high">
+                    <th className="px-8 py-4 text-[10px] font-black uppercase tracking-widest text-on-surface-variant">
+                      Cliente
+                    </th>
+                    <th className="px-8 py-4 text-[10px] font-black uppercase tracking-widest text-on-surface-variant text-right">
+                      Viagens
+                    </th>
+                    <th className="px-8 py-4 text-[10px] font-black uppercase tracking-widest text-on-surface-variant text-right">
+                      Ton
+                    </th>
+                    <th className="px-8 py-4 text-[10px] font-black uppercase tracking-widest text-on-surface-variant text-right">
+                      Receita
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-outline-variant/10">
+                  {(summary?.perCustomer || []).map((c) => (
+                    <tr
+                      key={c.customer_name}
+                      className="hover:bg-surface-bright/5 transition-colors"
+                    >
+                      <td className="px-8 py-5">
+                        <p className="font-black text-on-surface">{c.customer_name}</p>
+                        <p className="text-xs text-on-surface-variant opacity-60 mt-0.5">
+                          Líquida: R$ {formatBRL(c.netRevenue).replace('R$ ', '')}
+                        </p>
+                      </td>
+                      <td className="px-8 py-5 text-right font-bold text-on-surface">{c.trips}</td>
+                      <td className="px-8 py-5 text-right font-bold text-on-surface">
+                        {c.tonnage.toFixed(0)}
+                      </td>
+                      <td className="px-8 py-5 text-right font-headline font-black text-primary">
+                        {formatBRL(c.revenue)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Por Tipo de Carga */}
+            <div className="bg-surface-container rounded-2xl overflow-hidden border border-outline-variant/10">
+              <div className="p-8 pb-4">
+                <SectionHeader title="Por Tipo de Carga" icon="inventory_2" />
+              </div>
+              <table className="w-full text-left">
+                <thead>
+                  <tr className="bg-surface-container-high">
+                    <th className="px-8 py-4 text-[10px] font-black uppercase tracking-widest text-on-surface-variant">
+                      Produto
+                    </th>
+                    <th className="px-8 py-4 text-[10px] font-black uppercase tracking-widest text-on-surface-variant text-right">
+                      Viagens
+                    </th>
+                    <th className="px-8 py-4 text-[10px] font-black uppercase tracking-widest text-on-surface-variant text-right">
+                      Ton
+                    </th>
+                    <th className="px-8 py-4 text-[10px] font-black uppercase tracking-widest text-on-surface-variant text-right">
+                      Receita
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-outline-variant/10">
+                  {(summary?.perProduct || []).map((p) => (
+                    <tr
+                      key={p.product_name}
+                      className="hover:bg-surface-bright/5 transition-colors"
+                    >
+                      <td className="px-8 py-5">
+                        <p className="font-black text-on-surface">{p.product_name}</p>
+                      </td>
+                      <td className="px-8 py-5 text-right font-bold text-on-surface">{p.trips}</td>
+                      <td className="px-8 py-5 text-right font-bold text-on-surface">
+                        {p.tonnage.toFixed(0)}
+                      </td>
+                      <td className="px-8 py-5 text-right font-headline font-black text-primary">
+                        {formatBRL(p.revenue)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
           {/* Composição de Custos */}
           <div className="bg-surface-container rounded-2xl p-8 border border-outline-variant/10">
             <SectionHeader title="Composição de Custos" icon="pie_chart" />

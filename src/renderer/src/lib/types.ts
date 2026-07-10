@@ -215,6 +215,19 @@ export interface DashboardSummary {
     }>
   }
   perCategory: Array<{ category: string; total: number }>
+  perCustomer: Array<{
+    customer_name: string
+    revenue: number
+    netRevenue: number
+    tonnage: number
+    trips: number
+  }>
+  perProduct: Array<{
+    product_name: string
+    revenue: number
+    tonnage: number
+    trips: number
+  }>
 }
 
 // Augment Window

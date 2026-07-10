@@ -436,6 +436,49 @@ export function registerDashboardHandlers(): void {
       }))
       .sort((a, b) => b.total - a.total)
 
+    // 6. Revenue by Customer (Top 5)
+    const perCustomer = db()
+      .prepare(
+        `
+      SELECT
+        COALESCE(c.name, 'Sem cliente') as customer_name,
+        COALESCE(SUM(tr.price_charged), 0) as revenue,
+        COALESCE(SUM(tr.price_charged - COALESCE(tr.tax_value, 0)), 0) as netRevenue,
+        COALESCE(SUM(tr.weight_ton + COALESCE(tr.overweight_ton, 0)), 0) as tonnage,
+        COUNT(*) as trips
+      FROM trips tr
+      JOIN trucks t ON tr.truck_id = t.id
+      JOIN drivers d ON tr.driver_id = d.id
+      LEFT JOIN customers c ON tr.customer_id = c.id
+      WHERE tr.date BETWEEN ? AND ? AND ${INTERNAL_TRUCK} AND ${INTERNAL_DRIVER}
+      GROUP BY tr.customer_id
+      ORDER BY revenue DESC
+      LIMIT 5
+    `,
+      )
+      .all(startDate, endDate) as any[]
+
+    // 7. Revenue by Product (Top 5)
+    const perProduct = db()
+      .prepare(
+        `
+      SELECT
+        p.name as product_name,
+        COALESCE(SUM(tr.price_charged), 0) as revenue,
+        COALESCE(SUM(tr.weight_ton + COALESCE(tr.overweight_ton, 0)), 0) as tonnage,
+        COUNT(*) as trips
+      FROM trips tr
+      JOIN trucks t ON tr.truck_id = t.id
+      JOIN drivers d ON tr.driver_id = d.id
+      JOIN products p ON tr.product_id = p.id
+      WHERE tr.date BETWEEN ? AND ? AND ${INTERNAL_TRUCK} AND ${INTERNAL_DRIVER}
+      GROUP BY tr.product_id
+      ORDER BY revenue DESC
+      LIMIT 5
+    `,
+      )
+      .all(startDate, endDate) as any[]
+
     return {
       revenue,
       netRevenue: revenue - totalTax,
@@ -449,6 +492,8 @@ export function registerDashboardHandlers(): void {
       monthlyRevenue,
       maintenanceSummary,
       perCategory,
+      perCustomer,
+      perProduct,
     }
   })
 }
