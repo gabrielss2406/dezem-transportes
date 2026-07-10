@@ -1,11 +1,73 @@
+import type Database from 'better-sqlite3'
 import { ipcMain } from 'electron'
 import { maintenanceRecordSchema, maintenanceTypeSchema } from '../../../shared/schemas'
+import type { TruckMaintenanceStatus } from '../../../shared/types'
 import { getDb } from '../../database'
 import {
   createIdValidatedHandler,
   createValidatedHandler,
   createValidatedHandlerWithId,
 } from '../../lib/utils'
+
+export function getMaintenanceStatus(
+  db: Database.Database,
+  filters: any = {},
+): TruckMaintenanceStatus[] {
+  let trucksQuery = 'SELECT id, license_plate, model, current_odometer FROM trucks'
+  const truckParams: any[] = []
+  if (filters.truck_id) {
+    trucksQuery += ' WHERE id = ?'
+    truckParams.push(filters.truck_id)
+  }
+  trucksQuery += ' ORDER BY license_plate'
+  const trucks = db.prepare(trucksQuery).all(...truckParams) as any[]
+
+  const types = db
+    .prepare('SELECT * FROM maintenance_types WHERE is_active = 1 ORDER BY name')
+    .all() as any[]
+
+  const getLastRecord = db.prepare(
+    'SELECT * FROM maintenance_records WHERE truck_id = ? AND maintenance_type_id = ? ORDER BY date DESC, id DESC LIMIT 1',
+  )
+
+  const dueSoonKm = (interval_km: number) => Math.min(interval_km * 0.2, 500)
+
+  return trucks.map((truck) => ({
+    truck_id: truck.id,
+    truck_license_plate: truck.license_plate,
+    truck_model: truck.model,
+    current_odometer: truck.current_odometer,
+    types: types.map((type) => {
+      const lastRecord = getLastRecord.get(truck.id, type.id) as any
+      const km_since_last =
+        lastRecord != null ? truck.current_odometer - lastRecord.odometer_at_service : null
+      const km_remaining = km_since_last != null ? type.interval_km - km_since_last : null
+
+      let status: string
+      if (!lastRecord) {
+        status = 'never'
+      } else if (km_remaining !== null && km_remaining <= 0) {
+        status = 'overdue'
+      } else if (km_remaining !== null && km_remaining <= dueSoonKm(type.interval_km)) {
+        status = 'due_soon'
+      } else {
+        status = 'ok'
+      }
+
+      return {
+        type_id: type.id,
+        type_name: type.name,
+        interval_km: type.interval_km,
+        last_record_id: lastRecord?.id ?? null,
+        last_date: lastRecord?.date ?? null,
+        odometer_at_service: lastRecord?.odometer_at_service ?? null,
+        km_since_last,
+        km_remaining,
+        status,
+      }
+    }),
+  }))
+}
 
 export function registerMaintenanceHandlers(): void {
   const db = () => getDb()
@@ -111,61 +173,6 @@ export function registerMaintenanceHandlers(): void {
   })
 
   ipcMain.handle('maintenance:getStatus', (_e, filters: any = {}) => {
-    let trucksQuery = 'SELECT id, license_plate, model, current_odometer FROM trucks'
-    const truckParams: any[] = []
-    if (filters.truck_id) {
-      trucksQuery += ' WHERE id = ?'
-      truckParams.push(filters.truck_id)
-    }
-    trucksQuery += ' ORDER BY license_plate'
-    const trucks = db()
-      .prepare(trucksQuery)
-      .all(...truckParams) as any[]
-
-    const types = db()
-      .prepare('SELECT * FROM maintenance_types WHERE is_active = 1 ORDER BY name')
-      .all() as any[]
-
-    const getLastRecord = db().prepare(
-      'SELECT * FROM maintenance_records WHERE truck_id = ? AND maintenance_type_id = ? ORDER BY date DESC, id DESC LIMIT 1',
-    )
-
-    const dueSoonKm = (interval_km: number) => Math.min(interval_km * 0.2, 500)
-
-    return trucks.map((truck) => ({
-      truck_id: truck.id,
-      truck_license_plate: truck.license_plate,
-      truck_model: truck.model,
-      current_odometer: truck.current_odometer,
-      types: types.map((type) => {
-        const lastRecord = getLastRecord.get(truck.id, type.id) as any
-        const km_since_last =
-          lastRecord != null ? truck.current_odometer - lastRecord.odometer_at_service : null
-        const km_remaining = km_since_last != null ? type.interval_km - km_since_last : null
-
-        let status: string
-        if (!lastRecord) {
-          status = 'never'
-        } else if (km_remaining !== null && km_remaining <= 0) {
-          status = 'overdue'
-        } else if (km_remaining !== null && km_remaining <= dueSoonKm(type.interval_km)) {
-          status = 'due_soon'
-        } else {
-          status = 'ok'
-        }
-
-        return {
-          type_id: type.id,
-          type_name: type.name,
-          interval_km: type.interval_km,
-          last_record_id: lastRecord?.id ?? null,
-          last_date: lastRecord?.date ?? null,
-          odometer_at_service: lastRecord?.odometer_at_service ?? null,
-          km_since_last,
-          km_remaining,
-          status,
-        }
-      }),
-    }))
+    return getMaintenanceStatus(db(), filters)
   })
 }
