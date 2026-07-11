@@ -215,7 +215,7 @@ export function DashboardPage() {
               info="Combustível, despesas, comissão"
             />
 
-            <div className="rounded-xl p-6 bg-gradient-to-br from-primary to-primary-container border border-outline-variant/5 shadow-sm">
+            <div className="rounded-xl p-6 bg-primary border border-outline-variant/5 shadow-sm">
               <span className="text-[10px] font-black uppercase tracking-widest mb-4 text-on-primary/70 block">
                 Lucro Líquido
               </span>
