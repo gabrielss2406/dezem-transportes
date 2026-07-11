@@ -1,5 +1,6 @@
 import { ipcMain } from 'electron'
 import { getDb } from '../../database'
+import { getMaintenanceStatus } from '../maintenance/maintenance.handlers'
 
 export function registerDashboardHandlers(): void {
   const db = () => getDb()
@@ -152,7 +153,34 @@ export function registerDashboardHandlers(): void {
         .get(startDate, endDate) as any
     ).total
 
-    const totalCost = directCosts + fuelCosts + commissionCost
+    const fuelRecordsCost = (
+      db()
+        .prepare(
+          `
+        SELECT COALESCE(SUM(fr.value), 0) as total
+        FROM fuel_records fr
+        JOIN trucks t ON fr.truck_id = t.id
+        WHERE fr.date BETWEEN ? AND ? AND ${INTERNAL_TRUCK}
+      `,
+        )
+        .get(startDate, endDate) as any
+    ).total
+
+    const totalTax = (
+      db()
+        .prepare(
+          `
+        SELECT COALESCE(SUM(tr.tax_value), 0) as total
+        FROM trips tr
+        JOIN trucks t ON tr.truck_id = t.id
+        JOIN drivers d ON tr.driver_id = d.id
+        WHERE tr.date BETWEEN ? AND ? AND tr.has_percentage_tax = 1 AND ${INTERNAL_TRUCK} AND ${INTERNAL_DRIVER}
+      `,
+        )
+        .get(startDate, endDate) as any
+    ).total
+
+    const totalCost = directCosts + fuelCosts + commissionCost + fuelRecordsCost
 
     const totalTrips = (
       db()
@@ -206,6 +234,10 @@ export function registerDashboardHandlers(): void {
           JOIN drivers d3 ON tr3.driver_id = d3.id
           WHERE tr3.truck_id = t.id AND tr3.has_commission = 1 AND tr3.date BETWEEN ? AND ?
             AND (d3.is_outsourced = 0 OR d3.is_outsourced IS NULL)
+        ) + (
+          SELECT COALESCE(SUM(fr.value), 0)
+          FROM fuel_records fr
+          WHERE fr.truck_id = t.id AND fr.date BETWEEN ? AND ?
         ) as cost
       FROM trucks t
       LEFT JOIN trips tr ON tr.truck_id = t.id AND tr.date BETWEEN ? AND ?
@@ -214,7 +246,18 @@ export function registerDashboardHandlers(): void {
       ORDER BY revenue DESC
     `,
       )
-      .all(startDate, endDate, startDate, endDate, startDate, endDate, startDate, endDate) as any[]
+      .all(
+        startDate,
+        endDate,
+        startDate,
+        endDate,
+        startDate,
+        endDate,
+        startDate,
+        endDate,
+        startDate,
+        endDate,
+      ) as any[]
 
     const trucksWithMetrics = perTruck.map((t) => ({
       ...t,
@@ -254,33 +297,67 @@ export function registerDashboardHandlers(): void {
       })
     }
 
-    // 5. Maintenance Alerts — all trucks (operational view, not financial)
-    const maintenanceAlerts = db()
-      .prepare(
-        `
-      SELECT
-        t.license_plate,
-        t.current_odometer,
-        MAX(c.date) as last_maintenance_date,
-        COALESCE((
-          SELECT SUM(tr.km_driven)
-          FROM trips tr
-          WHERE tr.truck_id = t.id
-          AND tr.date > COALESCE(MAX(c.date), '1900-01-01')
-        ), 0) as km_since_last_maintenance
-      FROM trucks t
-      LEFT JOIN costs c ON c.truck_id = t.id AND c.category = 'maintenance'
-      GROUP BY t.id
-    `,
-      )
-      .all() as any[]
+    // 5. Maintenance Alerts — using real maintenance module
+    const maintenanceStatusData = getMaintenanceStatus(db())
 
-    const maintenanceAlertsFormatted = maintenanceAlerts.map((m) => ({
-      license_plate: m.license_plate,
-      current_odometer: m.current_odometer,
-      last_maintenance_date: m.last_maintenance_date,
-      km_since_last_maintenance: m.km_since_last_maintenance,
-    }))
+    const alertsList: any[] = []
+    let overdueCount = 0
+    let dueSoonCount = 0
+    let neverCount = 0
+    let okCount = 0
+
+    for (const truck of maintenanceStatusData) {
+      for (const type of truck.types) {
+        if (type.status === 'overdue') {
+          overdueCount++
+          alertsList.push({
+            truck_id: truck.truck_id,
+            truck_license_plate: truck.truck_license_plate,
+            truck_model: truck.truck_model,
+            type_name: type.type_name,
+            km_since_last: type.km_since_last ?? 0,
+            km_remaining: type.km_remaining ?? 0,
+            status: 'overdue',
+          })
+        } else if (type.status === 'due_soon') {
+          dueSoonCount++
+          alertsList.push({
+            truck_id: truck.truck_id,
+            truck_license_plate: truck.truck_license_plate,
+            truck_model: truck.truck_model,
+            type_name: type.type_name,
+            km_since_last: type.km_since_last ?? 0,
+            km_remaining: type.km_remaining ?? 0,
+            status: 'due_soon',
+          })
+        } else if (type.status === 'never') {
+          neverCount++
+        } else if (type.status === 'ok') {
+          okCount++
+        }
+      }
+    }
+
+    alertsList.sort((a, b) => {
+      if (a.status === 'overdue' && b.status !== 'overdue') {
+        return -1
+      }
+      if (a.status !== 'overdue' && b.status === 'overdue') {
+        return 1
+      }
+      if (a.status === 'due_soon' && b.status === 'due_soon') {
+        return (a.km_remaining ?? 0) - (b.km_remaining ?? 0)
+      }
+      return 0
+    })
+
+    const maintenanceSummary = {
+      overdueCount,
+      dueSoonCount,
+      neverCount,
+      okCount,
+      alerts: alertsList.slice(0, 8),
+    }
 
     const categoryTotals = new Map<string, number>()
 
@@ -332,6 +409,11 @@ export function registerDashboardHandlers(): void {
       categoryTotals.set(cat, current + (Number(f.total) || 0))
     }
 
+    if (fuelRecordsCost > 0) {
+      const currentFuel = categoryTotals.get('fuel') || 0
+      categoryTotals.set('fuel', currentFuel + fuelRecordsCost)
+    }
+
     if (commissionCost > 0) {
       const currentCommission = categoryTotals.get('commission') || 0
       categoryTotals.set('commission', currentCommission + (Number(commissionCost) || 0))
@@ -354,16 +436,64 @@ export function registerDashboardHandlers(): void {
       }))
       .sort((a, b) => b.total - a.total)
 
+    // 6. Revenue by Customer (Top 5)
+    const perCustomer = db()
+      .prepare(
+        `
+      SELECT
+        COALESCE(c.name, 'Sem cliente') as customer_name,
+        COALESCE(SUM(tr.price_charged), 0) as revenue,
+        COALESCE(SUM(tr.price_charged - COALESCE(tr.tax_value, 0)), 0) as netRevenue,
+        COALESCE(SUM(tr.weight_ton + COALESCE(tr.overweight_ton, 0)), 0) as tonnage,
+        COUNT(*) as trips
+      FROM trips tr
+      JOIN trucks t ON tr.truck_id = t.id
+      JOIN drivers d ON tr.driver_id = d.id
+      LEFT JOIN customers c ON tr.customer_id = c.id
+      WHERE tr.date BETWEEN ? AND ? AND ${INTERNAL_TRUCK} AND ${INTERNAL_DRIVER}
+      GROUP BY tr.customer_id
+      ORDER BY revenue DESC
+      LIMIT 5
+    `,
+      )
+      .all(startDate, endDate) as any[]
+
+    // 7. Revenue by Product (Top 5)
+    const perProduct = db()
+      .prepare(
+        `
+      SELECT
+        p.name as product_name,
+        COALESCE(SUM(tr.price_charged), 0) as revenue,
+        COALESCE(SUM(tr.weight_ton + COALESCE(tr.overweight_ton, 0)), 0) as tonnage,
+        COUNT(*) as trips
+      FROM trips tr
+      JOIN trucks t ON tr.truck_id = t.id
+      JOIN drivers d ON tr.driver_id = d.id
+      JOIN products p ON tr.product_id = p.id
+      WHERE tr.date BETWEEN ? AND ? AND ${INTERNAL_TRUCK} AND ${INTERNAL_DRIVER}
+      GROUP BY tr.product_id
+      ORDER BY revenue DESC
+      LIMIT 5
+    `,
+      )
+      .all(startDate, endDate) as any[]
+
     return {
       revenue,
+      netRevenue: revenue - totalTax,
+      tax: totalTax,
       cost: totalCost,
       profit: revenue - totalCost,
+      netProfit: revenue - totalTax - totalCost,
       totalTrips,
       totalKm,
       perTruck: trucksWithMetrics,
       monthlyRevenue,
-      maintenanceAlerts: maintenanceAlertsFormatted,
+      maintenanceSummary,
       perCategory,
+      perCustomer,
+      perProduct,
     }
   })
 }

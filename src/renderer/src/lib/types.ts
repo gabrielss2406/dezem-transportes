@@ -182,8 +182,11 @@ export interface Cost {
 
 export interface DashboardSummary {
   revenue: number
+  netRevenue: number
+  tax: number
   cost: number
   profit: number
+  netProfit: number
   totalTrips: number
   totalKm: number
   perTruck: Array<{
@@ -196,13 +199,35 @@ export interface DashboardSummary {
     cpk: number
   }>
   monthlyRevenue: Array<{ month: string; revenue: number }>
-  maintenanceAlerts: Array<{
-    license_plate: string
-    current_odometer: number
-    last_maintenance_date: string | null
-    km_since_last_maintenance: number
-  }>
+  maintenanceSummary: {
+    overdueCount: number
+    dueSoonCount: number
+    neverCount: number
+    okCount: number
+    alerts: Array<{
+      truck_id: number
+      truck_license_plate: string
+      truck_model: string
+      type_name: string
+      km_since_last: number
+      km_remaining: number
+      status: 'overdue' | 'due_soon'
+    }>
+  }
   perCategory: Array<{ category: string; total: number }>
+  perCustomer: Array<{
+    customer_name: string
+    revenue: number
+    netRevenue: number
+    tonnage: number
+    trips: number
+  }>
+  perProduct: Array<{
+    product_name: string
+    revenue: number
+    tonnage: number
+    trips: number
+  }>
 }
 
 // Augment Window

@@ -1,6 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Controller, useForm } from 'react-hook-form'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { maintenanceRecordSchema, maintenanceTypeSchema } from '../../../shared/schemas'
 import { PageHeader } from '../components/PageHeader'
 import {
@@ -113,6 +114,16 @@ export function MaintenancePage() {
   const [deleteTypeTarget, setDeleteTypeTarget] = useState<MaintenanceType | null>(null)
 
   const { toast, show } = useToast()
+
+  const location = useLocation()
+  const navigate = useNavigate()
+
+  useEffect(() => {
+    if (location.state?.openModal) {
+      openRecord()
+      navigate(location.pathname, { replace: true, state: {} })
+    }
+  }, [location, navigate])
 
   // ── Forms ──────────────────────────────────────────────────────────────────
 

@@ -304,10 +304,10 @@ export function SuppliersPage() {
       </div>
 
       {/* Table */}
-      <div className="bg-surface-container rounded-lg overflow-hidden border border-outline-variant/10">
+      <div className="bg-surface-container rounded-xl overflow-hidden border border-outline-variant/10">
         <table className="w-full text-left border-collapse">
           <thead>
-            <tr className="bg-surface-container-high/50">
+            <tr className="bg-surface-container-high">
               {['ID', 'Nome', 'Tipo', 'Telefone', ''].map((h) => (
                 <th
                   key={h}
@@ -331,9 +331,7 @@ export function SuppliersPage() {
               return (
                 <tr
                   key={row.id}
-                  className={`hover:bg-surface-bright/10 transition-colors group ${
-                    i % 2 === 0 ? 'bg-surface-container-lowest' : 'bg-surface-container-low'
-                  }`}
+                  className={`hover:bg-surface-bright/5 transition-colors group ${i % 2 === 1 ? 'bg-surface-container-lowest/30' : ''}`}
                 >
                   <td className="px-8 py-5 font-mono text-sm text-on-surface-variant">
                     {row.customId || '—'}
@@ -361,14 +359,14 @@ export function SuppliersPage() {
                       <button
                         type="button"
                         onClick={() => edit(row)}
-                        className="p-2 text-on-surface-variant hover:text-primary transition-colors"
+                        className="p-2 text-outline hover:text-primary hover:bg-primary/10 rounded-lg transition-all"
                       >
                         <span className="material-symbols-outlined text-xl">edit</span>
                       </button>
                       <button
                         type="button"
                         onClick={() => setDeleteTarget(row)}
-                        className="p-2 text-on-surface-variant hover:text-error transition-colors"
+                        className="p-2 text-outline hover:text-error hover:bg-error/10 rounded-lg transition-all"
                       >
                         <span className="material-symbols-outlined text-xl">delete</span>
                       </button>
@@ -379,6 +377,12 @@ export function SuppliersPage() {
             })}
           </tbody>
         </table>
+
+        <div className="px-8 py-4 bg-surface-container-high/50 border-t border-outline-variant/10">
+          <p className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">
+            {rows.length} fornecedor{rows.length !== 1 ? 'es' : ''} encontrado
+          </p>
+        </div>
       </div>
 
       {modal && (
