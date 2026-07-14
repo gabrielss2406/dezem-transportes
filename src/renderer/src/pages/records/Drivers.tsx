@@ -3,7 +3,16 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Controller, useForm } from 'react-hook-form'
 import { driverSchema } from '../../../../shared/schemas'
 import { PageHeader } from '../../components/PageHeader'
-import { Button, CurrencyInput, Input, Modal, Select, Toast, useToast } from '../../components/ui'
+import {
+  Badge,
+  Button,
+  CurrencyInput,
+  Input,
+  Modal,
+  Select,
+  Toast,
+  useToast,
+} from '../../components/ui'
 import type { Contractor, Driver, Truck } from '../../lib/types'
 import { formatBRL } from '../../lib/utils'
 
@@ -16,6 +25,7 @@ interface DriverFormData {
   customId?: number
   is_outsourced: number
   contractor_id: number | null
+  commission_rate_override: number | null
 }
 
 const EMPTY_VALUES: DriverFormData = {
@@ -27,6 +37,7 @@ const EMPTY_VALUES: DriverFormData = {
   customId: undefined,
   is_outsourced: 0,
   contractor_id: null,
+  commission_rate_override: null,
 }
 
 function initials(name: string) {
@@ -83,6 +94,7 @@ export function DriversPage() {
   const [pendingData, setPendingData] = useState<any>(null)
   const [deleteTarget, setDeleteTarget] = useState<Driver | null>(null)
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false)
+  const [defaultCommissionRate, setDefaultCommissionRate] = useState(0)
   const { toast, show } = useToast()
 
   const nameRef = useRef<HTMLInputElement>(null)
@@ -91,6 +103,7 @@ export function DriversPage() {
   const salaryRef = useRef<HTMLInputElement>(null)
   const truckSelectRef = useRef<any>(null)
   const contractorSelectRef = useRef<any>(null)
+  const commissionOverrideRef = useRef<HTMLInputElement>(null)
 
   const {
     handleSubmit,
@@ -114,6 +127,7 @@ export function DriversPage() {
       : '(00) 0000-0000'
 
   const isOutsourcedValue = watch('is_outsourced')
+  const commissionOverrideValue = watch('commission_rate_override')
 
   const load = useCallback(async () => {
     const listFilters = {
@@ -135,6 +149,10 @@ export function DriversPage() {
   useEffect(() => {
     load()
   }, [load])
+
+  useEffect(() => {
+    window.api.settings.getApp().then((s: any) => setDefaultCommissionRate(s.commissionRate || 0))
+  }, [])
 
   const findNextAvailableId = useCallback(() => {
     const usedIds = new Set(allDrivers.map((r) => r.customId).filter((id): id is number => !!id))
@@ -224,6 +242,7 @@ export function DriversPage() {
       customId: row.customId ?? undefined,
       is_outsourced: row.is_outsourced ?? 0,
       contractor_id: row.contractor_id ?? null,
+      commission_rate_override: row.commission_rate_override ?? null,
     })
     setModal(true)
   }
@@ -447,7 +466,12 @@ export function DriversPage() {
                     <div className="w-9 h-9 rounded bg-surface-container-lowest border border-outline-variant/20 flex items-center justify-center text-[10px] font-bold text-on-surface-variant shrink-0">
                       {initials(row.name)}
                     </div>
-                    <span className="font-bold text-on-surface text-sm">{row.name}</span>
+                    <div className="flex flex-col gap-1">
+                      <span className="font-bold text-on-surface text-sm">{row.name}</span>
+                      {row.commission_rate_override != null && (
+                        <Badge label={`Comissão ${row.commission_rate_override}%`} color="amber" />
+                      )}
+                    </div>
                   </div>
                 </td>
                 <td className="px-6 py-4 font-mono text-sm text-on-surface-variant">
@@ -651,7 +675,7 @@ export function DriversPage() {
                         value={field.value}
                         onChange={field.onChange}
                         error={errors.truck_id?.message}
-                        onEnterSelect={() => handleSubmit(onEnterSubmit as any)()}
+                        onEnterSelect={() => commissionOverrideRef.current?.focus()}
                         options={availableTrucks.map((t) => ({
                           value: t.id,
                           label: (
@@ -718,6 +742,41 @@ export function DriversPage() {
                 />
               </>
             )}
+
+            <div className="col-span-2">
+              <Controller
+                name="commission_rate_override"
+                control={control}
+                render={({ field }) => (
+                  <Input
+                    ref={commissionOverrideRef}
+                    label="Comissão personalizada (%)"
+                    optional
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    max="100"
+                    placeholder={`Padrão do sistema (${defaultCommissionRate}%)`}
+                    value={field.value ?? ''}
+                    onChange={(e) =>
+                      field.onChange(e.target.value === '' ? null : Number(e.target.value))
+                    }
+                    error={errors.commission_rate_override?.message}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault()
+                        handleSubmit(onEnterSubmit as any)()
+                      }
+                    }}
+                  />
+                )}
+              />
+              <p className="text-xs text-on-surface-variant mt-1">
+                {commissionOverrideValue != null
+                  ? 'Este motorista usará esta comissão em vez do padrão do sistema.'
+                  : `Em branco, usa a comissão padrão do sistema (${defaultCommissionRate}%).`}
+              </p>
+            </div>
           </div>
           <div className="flex justify-end gap-3 mt-6">
             <Button variant="ghost" onClick={() => setModal(false)}>

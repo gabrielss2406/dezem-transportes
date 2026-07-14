@@ -175,8 +175,14 @@ export function TripsPage() {
 
   const selectedCustomerId = watch('customer_id')
   const selectedProductId = watch('product_id')
+  const selectedDriverId = watch('driver_id')
   const currentWeight = watch('weight_ton')
   const currentOverweight = watch('overweight_ton')
+
+  const selectedDriver = drivers.find((d) => d.id === Number(selectedDriverId))
+  const hasCustomCommissionRate = selectedDriver?.commission_rate_override != null
+  const effectiveCommissionRate =
+    selectedDriver?.commission_rate_override ?? appSettings.commissionRate
 
   const priceLookupKeyRef = useRef<string | null>(null)
 
@@ -488,12 +494,13 @@ export function TripsPage() {
             'Peso',
             'Km',
             'Valor',
-            'Deduções',
+            'Imposto',
+            'Comissão',
             'Cliente',
           ]
           const data = trips.map((trip) => {
-            const totalDeductions = (trip.tax_value || 0) + (trip.commission_value || 0)
-            const deducoes = totalDeductions > 0 ? formatBRL(totalDeductions) : '—'
+            const imposto = trip.tax_value ? formatBRL(trip.tax_value) : '—'
+            const comissao = trip.commission_value ? formatBRL(trip.commission_value) : '—'
             return [
               formatDate(trip.date),
               trip.truck_license_plate ?? '—',
@@ -504,7 +511,8 @@ export function TripsPage() {
                 : `${trip.weight_ton} ton`,
               `${trip.km_driven} km`,
               formatBRL(trip.price_charged),
-              deducoes,
+              imposto,
+              comissao,
               trip.customer_name ?? '—',
             ]
           })
@@ -1025,7 +1033,14 @@ export function TripsPage() {
                       value: d.id,
                       label: (
                         <div className="flex justify-between">
-                          <span>{d.name}</span>
+                          <span>
+                            {d.name}
+                            {d.commission_rate_override != null && (
+                              <span className="text-secondary text-xs ml-1">
+                                (comissão {d.commission_rate_override}%)
+                              </span>
+                            )}
+                          </span>
                           {d.customId && (
                             <span className="text-on-surface-variant/50">#{d.customId}</span>
                           )}
@@ -1248,40 +1263,48 @@ export function TripsPage() {
               />
 
               {/* Commission section */}
-              <Controller
-                name="has_commission"
-                control={control}
-                render={({ field }) => (
-                  <Select
-                    ref={commissionSelectRef}
-                    label="Comissão"
-                    icon="percent"
-                    value={field.value ? 'true' : 'false'}
-                    onChange={(v) => field.onChange(v === 'true')}
-                    onEnterSelect={async () => {
-                      const ok = await resolvePendingFuelStopSuppliers()
-                      if (!ok) {
-                        return
-                      }
-                      handleSubmit(onEnterSubmit as any)()
-                    }}
-                    options={[
-                      {
-                        value: 'false',
-                        label: 'Sem comissão',
-                        displayLabel: 'Sem comissão',
-                        searchableLabel: 'sem comissao',
-                      },
-                      {
-                        value: 'true',
-                        label: `Com comissão (${appSettings.commissionRate}%)`,
-                        displayLabel: `Com comissão (${appSettings.commissionRate}%)`,
-                        searchableLabel: `com comissao ${appSettings.commissionRate}`,
-                      },
-                    ]}
-                  />
+              <div>
+                <Controller
+                  name="has_commission"
+                  control={control}
+                  render={({ field }) => (
+                    <Select
+                      ref={commissionSelectRef}
+                      label="Comissão"
+                      icon="percent"
+                      value={field.value ? 'true' : 'false'}
+                      onChange={(v) => field.onChange(v === 'true')}
+                      onEnterSelect={async () => {
+                        const ok = await resolvePendingFuelStopSuppliers()
+                        if (!ok) {
+                          return
+                        }
+                        handleSubmit(onEnterSubmit as any)()
+                      }}
+                      options={[
+                        {
+                          value: 'false',
+                          label: 'Sem comissão',
+                          displayLabel: 'Sem comissão',
+                          searchableLabel: 'sem comissao',
+                        },
+                        {
+                          value: 'true',
+                          label: `Com comissão (${effectiveCommissionRate}%)`,
+                          displayLabel: `Com comissão (${effectiveCommissionRate}%)`,
+                          searchableLabel: `com comissao ${effectiveCommissionRate}`,
+                        },
+                      ]}
+                    />
+                  )}
+                />
+                {hasCustomCommissionRate && (
+                  <p className="text-xs text-secondary mt-1 flex items-center gap-1">
+                    <span className="material-symbols-outlined text-xs">star</span>
+                    Comissão personalizada deste motorista
+                  </p>
                 )}
-              />
+              </div>
 
               {/* Overweight toggle */}
               <div className="col-span-2 pt-1">

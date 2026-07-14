@@ -64,6 +64,7 @@ export interface Driver {
   is_outsourced?: number
   contractor_id?: number
   contractor_name?: string
+  commission_rate_override?: number | null
 }
 
 export interface FuelStop {
