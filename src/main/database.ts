@@ -360,6 +360,12 @@ export function setupDatabase(): void {
     db.exec('ALTER TABLE drivers ADD COLUMN contractor_id INTEGER REFERENCES contractors(id)')
   }
 
+  // Migration: Add commission_rate_override to drivers if missing
+  // NULL means the driver uses the global default commission rate.
+  if (!driverInfo.some((col) => col.name === 'commission_rate_override')) {
+    db.exec('ALTER TABLE drivers ADD COLUMN commission_rate_override REAL DEFAULT NULL')
+  }
+
   // Seed: default supplier types if none exist
   const supplierTypeCount = (db.prepare('SELECT COUNT(*) as c FROM supplier_types').get() as any).c
   if (supplierTypeCount === 0) {

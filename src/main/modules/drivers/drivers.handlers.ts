@@ -53,7 +53,7 @@ export function registerDriverHandlers(): void {
 
     const r = db()
       .prepare(
-        'INSERT INTO drivers (name, cpf, phone, monthly_salary, truck_id, customId, is_outsourced, contractor_id) VALUES (?,?,?,?,?,?,?,?)',
+        'INSERT INTO drivers (name, cpf, phone, monthly_salary, truck_id, customId, is_outsourced, contractor_id, commission_rate_override) VALUES (?,?,?,?,?,?,?,?,?)',
       )
       .run(
         data.name,
@@ -64,6 +64,7 @@ export function registerDriverHandlers(): void {
         customId,
         data.is_outsourced ?? 0,
         data.contractor_id || null,
+        data.commission_rate_override ?? null,
       )
     return { id: r.lastInsertRowid }
   })
@@ -71,7 +72,7 @@ export function registerDriverHandlers(): void {
   createValidatedHandlerWithId('drivers:update', driverSchema, (id, data) => {
     const result = db()
       .prepare(
-        'UPDATE drivers SET name=?, cpf=?, phone=?, monthly_salary=?, truck_id=?, customId=?, is_outsourced=?, contractor_id=? WHERE id=?',
+        'UPDATE drivers SET name=?, cpf=?, phone=?, monthly_salary=?, truck_id=?, customId=?, is_outsourced=?, contractor_id=?, commission_rate_override=? WHERE id=?',
       )
       .run(
         data.name,
@@ -82,6 +83,7 @@ export function registerDriverHandlers(): void {
         data.customId,
         data.is_outsourced ?? 0,
         data.contractor_id || null,
+        data.commission_rate_override ?? null,
         id,
       )
 

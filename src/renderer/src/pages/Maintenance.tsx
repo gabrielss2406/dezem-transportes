@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Controller, useForm } from 'react-hook-form'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { maintenanceRecordSchema, maintenanceTypeSchema } from '../../../shared/schemas'
@@ -12,6 +12,7 @@ import {
   Input,
   Modal,
   Select,
+  type SelectRef,
   Toast,
   useToast,
 } from '../components/ui'
@@ -108,8 +109,12 @@ export function MaintenancePage() {
 
   // Modals
   const [recordModal, setRecordModal] = useState(false)
+  const [pendingRecord, setPendingRecord] = useState<any>(null)
+  const [showRecordDiscardConfirm, setShowRecordDiscardConfirm] = useState(false)
   const [typesView, setTypesView] = useState<null | 'list' | 'form'>(null)
   const [editingType, setEditingType] = useState<MaintenanceType | null>(null)
+  const [pendingType, setPendingType] = useState<any>(null)
+  const [showTypeDiscardConfirm, setShowTypeDiscardConfirm] = useState(false)
   const [deleteRecordTarget, setDeleteRecordTarget] = useState<MaintenanceRecord | null>(null)
   const [deleteTypeTarget, setDeleteTypeTarget] = useState<MaintenanceType | null>(null)
 
@@ -127,24 +132,32 @@ export function MaintenancePage() {
 
   // ── Forms ──────────────────────────────────────────────────────────────────
 
+  const truckSelectRef = useRef<SelectRef>(null)
+  const typeSelectRef = useRef<SelectRef>(null)
+  const dateRef = useRef<HTMLInputElement>(null)
+  const odometerRef = useRef<HTMLInputElement>(null)
+  const notesRef = useRef<HTMLInputElement>(null)
+
   const {
-    register: regRecord,
     handleSubmit: handleRecord,
     control: controlRecord,
     reset: resetRecord,
-    formState: { errors: recordErrors },
+    formState: { errors: recordErrors, isDirty: isRecordDirty },
   } = useForm<RecordFormData>({
     resolver: zodResolver(maintenanceRecordSchema) as any,
     defaultValues: EMPTY_RECORD,
     mode: 'all',
   })
 
+  const nameRef = useRef<HTMLInputElement>(null)
+  const descRef = useRef<HTMLInputElement>(null)
+  const intervalRef = useRef<HTMLInputElement>(null)
+
   const {
-    register: regType,
     handleSubmit: handleType,
     control: controlType,
     reset: resetType,
-    formState: { errors: typeErrors },
+    formState: { errors: typeErrors, isDirty: isTypeDirty },
   } = useForm<TypeFormData>({
     resolver: zodResolver(maintenanceTypeSchema) as any,
     defaultValues: EMPTY_TYPE,
@@ -195,17 +208,41 @@ export function MaintenancePage() {
     setRecordModal(true)
   }
 
+  useEffect(() => {
+    if (recordModal) {
+      setTimeout(() => {
+        window.focus()
+        truckSelectRef.current?.open()
+      }, 200)
+    } else {
+      resetRecord(EMPTY_RECORD)
+    }
+  }, [recordModal, resetRecord])
+
   async function saveRecord(data: RecordFormData) {
     const result = await window.api.maintenance.createRecord(data as any)
     if (result?.ok === false) {
+      setPendingRecord(null)
       show((result as any).errors?.form || 'Erro ao registrar', 'error')
       return
     }
     show('Manutenção registrada!')
     setRecordModal(false)
+    setPendingRecord(null)
     loadStatus()
     if (tab === 'history') {
       loadHistory()
+    }
+  }
+
+  const onRecordSubmit = (data: RecordFormData) => saveRecord(data)
+  const onRecordEnterSubmit = (data: RecordFormData) => setPendingRecord(data)
+
+  const handleRecordEscape = () => {
+    if (isRecordDirty) {
+      setShowRecordDiscardConfirm(true)
+    } else {
+      setRecordModal(false)
     }
   }
 
@@ -226,6 +263,15 @@ export function MaintenancePage() {
     setTypesView('form')
   }
 
+  useEffect(() => {
+    if (typesView === 'form') {
+      setTimeout(() => {
+        window.focus()
+        nameRef.current?.focus()
+      }, 200)
+    }
+  }, [typesView])
+
   async function saveType(data: TypeFormData) {
     let result: any
     if (editingType) {
@@ -234,12 +280,25 @@ export function MaintenancePage() {
       result = await window.api.maintenance.createType(data as any)
     }
     if (result?.ok === false) {
+      setPendingType(null)
       show((result as any).errors?.form || 'Erro ao salvar', 'error')
       return
     }
     show(editingType ? 'Tipo atualizado!' : 'Tipo criado!')
     setTypesView('list')
+    setPendingType(null)
     loadStatus()
+  }
+
+  const onTypeSubmit = (data: TypeFormData) => saveType(data)
+  const onTypeEnterSubmit = (data: TypeFormData) => setPendingType(data)
+
+  const handleTypeEscape = () => {
+    if (isTypeDirty) {
+      setShowTypeDiscardConfirm(true)
+    } else {
+      setTypesView('list')
+    }
   }
 
   async function confirmDeleteType() {
@@ -293,55 +352,75 @@ export function MaintenancePage() {
 
   const truckOptions = trucks.map((t) => ({
     value: t.id,
-    label: `${t.license_plate} — ${t.model}`,
+    label: (
+      <div className="flex justify-between">
+        <span>{t.license_plate}</span>
+        {t.customId && <span className="text-on-surface-variant/50">#{t.customId}</span>}
+      </div>
+    ),
     displayLabel: t.license_plate,
-    searchableLabel: `${t.license_plate} ${t.model}`,
+    searchableLabel: `${t.license_plate} ${t.model ?? ''} ${t.customId || ''}`,
   }))
 
   const typeOptions = activeTypes.map((t) => ({
     value: t.id,
     label: t.name,
+    displayLabel: t.name,
+    searchableLabel: t.name,
   }))
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
-    <>
-      {toast && <Toast {...toast} />}
+    <div className="p-12 max-w-7xl mx-auto">
+      {toast && <Toast message={toast.message} type={toast.type} />}
 
-      <div className="p-8">
-        <PageHeader
-          title="Manutenção"
-          subtitle="Controle de manutenção preventiva"
-          actionLabel="Registrar Manutenção"
-          onAction={() => openRecord()}
-          secondaryActionLabel="Gerenciar Tipos"
-          onSecondaryAction={() => setTypesView('list')}
-        />
+      <PageHeader
+        pretitle="Gestão de Frota"
+        title="Manutenção"
+        subtitle="Controle de manutenção preventiva da frota."
+        actionLabel="Registrar Manutenção"
+        onAction={() => openRecord()}
+        secondaryActionLabel="Gerenciar Tipos"
+        onSecondaryAction={() => setTypesView('list')}
+      />
 
-        {/* Tabs */}
-        <div className="flex gap-1 mb-6 bg-surface-container-highest/30 p-1 rounded-lg w-fit">
-          {(['status', 'history'] as const).map((t) => (
-            <button
-              key={t}
-              type="button"
-              onClick={() => setTab(t)}
-              className={`px-5 py-2 rounded-md text-sm font-semibold transition-all ${
-                tab === t
-                  ? 'bg-surface-container-low text-on-surface shadow-sm'
-                  : 'text-on-surface-variant hover:text-on-surface'
-              }`}
-            >
-              {t === 'status' ? 'Status Geral' : 'Histórico'}
-            </button>
-          ))}
-        </div>
+      {/* Tabs */}
+      <div className="flex gap-1 mb-8 bg-surface-container-high rounded-lg p-1 w-fit border border-outline-variant/10">
+        <button
+          type="button"
+          onClick={() => setTab('status')}
+          className={`px-5 py-2 rounded-md text-sm font-bold transition-all ${
+            tab === 'status'
+              ? 'bg-primary text-on-primary shadow-sm'
+              : 'text-on-surface-variant hover:text-on-surface'
+          }`}
+        >
+          <span className="material-symbols-outlined text-base align-middle mr-1.5">
+            monitoring
+          </span>
+          Status Geral
+        </button>
+        <button
+          type="button"
+          onClick={() => setTab('history')}
+          className={`px-5 py-2 rounded-md text-sm font-bold transition-all ${
+            tab === 'history'
+              ? 'bg-primary text-on-primary shadow-sm'
+              : 'text-on-surface-variant hover:text-on-surface'
+          }`}
+        >
+          <span className="material-symbols-outlined text-base align-middle mr-1.5">history</span>
+          Histórico
+        </button>
+      </div>
 
-        {/* ── STATUS TAB ────────────────────────────────────────────────────── */}
-        {tab === 'status' && (
-          <>
-            <div className="flex flex-wrap gap-3 mb-6">
-              <div className="w-56">
+      {/* ── STATUS TAB ────────────────────────────────────────────────────── */}
+      {tab === 'status' && (
+        <>
+          <div className="bg-surface-container-low p-4 rounded-xl mb-10 border border-outline-variant/10 shadow-sm">
+            <div className="flex flex-wrap items-end gap-4">
+              <div className="flex-1 min-w-[220px]">
                 <Select
                   label="Caminhão"
                   optional
@@ -355,7 +434,7 @@ export function MaintenancePage() {
                   placeholder="Todos os caminhões"
                 />
               </div>
-              <div className="w-48">
+              <div className="flex-1 min-w-[180px]">
                 <Select
                   label="Tipo"
                   optional
@@ -365,7 +444,7 @@ export function MaintenancePage() {
                   placeholder="Todos os tipos"
                 />
               </div>
-              <div className="w-44">
+              <div className="flex-1 min-w-[160px]">
                 <Select
                   label="Status"
                   optional
@@ -381,142 +460,144 @@ export function MaintenancePage() {
                 />
               </div>
             </div>
+          </div>
 
-            {loading ? (
-              <div className="flex items-center justify-center py-20 text-on-surface-variant">
-                <span className="material-symbols-outlined animate-spin mr-2">autorenew</span>
-                Carregando...
-              </div>
-            ) : filteredStatus.length === 0 ? (
-              <div className="text-center py-20 text-on-surface-variant text-sm">
-                Nenhum caminhão encontrado com os filtros aplicados.
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {filteredStatus.map((truck) => {
-                  const worst = getWorstStatus(truck)
-                  const worstCfg = STATUS_CONFIG[worst as keyof typeof STATUS_CONFIG]
-                  return (
-                    <div
-                      key={truck.truck_id}
-                      className="bg-surface-container rounded-xl border border-outline-variant/10 overflow-hidden"
-                    >
-                      {/* Truck header */}
-                      <div className="flex items-center justify-between px-6 py-4 bg-surface-container-high">
-                        <div className="flex items-center gap-3">
-                          <span className="material-symbols-outlined text-primary text-xl">
-                            local_shipping
-                          </span>
-                          <div>
-                            <span className="font-bold text-on-surface font-mono">
-                              {truck.truck_license_plate}
-                            </span>
-                            <span className="text-on-surface-variant text-sm ml-2">
-                              — {truck.truck_model}
-                            </span>
-                          </div>
-                          <Badge label={worstCfg.label} color={worstCfg.color} />
-                        </div>
-                        <span className="text-sm text-on-surface-variant">
-                          Odômetro:{' '}
-                          <span className="font-bold text-on-surface">
-                            {truck.current_odometer.toLocaleString('pt-BR')} km
-                          </span>
+          {loading ? (
+            <div className="flex items-center justify-center py-20 text-on-surface-variant">
+              <span className="material-symbols-outlined animate-spin mr-2">autorenew</span>
+              Carregando...
+            </div>
+          ) : filteredStatus.length === 0 ? (
+            <div className="text-center py-20 text-on-surface-variant text-sm">
+              Nenhum caminhão encontrado com os filtros aplicados.
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {filteredStatus.map((truck) => {
+                const worst = getWorstStatus(truck)
+                const worstCfg = STATUS_CONFIG[worst as keyof typeof STATUS_CONFIG]
+                return (
+                  <div
+                    key={truck.truck_id}
+                    className="bg-surface-container rounded-xl border border-outline-variant/10 overflow-hidden"
+                  >
+                    {/* Truck header */}
+                    <div className="flex items-center justify-between px-6 py-4 bg-surface-container-high">
+                      <div className="flex items-center gap-3">
+                        <span className="material-symbols-outlined text-primary text-xl">
+                          local_shipping
                         </span>
+                        <div>
+                          <span className="font-bold text-on-surface font-mono">
+                            {truck.truck_license_plate}
+                          </span>
+                          <span className="text-on-surface-variant text-sm ml-2">
+                            — {truck.truck_model}
+                          </span>
+                        </div>
+                        <Badge label={worstCfg.label} color={worstCfg.color} />
                       </div>
+                      <span className="text-sm text-on-surface-variant">
+                        Odômetro:{' '}
+                        <span className="font-bold text-on-surface">
+                          {truck.current_odometer.toLocaleString('pt-BR')} km
+                        </span>
+                      </span>
+                    </div>
 
-                      {/* Maintenance items */}
-                      <div className="divide-y divide-outline-variant/10">
-                        {truck.types.length === 0 ? (
-                          <div className="px-6 py-4 text-sm text-on-surface-variant italic">
-                            Nenhum tipo ativo correspondente.
-                          </div>
-                        ) : (
-                          truck.types.map((type) => {
-                            const cfg = STATUS_CONFIG[type.status as keyof typeof STATUS_CONFIG]
-                            const isOverdue = type.status === 'overdue' || type.status === 'never'
-                            const isDueSoon = type.status === 'due_soon'
-                            return (
-                              <div
-                                key={type.type_id}
-                                className="flex items-center justify-between px-6 py-4 hover:bg-surface-container-highest/20 transition-colors"
-                              >
-                                <div className="flex items-center gap-4">
-                                  <Badge label={cfg.label} color={cfg.color} />
-                                  <div>
-                                    <div className="font-medium text-sm text-on-surface">
-                                      {type.type_name}
-                                    </div>
-                                    <div className="text-xs text-on-surface-variant mt-0.5">
-                                      {type.last_date
-                                        ? `Último: ${new Date(
-                                            `${type.last_date}T00:00:00`,
-                                          ).toLocaleDateString('pt-BR')}${
-                                            type.km_since_last != null
-                                              ? ` — ${type.km_since_last.toLocaleString('pt-BR')} km atrás`
-                                              : ''
-                                          }`
-                                        : 'Nenhum registro anterior'}
-                                    </div>
+                    {/* Maintenance items */}
+                    <div className="divide-y divide-outline-variant/10">
+                      {truck.types.length === 0 ? (
+                        <div className="px-6 py-4 text-sm text-on-surface-variant italic">
+                          Nenhum tipo ativo correspondente.
+                        </div>
+                      ) : (
+                        truck.types.map((type) => {
+                          const cfg = STATUS_CONFIG[type.status as keyof typeof STATUS_CONFIG]
+                          const isOverdue = type.status === 'overdue' || type.status === 'never'
+                          const isDueSoon = type.status === 'due_soon'
+                          return (
+                            <div
+                              key={type.type_id}
+                              className="flex items-center justify-between px-6 py-4 hover:bg-surface-bright/5 transition-colors"
+                            >
+                              <div className="flex items-center gap-4">
+                                <Badge label={cfg.label} color={cfg.color} />
+                                <div>
+                                  <div className="font-medium text-sm text-on-surface">
+                                    {type.type_name}
+                                  </div>
+                                  <div className="text-xs text-on-surface-variant mt-0.5">
+                                    {type.last_date
+                                      ? `Último: ${new Date(
+                                          `${type.last_date}T00:00:00`,
+                                        ).toLocaleDateString('pt-BR')}${
+                                          type.km_since_last != null
+                                            ? ` — ${type.km_since_last.toLocaleString('pt-BR')} km atrás`
+                                            : ''
+                                        }`
+                                      : 'Nenhum registro anterior'}
                                   </div>
                                 </div>
+                              </div>
 
-                                <div className="flex items-center gap-6">
-                                  <div className="text-right min-w-[140px]">
-                                    {type.km_remaining != null ? (
-                                      <>
-                                        <div
-                                          className={`text-sm font-bold ${
-                                            isOverdue
-                                              ? 'text-error'
-                                              : isDueSoon
-                                                ? 'text-amber-500'
-                                                : 'text-tertiary'
-                                          }`}
-                                        >
-                                          {type.km_remaining <= 0
-                                            ? `${Math.abs(type.km_remaining).toLocaleString('pt-BR')} km atrasado`
-                                            : `${type.km_remaining.toLocaleString('pt-BR')} km restantes`}
-                                        </div>
-                                        <div className="text-xs text-on-surface-variant">
-                                          Intervalo: {type.interval_km.toLocaleString('pt-BR')} km
-                                        </div>
-                                      </>
-                                    ) : (
+                              <div className="flex items-center gap-6">
+                                <div className="text-right min-w-[140px]">
+                                  {type.km_remaining != null ? (
+                                    <>
+                                      <div
+                                        className={`text-sm font-bold ${
+                                          isOverdue
+                                            ? 'text-error'
+                                            : isDueSoon
+                                              ? 'text-amber-500'
+                                              : 'text-tertiary'
+                                        }`}
+                                      >
+                                        {type.km_remaining <= 0
+                                          ? `${Math.abs(type.km_remaining).toLocaleString('pt-BR')} km atrasado`
+                                          : `${type.km_remaining.toLocaleString('pt-BR')} km restantes`}
+                                      </div>
                                       <div className="text-xs text-on-surface-variant">
                                         Intervalo: {type.interval_km.toLocaleString('pt-BR')} km
                                       </div>
-                                    )}
-                                  </div>
-                                  <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    onClick={() => openRecord(truck.truck_id, type.type_id)}
-                                  >
-                                    <span className="material-symbols-outlined text-base mr-1">
-                                      build
-                                    </span>
-                                    Registrar
-                                  </Button>
+                                    </>
+                                  ) : (
+                                    <div className="text-xs text-on-surface-variant">
+                                      Intervalo: {type.interval_km.toLocaleString('pt-BR')} km
+                                    </div>
+                                  )}
                                 </div>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => openRecord(truck.truck_id, type.type_id)}
+                                >
+                                  <span className="material-symbols-outlined text-base mr-1">
+                                    build
+                                  </span>
+                                  Registrar
+                                </Button>
                               </div>
-                            )
-                          })
-                        )}
-                      </div>
+                            </div>
+                          )
+                        })
+                      )}
                     </div>
-                  )
-                })}
-              </div>
-            )}
-          </>
-        )}
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </>
+      )}
 
-        {/* ── HISTORY TAB ───────────────────────────────────────────────────── */}
-        {tab === 'history' && (
-          <>
-            <div className="flex flex-wrap gap-3 mb-6">
-              <div className="w-56">
+      {/* ── HISTORY TAB ───────────────────────────────────────────────────── */}
+      {tab === 'history' && (
+        <>
+          <div className="bg-surface-container-low p-4 rounded-xl mb-10 border border-outline-variant/10 shadow-sm">
+            <div className="flex flex-wrap items-end gap-4">
+              <div className="flex-1 min-w-[220px]">
                 <Select
                   label="Caminhão"
                   optional
@@ -535,7 +616,7 @@ export function MaintenancePage() {
                   placeholder="Todos"
                 />
               </div>
-              <div className="w-48">
+              <div className="flex-1 min-w-[180px]">
                 <Select
                   label="Tipo"
                   optional
@@ -550,149 +631,206 @@ export function MaintenancePage() {
                   placeholder="Todos"
                 />
               </div>
-              <div className="flex-1 min-w-[130px]">
-                <Input
+              <div className="flex-1 min-w-[140px]">
+                <DatePicker
                   label="De"
-                  type="date"
                   value={histFilters.startDate}
                   onChange={(e) => setHistFilters((f) => ({ ...f, startDate: e.target.value }))}
                 />
               </div>
-              <div className="flex-1 min-w-[130px]">
-                <Input
+              <div className="flex-1 min-w-[140px]">
+                <DatePicker
                   label="Até"
-                  type="date"
                   value={histFilters.endDate}
                   onChange={(e) => setHistFilters((f) => ({ ...f, endDate: e.target.value }))}
                 />
               </div>
             </div>
+          </div>
 
-            <div className="overflow-x-auto rounded-xl bg-surface-container overflow-hidden border border-outline-variant/10">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-surface-container-high">
-                    {['Data', 'Caminhão', 'Tipo de Manutenção', 'Odômetro', 'Notas', ''].map(
-                      (h) => (
-                        <th
-                          key={h}
-                          className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-on-surface-variant"
-                        >
-                          {h}
-                        </th>
-                      ),
-                    )}
+          <div className="bg-surface-container rounded-xl overflow-hidden border border-outline-variant/10">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-surface-container-high">
+                  {['Data', 'Caminhão', 'Tipo de Manutenção', 'Odômetro', 'Notas', ''].map((h) => (
+                    <th
+                      key={h}
+                      className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-on-surface-variant"
+                    >
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-outline-variant/10">
+                {records.length === 0 ? (
+                  <tr>
+                    <td
+                      colSpan={6}
+                      className="px-6 py-12 text-center text-on-surface-variant text-sm"
+                    >
+                      Nenhum registro encontrado.
+                    </td>
                   </tr>
-                </thead>
-                <tbody className="divide-y divide-outline-variant/10">
-                  {records.length === 0 ? (
-                    <tr>
-                      <td colSpan={6} className="text-center py-12 text-on-surface-variant text-sm">
-                        Nenhum registro encontrado.
+                ) : (
+                  records.map((rec, i) => (
+                    <tr
+                      key={rec.id}
+                      className={`hover:bg-surface-bright/5 transition-colors group ${
+                        i % 2 === 1 ? 'bg-surface-container-lowest/30' : ''
+                      }`}
+                    >
+                      <td className="px-6 py-4 text-sm text-on-surface-variant">
+                        {new Date(`${rec.date}T00:00:00`).toLocaleDateString('pt-BR')}
+                      </td>
+                      <td className="px-6 py-4 text-sm">
+                        <span className="font-mono font-bold text-primary">
+                          {rec.truck_license_plate}
+                        </span>
+                        <span className="text-on-surface-variant ml-1.5">{rec.truck_model}</span>
+                      </td>
+                      <td className="px-6 py-4 text-sm text-on-surface">{rec.type_name}</td>
+                      <td className="px-6 py-4 text-sm text-on-surface">
+                        {rec.odometer_at_service?.toLocaleString('pt-BR')} km
+                      </td>
+                      <td className="px-6 py-4 text-sm text-on-surface-variant">
+                        {rec.notes || '—'}
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex gap-1 justify-end opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button
+                            type="button"
+                            onClick={() => setDeleteRecordTarget(rec)}
+                            className="p-2 text-on-surface-variant hover:text-error hover:bg-error/10 rounded-lg transition-all"
+                            title="Excluir"
+                          >
+                            <span className="material-symbols-outlined text-xl">delete</span>
+                          </button>
+                        </div>
                       </td>
                     </tr>
-                  ) : (
-                    records.map((rec, i) => (
-                      <tr
-                        key={rec.id}
-                        className={`hover:bg-surface-bright/10 transition-colors group ${
-                          i % 2 === 1 ? 'bg-surface-container-lowest/30' : ''
-                        }`}
-                      >
-                        <td className="px-6 py-4 text-sm text-on-surface">
-                          {new Date(`${rec.date}T00:00:00`).toLocaleDateString('pt-BR')}
-                        </td>
-                        <td className="px-6 py-4 text-sm">
-                          <span className="font-mono font-semibold text-on-surface">
-                            {rec.truck_license_plate}
-                          </span>
-                          <span className="text-on-surface-variant ml-1.5">{rec.truck_model}</span>
-                        </td>
-                        <td className="px-6 py-4 text-sm text-on-surface">{rec.type_name}</td>
-                        <td className="px-6 py-4 text-sm text-on-surface">
-                          {rec.odometer_at_service?.toLocaleString('pt-BR')} km
-                        </td>
-                        <td className="px-6 py-4 text-sm text-on-surface-variant">
-                          {rec.notes || '—'}
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="flex gap-1 justify-end opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button
-                              type="button"
-                              onClick={() => setDeleteRecordTarget(rec)}
-                              className="p-2 text-on-surface-variant hover:text-error hover:bg-error/10 rounded-lg transition-all"
-                              title="Excluir"
-                            >
-                              <span className="material-symbols-outlined text-xl">delete</span>
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </>
-        )}
-      </div>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
 
       {/* ── RECORD MODAL ─────────────────────────────────────────────────────── */}
       {recordModal && (
-        <Modal title="Registrar Manutenção" onClose={() => setRecordModal(false)}>
-          <form onSubmit={handleRecord(saveRecord)} className="space-y-4">
-            <Controller
-              name="truck_id"
-              control={controlRecord}
-              render={({ field }) => (
-                <Select
-                  label="Caminhão"
-                  options={truckOptions}
-                  value={field.value}
-                  onChange={field.onChange}
-                  error={recordErrors.truck_id?.message as string}
-                />
-              )}
-            />
-            <Controller
-              name="maintenance_type_id"
-              control={controlRecord}
-              render={({ field }) => (
-                <Select
-                  label="Tipo de Manutenção"
-                  options={typeOptions}
-                  value={field.value}
-                  onChange={field.onChange}
-                  error={recordErrors.maintenance_type_id?.message as string}
-                />
-              )}
-            />
-            <DatePicker
-              label="Data do Serviço"
-              {...regRecord('date')}
-              error={recordErrors.date?.message}
-            />
-            <Input
-              label="Odômetro no Serviço (km)"
-              type="number"
-              placeholder="Ex: 45000"
-              {...regRecord('odometer_at_service')}
-              error={recordErrors.odometer_at_service?.message as string}
-            />
-            <Input
-              label="Observações"
-              optional
-              placeholder="Ex: Óleo 5W30 sintético, marca X..."
-              {...regRecord('notes')}
-              error={recordErrors.notes?.message}
-            />
-            <div className="flex justify-end gap-3 pt-2">
-              <Button type="button" variant="ghost" onClick={() => setRecordModal(false)}>
-                Cancelar
-              </Button>
-              <Button type="submit">Registrar</Button>
+        <Modal
+          title="Registrar Manutenção"
+          onClose={() => setRecordModal(false)}
+          onEscape={handleRecordEscape}
+        >
+          <div className="grid grid-cols-2 gap-4">
+            <div className="col-span-2">
+              <Controller
+                name="truck_id"
+                control={controlRecord}
+                render={({ field }) => (
+                  <Select
+                    ref={truckSelectRef}
+                    label="Caminhão"
+                    icon="local_shipping"
+                    options={truckOptions}
+                    value={field.value}
+                    onChange={field.onChange}
+                    onEnterSelect={() => typeSelectRef.current?.open()}
+                    error={recordErrors.truck_id?.message as string}
+                  />
+                )}
+              />
             </div>
-          </form>
+            <div className="col-span-2">
+              <Controller
+                name="maintenance_type_id"
+                control={controlRecord}
+                render={({ field }) => (
+                  <Select
+                    ref={typeSelectRef}
+                    label="Tipo de Manutenção"
+                    icon="build"
+                    options={typeOptions}
+                    value={field.value}
+                    onChange={field.onChange}
+                    onEnterSelect={() => dateRef.current?.focus()}
+                    error={recordErrors.maintenance_type_id?.message as string}
+                  />
+                )}
+              />
+            </div>
+            <Controller
+              name="date"
+              control={controlRecord}
+              render={({ field }) => (
+                <DatePicker
+                  ref={dateRef}
+                  label="Data do Serviço"
+                  value={field.value}
+                  onChange={field.onChange}
+                  error={recordErrors.date?.message}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                      odometerRef.current?.focus()
+                    }
+                  }}
+                />
+              )}
+            />
+            <Controller
+              name="odometer_at_service"
+              control={controlRecord}
+              render={({ field }) => (
+                <Input
+                  ref={odometerRef}
+                  label="Odômetro no Serviço (km)"
+                  type="number"
+                  placeholder="Ex: 45000"
+                  value={field.value}
+                  onChange={field.onChange}
+                  error={recordErrors.odometer_at_service?.message as string}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                      notesRef.current?.focus()
+                    }
+                  }}
+                />
+              )}
+            />
+            <div className="col-span-2">
+              <Controller
+                name="notes"
+                control={controlRecord}
+                render={({ field }) => (
+                  <Input
+                    ref={notesRef}
+                    label="Observações"
+                    optional
+                    placeholder="Ex: Óleo 5W30 sintético, marca X..."
+                    value={field.value ?? ''}
+                    onChange={field.onChange}
+                    error={recordErrors.notes?.message}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault()
+                        handleRecord(onRecordEnterSubmit as any)()
+                      }
+                    }}
+                  />
+                )}
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-3 mt-6">
+            <Button variant="ghost" onClick={() => setRecordModal(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleRecord(onRecordSubmit as any)}>Registrar</Button>
+          </div>
         </Modal>
       )}
 
@@ -705,8 +843,8 @@ export function MaintenancePage() {
                 Nenhum tipo cadastrado.
               </p>
             ) : (
-              <div className="overflow-hidden rounded-lg border border-outline-variant/10">
-                <table className="w-full text-left">
+              <div className="rounded-xl overflow-hidden border border-outline-variant/10">
+                <table className="w-full text-left border-collapse">
                   <thead>
                     <tr className="bg-surface-container-high">
                       <th className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-on-surface-variant">
@@ -725,7 +863,7 @@ export function MaintenancePage() {
                     {types.map((type) => (
                       <tr
                         key={type.id}
-                        className="hover:bg-surface-container-highest/20 transition-colors group"
+                        className="hover:bg-surface-bright/5 transition-colors group"
                       >
                         <td className="px-4 py-3 text-sm text-on-surface">{type.name}</td>
                         <td className="px-4 py-3 text-sm text-on-surface">
@@ -738,7 +876,7 @@ export function MaintenancePage() {
                           />
                         </td>
                         <td className="px-4 py-3">
-                          <div className="flex gap-1 justify-end">
+                          <div className="flex gap-1 justify-end opacity-0 group-hover:opacity-100 transition-opacity">
                             <button
                               type="button"
                               onClick={() => openTypeForm(type)}
@@ -783,66 +921,139 @@ export function MaintenancePage() {
         <Modal
           title={editingType ? 'Editar Tipo' : 'Novo Tipo de Manutenção'}
           onClose={() => setTypesView('list')}
+          onEscape={handleTypeEscape}
         >
-          <form onSubmit={handleType(saveType)} className="space-y-4">
-            <Input
-              label="Nome"
-              placeholder="Ex: Troca de Filtro de Ar"
-              {...regType('name')}
-              error={typeErrors.name?.message}
-            />
-            <Input
-              label="Descrição"
-              optional
-              placeholder="Ex: Troca do filtro de ar do motor"
-              {...regType('description')}
-              error={typeErrors.description?.message}
-            />
-            <Input
-              label="Intervalo (km)"
-              type="number"
-              placeholder="Ex: 1000"
-              {...regType('interval_km')}
-              error={typeErrors.interval_km?.message as string}
-            />
+          <div className="grid grid-cols-2 gap-4">
+            <div className="col-span-2">
+              <Controller
+                name="name"
+                control={controlType}
+                render={({ field }) => (
+                  <Input
+                    ref={nameRef}
+                    label="Nome"
+                    placeholder="Ex: Troca de Filtro de Ar"
+                    value={field.value}
+                    onChange={field.onChange}
+                    error={typeErrors.name?.message}
+                    onKeyDown={(e) => e.key === 'Enter' && descRef.current?.focus()}
+                  />
+                )}
+              />
+            </div>
+            <div className="col-span-2">
+              <Controller
+                name="description"
+                control={controlType}
+                render={({ field }) => (
+                  <Input
+                    ref={descRef}
+                    label="Descrição"
+                    optional
+                    placeholder="Ex: Troca do filtro de ar do motor"
+                    value={field.value ?? ''}
+                    onChange={field.onChange}
+                    error={typeErrors.description?.message}
+                    onKeyDown={(e) => e.key === 'Enter' && intervalRef.current?.focus()}
+                  />
+                )}
+              />
+            </div>
             <Controller
-              name="is_active"
+              name="interval_km"
               control={controlType}
               render={({ field }) => (
-                <button
-                  type="button"
-                  className="flex items-center gap-3 cursor-pointer"
-                  onClick={() => field.onChange(field.value === 1 ? 0 : 1)}
+                <Input
+                  ref={intervalRef}
+                  label="Intervalo (km)"
+                  type="number"
+                  placeholder="Ex: 1000"
+                  value={field.value}
+                  onChange={field.onChange}
+                  error={typeErrors.interval_km?.message as string}
                   onKeyDown={(e) => {
-                    if (e.key === ' ' || e.key === 'Enter') {
+                    if (e.key === 'Enter') {
                       e.preventDefault()
-                      field.onChange(field.value === 1 ? 0 : 1)
+                      handleType(onTypeEnterSubmit as any)()
                     }
                   }}
-                >
-                  <div
-                    className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all shrink-0 ${
-                      field.value === 1 ? 'bg-primary border-primary' : 'border-outline-variant'
-                    }`}
-                  >
-                    {field.value === 1 && (
-                      <span className="material-symbols-outlined text-on-primary text-sm">
-                        check
-                      </span>
-                    )}
-                  </div>
-                  <span className="text-sm text-on-surface select-none">Tipo ativo</span>
-                </button>
+                />
               )}
             />
-            <div className="flex justify-between pt-2">
-              <Button type="button" variant="ghost" onClick={() => setTypesView('list')}>
-                Voltar
-              </Button>
-              <Button type="submit">{editingType ? 'Salvar' : 'Criar'}</Button>
+            <div className="flex items-center gap-3">
+              <Controller
+                name="is_active"
+                control={controlType}
+                render={({ field }) => (
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={field.value === 1}
+                    onClick={() => field.onChange(field.value === 1 ? 0 : 1)}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none shrink-0 ${
+                      field.value === 1 ? 'bg-primary' : 'bg-outline-variant'
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+                        field.value === 1 ? 'translate-x-6' : 'translate-x-1'
+                      }`}
+                    />
+                  </button>
+                )}
+              />
+              <span className="text-sm text-on-surface-variant">Tipo ativo</span>
             </div>
-          </form>
+          </div>
+          <div className="flex justify-between mt-6">
+            <Button variant="ghost" onClick={() => setTypesView('list')}>
+              Voltar
+            </Button>
+            <Button onClick={handleType(onTypeSubmit as any)}>
+              {editingType ? 'Salvar' : 'Criar'}
+            </Button>
+          </div>
         </Modal>
+      )}
+
+      {/* ── CONFIRM: SAVE ON ENTER ────────────────────────────────────────────── */}
+      {pendingRecord && (
+        <ConfirmModal
+          message="Confirmar o registro desta manutenção?"
+          onConfirm={() => saveRecord(pendingRecord)}
+          onCancel={() => setPendingRecord(null)}
+        />
+      )}
+      {pendingType && (
+        <ConfirmModal
+          message={
+            editingType ? 'Salvar as alterações deste tipo?' : 'Confirmar a criação deste tipo?'
+          }
+          onConfirm={() => saveType(pendingType)}
+          onCancel={() => setPendingType(null)}
+        />
+      )}
+
+      {/* ── CONFIRM: DISCARD UNSAVED CHANGES ──────────────────────────────────── */}
+      {showRecordDiscardConfirm && (
+        <ConfirmModal
+          message="Existem alterações não salvas. Deseja realmente fechar?"
+          onConfirm={() => {
+            setShowRecordDiscardConfirm(false)
+            setRecordModal(false)
+          }}
+          onCancel={() => setShowRecordDiscardConfirm(false)}
+        />
+      )}
+      {showTypeDiscardConfirm && (
+        <ConfirmModal
+          message="Existem alterações não salvas. Deseja realmente fechar?"
+          onConfirm={() => {
+            setShowTypeDiscardConfirm(false)
+            setTypesView('list')
+          }}
+          onCancel={() => setShowTypeDiscardConfirm(false)}
+        />
       )}
 
       {/* ── CONFIRM DELETE RECORD ─────────────────────────────────────────────── */}
@@ -862,6 +1073,6 @@ export function MaintenancePage() {
           onCancel={() => setDeleteTypeTarget(null)}
         />
       )}
-    </>
+    </div>
   )
 }

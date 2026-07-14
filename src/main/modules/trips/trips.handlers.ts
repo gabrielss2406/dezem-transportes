@@ -11,6 +11,14 @@ import { getAppSettings } from '../settings/app-settings'
 export function registerTripHandlers(): void {
   const db = () => getDb()
 
+  // Effective commission rate: driver-specific override if configured, otherwise the global default.
+  const getEffectiveCommissionRate = (driverId: number): number => {
+    const driver = db()
+      .prepare('SELECT commission_rate_override FROM drivers WHERE id = ?')
+      .get(driverId) as { commission_rate_override: number | null } | undefined
+    return driver?.commission_rate_override ?? getAppSettings().commissionRate
+  }
+
   ipcMain.handle('trips:list', (_e, filters: any = {}) => {
     let query = `
       SELECT t.*,
@@ -78,7 +86,7 @@ export function registerTripHandlers(): void {
     const taxValue = hasTax ? (tripData.price_charged * getAppSettings().taxRate) / 100 : 0
     const hasCommission = !!(tripData as any).has_commission
     const commissionValue = hasCommission
-      ? (tripData.price_charged * getAppSettings().commissionRate) / 100
+      ? (tripData.price_charged * getEffectiveCommissionRate(tripData.driver_id)) / 100
       : 0
     const r = db().transaction(() => {
       const res = db()
@@ -130,7 +138,7 @@ export function registerTripHandlers(): void {
     const taxValue = hasTax ? (tripData.price_charged * getAppSettings().taxRate) / 100 : 0
     const hasCommission = !!(tripData as any).has_commission
     const commissionValue = hasCommission
-      ? (tripData.price_charged * getAppSettings().commissionRate) / 100
+      ? (tripData.price_charged * getEffectiveCommissionRate(tripData.driver_id)) / 100
       : 0
     db().transaction(() => {
       db()

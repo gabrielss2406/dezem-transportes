@@ -139,6 +139,10 @@ export const driverSchema = z.object({
     (val) => (val === '' || val === null || val === undefined ? null : Number(val)),
     z.number().int().positive().nullable().optional(),
   ),
+  commission_rate_override: z.preprocess(
+    (val) => (val === '' || val === null || val === undefined ? null : Number(val)),
+    z.number().min(0).max(100, 'Máximo de 100%').nullable().optional(),
+  ),
 })
 
 export const routeSchema = z.object({
