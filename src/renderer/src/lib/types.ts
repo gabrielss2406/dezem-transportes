@@ -333,6 +333,21 @@ declare global {
         getStatus(): Promise<import('../../../shared/types').BackupStatus | null>
         isEnvConfigured(): Promise<{ isEnv: boolean; isDb: boolean }>
         list(): Promise<Array<{ key: string; size: number; lastModified: string }>>
+        analyze(key: string): Promise<{
+          timestamp: string
+          tables: Array<{ name: string; count: number; columns: string[] }>
+          stats: {
+            trips: number
+            costs: number
+            drivers: number
+            trucks: number
+            customers: number
+            products: number
+            suppliers: number
+          }
+          warnings: string[]
+          size_mb: number
+        }>
         restore(key: string): Promise<{ ok: boolean }>
         onStatusUpdate(
           callback: (status: import('../../../shared/types').BackupStatus) => void,

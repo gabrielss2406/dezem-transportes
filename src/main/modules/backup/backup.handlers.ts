@@ -5,7 +5,7 @@ import {
   getBackupStatus,
   saveBackupConfig,
 } from './backup-config'
-import { listBackups, performBackup, restoreBackup } from './backup-service'
+import { analyzeBackup, listBackups, performBackup, restoreBackup } from './backup-service'
 
 export function registerBackupHandlers() {
   ipcMain.handle('backup:getConfig', () => getBackupConfig())
@@ -45,5 +45,6 @@ export function registerBackupHandlers() {
   })
 
   ipcMain.handle('backup:list', () => listBackups())
+  ipcMain.handle('backup:analyze', (_, key: string) => analyzeBackup(key))
   ipcMain.handle('backup:restore', (_, key: string) => restoreBackup(key))
 }

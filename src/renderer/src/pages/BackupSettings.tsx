@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { backupConfigSchema } from '../../../shared/schemas'
 import type { BackupConfig, BackupStatus } from '../../../shared/types'
-import { Button, ConfirmModal, Input, Toast, useToast } from '../components/ui'
+import { Button, Input, Toast, useToast } from '../components/ui'
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -119,6 +119,21 @@ export function BackupSettings() {
     }
   }
 
+  const [analysisData, setAnalysisData] = useState<any>(null)
+  const [isAnalyzing, setIsAnalyzing] = useState(false)
+
+  const onAnalyzeBackup = async (key: string) => {
+    setIsAnalyzing(true)
+    try {
+      const analysis = await window.api.backup.analyze(key)
+      setAnalysisData(analysis)
+    } catch (error: any) {
+      show(error.message || 'Erro ao analisar backup', 'error')
+    } finally {
+      setIsAnalyzing(false)
+    }
+  }
+
   const onRestore = async () => {
     if (!restoreTarget) {
       return
@@ -129,6 +144,7 @@ export function BackupSettings() {
     } catch (error: any) {
       show(error.message || 'Erro ao restaurar backup', 'error')
       setRestoreTarget(null)
+      setAnalysisData(null)
     }
   }
 
@@ -328,9 +344,13 @@ export function BackupSettings() {
                   size="sm"
                   variant="ghost"
                   className="opacity-0 group-hover:opacity-100 transition-opacity"
-                  onClick={() => setRestoreTarget(b.key)}
+                  disabled={isAnalyzing}
+                  onClick={() => {
+                    setRestoreTarget(b.key)
+                    onAnalyzeBackup(b.key)
+                  }}
                 >
-                  Restaurar
+                  {isAnalyzing ? 'Analisando...' : 'Restaurar'}
                 </Button>
               </div>
             ))}
@@ -377,12 +397,97 @@ export function BackupSettings() {
         </div>
       </div>
 
-      {restoreTarget && (
-        <ConfirmModal
-          message={`Tem certeza que deseja restaurar o backup de ${new Date(backups.find((b) => b.key === restoreTarget)?.lastModified).toLocaleString('pt-BR')}? O sistema será reiniciado e os dados atuais serão substituídos.`}
-          onConfirm={onRestore}
-          onCancel={() => setRestoreTarget(null)}
-        />
+      {restoreTarget && analysisData && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-surface rounded-2xl shadow-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6 border-b border-outline-variant/10 sticky top-0 bg-surface">
+              <h3 className="text-lg font-bold text-on-surface">Análise do Backup</h3>
+              <p className="text-xs text-on-surface-variant mt-1">
+                {new Date(
+                  backups.find((b) => b.key === restoreTarget)?.lastModified,
+                ).toLocaleString('pt-BR')}
+              </p>
+            </div>
+
+            <div className="p-6 space-y-6">
+              {/* Estatísticas */}
+              <div className="grid grid-cols-3 gap-4 md:grid-cols-4">
+                {[
+                  { label: 'Viagens', value: analysisData.stats.trips, icon: 'directions_car' },
+                  { label: 'Custos', value: analysisData.stats.costs, icon: 'attach_money' },
+                  { label: 'Motoristas', value: analysisData.stats.drivers, icon: 'person' },
+                  { label: 'Caminhões', value: analysisData.stats.trucks, icon: 'local_shipping' },
+                  { label: 'Clientes', value: analysisData.stats.customers, icon: 'business' },
+                  { label: 'Produtos', value: analysisData.stats.products, icon: 'inventory_2' },
+                  { label: 'Fornecedores', value: analysisData.stats.suppliers, icon: 'store' },
+                ].map((stat) => (
+                  <div key={stat.label} className="bg-surface-container p-3 rounded-lg text-center">
+                    <div className="text-primary text-xl mb-1">
+                      <span className="material-symbols-outlined text-2xl">{stat.icon}</span>
+                    </div>
+                    <p className="text-2xl font-bold text-on-surface">{stat.value}</p>
+                    <p className="text-[10px] text-on-surface-variant uppercase tracking-tight">
+                      {stat.label}
+                    </p>
+                  </div>
+                ))}
+              </div>
+
+              {/* Avisos */}
+              {analysisData.warnings.length > 0 && (
+                <div className="bg-warning-container/10 border border-warning/20 rounded-lg p-4">
+                  <div className="flex gap-3 text-warning mb-3">
+                    <span className="material-symbols-outlined text-lg">info</span>
+                    <p className="font-bold text-sm">Informações Importantes</p>
+                  </div>
+                  <ul className="text-[12px] text-on-surface-variant space-y-2 ml-6">
+                    {analysisData.warnings.map((w: string) => (
+                      <li key={w} className="list-disc">
+                        {w}
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="text-[11px] text-on-surface-variant mt-3 italic">
+                    Essas colunas serão recriadas automaticamente durante a restauração.
+                  </p>
+                </div>
+              )}
+
+              {/* Confirmação */}
+              <div className="bg-error-container/10 border border-error/20 rounded-lg p-4">
+                <div className="flex gap-3 text-error">
+                  <span className="material-symbols-outlined text-lg">warning</span>
+                  <p className="text-[11px] font-medium leading-tight">
+                    A restauração substituirá todos os dados atuais. Esta ação não pode ser
+                    desfeita.
+                  </p>
+                </div>
+              </div>
+
+              {/* Botões */}
+              <div className="flex gap-3 pt-4 border-t border-outline-variant/10">
+                <Button
+                  variant="ghost"
+                  className="flex-1"
+                  onClick={() => {
+                    setRestoreTarget(null)
+                    setAnalysisData(null)
+                  }}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  variant="primary"
+                  className="flex-1 bg-error hover:bg-error/90"
+                  onClick={onRestore}
+                >
+                  <span className="material-symbols-outlined">restore</span>
+                  <span>Restaurar Agora</span>
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </Section>
   )

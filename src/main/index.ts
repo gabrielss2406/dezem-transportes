@@ -1,9 +1,9 @@
 import fs from 'fs'
 import { join } from 'path'
 import path from 'path'
-import { BrowserWindow, app, ipcMain, shell } from 'electron'
+import { BrowserWindow, app, dialog, ipcMain, shell } from 'electron'
 
-import type { PdfExportData } from '../shared/types' // Adicionar import de PdfExportData
+import type { PdfExportData } from '../shared/types'
 import { setupDatabase } from './database'
 import { registerAuthHandlers } from './modules/auth/auth.handlers'
 import { startBackupScheduler } from './modules/backup/backup-scheduler'
@@ -23,43 +23,29 @@ import { registerSupplierTypesHandlers } from './modules/supplier-types/supplier
 import { registerSupplierHandlers } from './modules/suppliers/suppliers.handlers'
 import { registerTripHandlers } from './modules/trips/trips.handlers'
 import { registerTruckHandlers } from './modules/trucks/trucks.handlers'
+import { createWindow } from './window'
 
-function createWindow(): void {
-  const mainWindow = new BrowserWindow({
-    width: 1280,
-    height: 800,
-    minWidth: 1024,
-    minHeight: 600,
-    show: false,
-    autoHideMenuBar: true,
-    title: 'Dezem — Gestão de Frota',
-    webPreferences: {
-      preload: join(__dirname, '../preload/index.js'),
-      sandbox: false,
-    },
-  })
+process.on('uncaughtException', (error) => {
+  console.error('[Main] Erro não tratado (uncaughtException):', error)
+})
 
-  mainWindow.on('ready-to-show', () => {
-    mainWindow.maximize()
-    mainWindow.show()
-  })
+process.on('unhandledRejection', (reason) => {
+  console.error('[Main] Rejeição de Promise não tratada (unhandledRejection):', reason)
+})
 
-  mainWindow.webContents.setWindowOpenHandler((details) => {
-    shell.openExternal(details.url)
-    return { action: 'deny' }
-  })
-
-  if (!app.isPackaged && process.env.ELECTRON_RENDERER_URL) {
-    mainWindow.loadURL(process.env.ELECTRON_RENDERER_URL)
-  } else {
-    mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
+app.whenReady().then(async () => {
+  try {
+    setupDatabase()
+  } catch (error) {
+    console.error('[Boot] Falha crítica ao inicializar o banco de dados:', error)
+    dialog.showErrorBox(
+      'Erro ao iniciar o Dezem Gestão de Frota',
+      `Não foi possível inicializar o banco de dados.\n\n${(error as Error).message}\n\nO aplicativo será encerrado.`,
+    )
+    app.quit()
+    return
   }
 
-  startBackupScheduler(mainWindow)
-}
-
-app.whenReady().then(() => {
-  setupDatabase()
   registerAuthHandlers()
   registerContractorHandlers()
   registerCostCategoryHandlers()
@@ -78,7 +64,6 @@ app.whenReady().then(() => {
   registerTruckHandlers()
   registerBackupHandlers()
 
-  // Handler para exportação de PDF
   ipcMain.handle('export-pdf', async (_event, pdfData: PdfExportData) => {
     try {
       const documentsPath = app.getPath('documents')
@@ -96,11 +81,13 @@ app.whenReady().then(() => {
     }
   })
 
-  createWindow()
+  const win = createWindow()
+  startBackupScheduler(win)
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
-      createWindow()
+      const newWin = createWindow()
+      startBackupScheduler(newWin)
     }
   })
 })

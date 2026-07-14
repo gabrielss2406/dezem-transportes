@@ -140,6 +140,7 @@ contextBridge.exposeInMainWorld('api', {
     getStatus: () => ipcRenderer.invoke('backup:getStatus'),
     isEnvConfigured: () => ipcRenderer.invoke('backup:isEnvConfigured'),
     list: () => ipcRenderer.invoke('backup:list'),
+    analyze: (key: string) => ipcRenderer.invoke('backup:analyze', key),
     restore: (key: string) => ipcRenderer.invoke('backup:restore', key),
     onStatusUpdate: (callback: (status: any) => void) => {
       const listener = (_event: any, status: any) => callback(status)
