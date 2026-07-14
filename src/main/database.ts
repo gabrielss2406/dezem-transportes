@@ -295,6 +295,18 @@ export function setupDatabase(): void {
     db.exec('ALTER TABLE trucks ADD COLUMN contractor_id INTEGER REFERENCES contractors(id)')
   }
 
+  // Migrations for customId - MUST run before trucks table recreation below
+  const tablesWithCustomId = ['customers', 'products', 'suppliers', 'trucks', 'drivers']
+  for (const tableName of tablesWithCustomId) {
+    const tableInfo = db.pragma(`table_info(${tableName})`) as { name: string }[]
+    if (!tableInfo.some((col) => col.name === 'customId')) {
+      db.exec(`ALTER TABLE ${tableName} ADD COLUMN customId INTEGER`)
+      db.exec(
+        `CREATE UNIQUE INDEX IF NOT EXISTS idx_${tableName}_customId ON ${tableName}(customId)`,
+      )
+    }
+  }
+
   // Migration: Make model column nullable in trucks table
   const modelColumn = (truckInfo as any[]).find((col) => col.name === 'model')
   if (modelColumn && modelColumn.notnull === 1) {
@@ -346,18 +358,6 @@ export function setupDatabase(): void {
   }
   if (!driverInfo.some((col) => col.name === 'contractor_id')) {
     db.exec('ALTER TABLE drivers ADD COLUMN contractor_id INTEGER REFERENCES contractors(id)')
-  }
-
-  // Migrations for customId
-  const tablesWithCustomId = ['customers', 'products', 'suppliers', 'trucks', 'drivers']
-  for (const tableName of tablesWithCustomId) {
-    const tableInfo = db.pragma(`table_info(${tableName})`) as { name: string }[]
-    if (!tableInfo.some((col) => col.name === 'customId')) {
-      db.exec(`ALTER TABLE ${tableName} ADD COLUMN customId INTEGER`)
-      db.exec(
-        `CREATE UNIQUE INDEX IF NOT EXISTS idx_${tableName}_customId ON ${tableName}(customId)`,
-      )
-    }
   }
 
   // Seed: default supplier types if none exist
