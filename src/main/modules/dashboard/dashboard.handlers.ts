@@ -436,7 +436,7 @@ export function registerDashboardHandlers(): void {
       }))
       .sort((a, b) => b.total - a.total)
 
-    // 6. Revenue by Customer (Top 5)
+    // 6. Revenue by Customer (Top 5) — includes outsourced trips
     const perCustomer = db()
       .prepare(
         `
@@ -450,7 +450,7 @@ export function registerDashboardHandlers(): void {
       JOIN trucks t ON tr.truck_id = t.id
       JOIN drivers d ON tr.driver_id = d.id
       LEFT JOIN customers c ON tr.customer_id = c.id
-      WHERE tr.date BETWEEN ? AND ? AND ${INTERNAL_TRUCK} AND ${INTERNAL_DRIVER}
+      WHERE tr.date BETWEEN ? AND ?
       GROUP BY tr.customer_id
       ORDER BY revenue DESC
       LIMIT 5
@@ -458,7 +458,7 @@ export function registerDashboardHandlers(): void {
       )
       .all(startDate, endDate) as any[]
 
-    // 7. Revenue by Product (Top 5)
+    // 7. Revenue by Product (Top 5) — includes outsourced trips
     const perProduct = db()
       .prepare(
         `
@@ -471,7 +471,7 @@ export function registerDashboardHandlers(): void {
       JOIN trucks t ON tr.truck_id = t.id
       JOIN drivers d ON tr.driver_id = d.id
       JOIN products p ON tr.product_id = p.id
-      WHERE tr.date BETWEEN ? AND ? AND ${INTERNAL_TRUCK} AND ${INTERNAL_DRIVER}
+      WHERE tr.date BETWEEN ? AND ?
       GROUP BY tr.product_id
       ORDER BY revenue DESC
       LIMIT 5
