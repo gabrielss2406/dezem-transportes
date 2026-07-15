@@ -17,7 +17,7 @@ import {
   useToast,
 } from '../components/ui'
 import type { Cost, Driver, FuelRecord, Supplier, Truck } from '../lib/types'
-import { currentMonthKey, formatBRL, formatDate } from '../lib/utils'
+import { currentMonthKey, formatBRL, formatDate, today } from '../lib/utils'
 
 interface CostFormData {
   date: string
@@ -40,7 +40,7 @@ interface FuelFormData {
 }
 
 const EMPTY_COST: CostFormData = {
-  date: '',
+  date: today(),
   category: '',
   value: 0,
   truck_id: null,
@@ -75,6 +75,7 @@ export function CostsPage() {
   const [costs, setCosts] = useState<Cost[]>([])
   const [costCategories, setCostCategories] = useState<{ value: string; label: string }[]>([])
   const [filterCategory, setFilterCategory] = useState('')
+  const [costDateFilters, setCostDateFilters] = useState({ startDate: '', endDate: '' })
   const [costModal, setCostModal] = useState(false)
   const [pendingCost, setPendingCost] = useState<any>(null)
   const [deleteCostTarget, setDeleteCostTarget] = useState<Cost | null>(null)
@@ -165,9 +166,12 @@ export function CostsPage() {
   }, [])
 
   const loadCosts = useCallback(async () => {
-    const c = await window.api.costs.list({})
+    const c = await window.api.costs.list({
+      startDate: costDateFilters.startDate || undefined,
+      endDate: costDateFilters.endDate || undefined,
+    })
     setCosts(c)
-  }, [])
+  }, [costDateFilters])
 
   const loadFuel = useCallback(async () => {
     const f = await window.api.fuel.list(
@@ -379,6 +383,24 @@ export function CostsPage() {
                 <span className="material-symbols-outlined text-sm">add</span>
                 Novo Custo
               </button>
+            </div>
+          </div>
+
+          {/* Date filters */}
+          <div className="bg-surface-container-low p-4 rounded-xl border border-outline-variant/10 flex flex-wrap items-end gap-4">
+            <div className="flex-1 min-w-[140px]">
+              <DatePicker
+                label="De"
+                value={costDateFilters.startDate}
+                onChange={(e) => setCostDateFilters((f) => ({ ...f, startDate: e.target.value }))}
+              />
+            </div>
+            <div className="flex-1 min-w-[140px]">
+              <DatePicker
+                label="Até"
+                value={costDateFilters.endDate}
+                onChange={(e) => setCostDateFilters((f) => ({ ...f, endDate: e.target.value }))}
+              />
             </div>
           </div>
 
