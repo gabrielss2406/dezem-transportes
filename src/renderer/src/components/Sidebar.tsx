@@ -10,7 +10,7 @@ const navItems = [
   { path: '/prices', label: 'Tabela de Preços', icon: 'request_quote' },
   { path: '/suppliers', label: 'Fornecedores', icon: 'handshake' },
   { path: '/contractors', label: 'Terceirizados', icon: 'group_add' },
-  { path: '/trips', label: 'Viagens', icon: 'route' },
+  { path: '/trips', label: 'Lançamentos', icon: 'route' },
   { path: '/maintenance', label: 'Manutenção', icon: 'build' },
   { path: '/costs', label: 'Custos', icon: 'payments' },
   { path: '/settings', label: 'Configurações', icon: 'settings' },
