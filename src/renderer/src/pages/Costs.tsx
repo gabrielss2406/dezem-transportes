@@ -51,7 +51,7 @@ const EMPTY_COST: CostFormData = {
 
 const EMPTY_FUEL: FuelFormData = {
   truck_id: 0,
-  date: '',
+  date: today(),
   liters: null,
   value: 0,
   odometer_at_service: 0,
