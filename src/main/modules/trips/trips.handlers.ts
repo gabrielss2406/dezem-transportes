@@ -19,6 +19,17 @@ export function registerTripHandlers(): void {
     return driver?.commission_rate_override ?? getAppSettings().commissionRate
   }
 
+  // Ticket numbers must be unique across trips. When editing, the current record is
+  // excluded so a trip can keep its own ticket number unchanged.
+  const isTicketNumberTaken = (ticketNumber: string, excludeId?: number): boolean => {
+    const row = excludeId
+      ? db()
+          .prepare('SELECT id FROM trips WHERE ticket_number = ? AND id != ?')
+          .get(ticketNumber, excludeId)
+      : db().prepare('SELECT id FROM trips WHERE ticket_number = ?').get(ticketNumber)
+    return !!row
+  }
+
   ipcMain.handle('trips:list', (_e, filters: any = {}) => {
     let query = `
       SELECT t.*,
@@ -82,6 +93,12 @@ export function registerTripHandlers(): void {
 
   createValidatedHandler('trips:create', tripSchema, (data) => {
     const { fuel_stops, ...tripData } = data
+    if (isTicketNumberTaken((tripData as any).ticket_number)) {
+      return {
+        ok: false,
+        errors: { ticket_number: 'Já existe um lançamento com este número de bilhete.' },
+      }
+    }
     const hasTax = !!(tripData as any).has_percentage_tax
     const taxValue = hasTax ? (tripData.price_charged * getAppSettings().taxRate) / 100 : 0
     const hasCommission = !!(tripData as any).has_commission
@@ -134,6 +151,12 @@ export function registerTripHandlers(): void {
 
   createValidatedHandlerWithId('trips:update', tripSchema, (id, data) => {
     const { fuel_stops, ...tripData } = data
+    if (isTicketNumberTaken((tripData as any).ticket_number, id)) {
+      return {
+        ok: false,
+        errors: { ticket_number: 'Já existe um lançamento com este número de bilhete.' },
+      }
+    }
     const hasTax = !!(tripData as any).has_percentage_tax
     const taxValue = hasTax ? (tripData.price_charged * getAppSettings().taxRate) / 100 : 0
     const hasCommission = !!(tripData as any).has_commission
@@ -168,13 +191,18 @@ export function registerTripHandlers(): void {
           id,
         )
 
-      db().prepare('DELETE FROM trip_fuel_stops WHERE trip_id = ?').run(id)
-      if (fuel_stops && fuel_stops.length > 0) {
-        const insertStop = db().prepare(
-          'INSERT INTO trip_fuel_stops (trip_id, supplier_id, value, liters, km_driven) VALUES (?, ?, ?, ?, ?)',
-        )
-        for (const stop of fuel_stops) {
-          insertStop.run(id, stop.supplier_id, stop.value, stop.liters, stop.km_driven)
+      // The trip entry form no longer manages fuel stops (handled by the Cost Records
+      // module), so it never sends `fuel_stops`. Only touch existing stops when a
+      // caller explicitly provides the field, to avoid wiping historical records.
+      if (fuel_stops !== undefined) {
+        db().prepare('DELETE FROM trip_fuel_stops WHERE trip_id = ?').run(id)
+        if (fuel_stops.length > 0) {
+          const insertStop = db().prepare(
+            'INSERT INTO trip_fuel_stops (trip_id, supplier_id, value, liters, km_driven) VALUES (?, ?, ?, ?, ?)',
+          )
+          for (const stop of fuel_stops) {
+            insertStop.run(id, stop.supplier_id, stop.value, stop.liters, stop.km_driven)
+          }
         }
       }
     })()

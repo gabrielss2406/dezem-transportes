@@ -184,7 +184,12 @@ export const tripSchema = z.object({
   overweight_ton: optionalNumber(999999, 'Excesso máximo de 999.999 toneladas'),
   overweight_observation: z.string().max(500).optional().nullable(),
   price_charged: requiredNumber(1000000, 'Valor máximo de R$ 1.000.000'),
-  km_driven: requiredNumber(10000, 'KM máximo de 10.000'),
+  // No longer collected in the trip entry form; defaults to 0 for new trips
+  // and is preserved unchanged for existing trips edited through the form.
+  km_driven: z.preprocess(
+    (val) => (val === '' || val === null || val === undefined ? 0 : Number(val)),
+    z.number().min(0).max(10000, 'KM máximo de 10.000'),
+  ),
   observation: z.string().max(500).optional(),
   has_percentage_tax: z.boolean().optional(),
   has_commission: z.boolean().optional(),
