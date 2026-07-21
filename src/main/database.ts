@@ -234,7 +234,17 @@ export function setupDatabase(): void {
   }
   if (!tripInfo.some((col) => col.name === 'ticket_number')) {
     db.exec('ALTER TABLE trips ADD COLUMN ticket_number TEXT')
+  }
+  // Always ensure the unique index exists, even on databases where the column was
+  // added before this index was introduced (previously this only ran once, alongside
+  // the ALTER TABLE above, silently leaving older databases without the constraint).
+  try {
     db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_trips_ticket_number ON trips(ticket_number)')
+  } catch (error) {
+    // Duplicate ticket_number values may already exist from before this constraint
+    // was enforced — don't crash startup; the app-level check in trips.handlers.ts
+    // still blocks new duplicates going forward.
+    console.error('Could not create unique index on trips.ticket_number:', error)
   }
 
   // Migration: Add tax fields to trips if missing

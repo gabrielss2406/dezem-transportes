@@ -1,10 +1,9 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Controller, useFieldArray, useForm } from 'react-hook-form'
+import { Controller, useForm } from 'react-hook-form'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { tripSchema } from '../../../shared/schemas'
 import { PageHeader } from '../components/PageHeader'
-import { SupplierCombobox } from '../components/SupplierCombobox'
 import {
   Badge,
   Button,
@@ -18,7 +17,7 @@ import {
   useToast,
 } from '../components/ui'
 import { generatePdf } from '../lib/pdfGenerator'
-import type { Customer, Driver, Product, Supplier, Trip, Truck } from '../lib/types'
+import type { Customer, Driver, Product, Trip, Truck } from '../lib/types'
 import { formatBRL, formatDate, today } from '../lib/utils'
 
 interface TripFormData {
@@ -32,12 +31,13 @@ interface TripFormData {
   overweight_ton?: number | null
   overweight_observation?: string | null
   price_charged: number
+  // No longer editable in the form (Total Trip Distance field was removed) — carried
+  // through silently so existing trips keep their historical value on edit.
   km_driven: number
   observation?: string
   ticket_number: string
   has_percentage_tax?: boolean
   has_commission?: boolean
-  fuel_stops?: any[]
 }
 
 const EMPTY: TripFormData = {
@@ -54,16 +54,8 @@ const EMPTY: TripFormData = {
   km_driven: 0,
   ticket_number: '',
   observation: '',
-  has_percentage_tax: false,
+  has_percentage_tax: true,
   has_commission: true,
-  fuel_stops: [],
-}
-
-const typeIcon: Record<string, string> = {
-  gas_station: 'local_gas_station',
-  workshop: 'build',
-  quarry: 'foundation',
-  other: 'handshake',
 }
 
 // Modal de confirmação próprio — sem confirm() nativo do Electron
@@ -105,7 +97,6 @@ export function TripsPage() {
   const [drivers, setDrivers] = useState<Driver[]>([])
   const [products, setProducts] = useState<Product[]>([])
   const [customers, setCustomers] = useState<Customer[]>([])
-  const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [modal, setModal] = useState(false)
   const [editing, setEditing] = useState<Trip | null>(null)
   const [hasOverweight, setHasOverweight] = useState(false)
@@ -141,7 +132,6 @@ export function TripsPage() {
   const weightInputRef = useRef<HTMLInputElement>(null)
   const unitPriceInputRef = useRef<HTMLInputElement>(null)
   const priceInputRef = useRef<HTMLInputElement>(null)
-  const kmInputRef = useRef<HTMLInputElement>(null)
   const taxSelectRef = useRef<SelectRef>(null)
   const commissionSelectRef = useRef<SelectRef>(null)
   const ticketInputRef = useRef<HTMLInputElement>(null)
@@ -162,15 +152,11 @@ export function TripsPage() {
     watch,
     setValue,
     getValues,
+    setError,
   } = useForm<TripFormData>({
     resolver: zodResolver(tripSchema) as any,
     defaultValues: { ...EMPTY },
     mode: 'all',
-  })
-
-  const { fields, append, remove } = useFieldArray({
-    control,
-    name: 'fuel_stops' as any,
   })
 
   const selectedCustomerId = watch('customer_id')
@@ -254,13 +240,12 @@ export function TripsPage() {
   }, [manualUnitPrice, noPriceRegistered, currentWeight, currentOverweight, setValue])
 
   const load = useCallback(async () => {
-    const [t, tr, d, p, c, s, settings] = await Promise.all([
+    const [t, tr, d, p, c, settings] = await Promise.all([
       window.api.trips.list(filters),
       window.api.trucks.list(),
       window.api.drivers.list(),
       window.api.products.list(),
       window.api.customers.list(),
-      window.api.suppliers.list(),
       window.api.settings.getApp(),
     ])
     setTrips(t)
@@ -268,7 +253,6 @@ export function TripsPage() {
     setDrivers(d)
     setProducts(p)
     setCustomers(c)
-    setSuppliers(s)
     setAppSettings(settings)
   }, [filters])
 
@@ -297,54 +281,28 @@ export function TripsPage() {
     }
   }, [modal, editing, reset])
 
-  const resolvePendingFuelStopSuppliers = async (): Promise<boolean> => {
-    const fuelStops: any[] = getValues('fuel_stops' as any) || []
-    const createdCache: Record<string, number> = {}
-
-    for (let i = 0; i < fuelStops.length; i++) {
-      const stop = fuelStops[i]
-      if (stop.supplier_id) {
-        continue
-      }
-
-      const name = (stop.pendingSupplierName || '').trim()
-      if (!name) {
-        show('Selecione ou digite um fornecedor para todas as paradas', 'error')
-        return false
-      }
-
-      const normalized = name.toLowerCase()
-      const existing = suppliers.find((s) => s.name.trim().toLowerCase() === normalized)
-      if (existing) {
-        setValue(`fuel_stops.${i}.supplier_id` as any, existing.id)
-        continue
-      }
-      if (createdCache[normalized]) {
-        setValue(`fuel_stops.${i}.supplier_id` as any, createdCache[normalized])
-        continue
-      }
-
-      const created = await window.api.suppliers.create({ name, type: 'other' })
-      if ('ok' in created && created.ok === false) {
-        show('Erro ao criar fornecedor', 'error')
-        return false
-      }
-      createdCache[normalized] = created.id
-      setSuppliers((prev) => [...prev, { id: created.id, name, type: 'other' } as any])
-      setValue(`fuel_stops.${i}.supplier_id` as any, created.id)
-    }
-    return true
-  }
-
   const save = async (data: TripFormData) => {
     try {
+      let res: any
       if (editing) {
-        await window.api.trips.update(editing.id, data as any)
-        show('Lançamento atualizado!')
+        res = await window.api.trips.update(editing.id, data as any)
       } else {
-        await window.api.trips.create(data as any)
-        show('Lançamento registrado!')
+        res = await window.api.trips.create(data as any)
       }
+
+      if (res && res.ok === false) {
+        setPendingData(null)
+        if (res.errors) {
+          for (const [field, message] of Object.entries(res.errors)) {
+            setError(field as any, { type: 'manual', message: message as string })
+          }
+        } else {
+          show('Ocorreu um erro ao salvar.', 'error')
+        }
+        return
+      }
+
+      show(editing ? 'Lançamento atualizado!' : 'Lançamento registrado!')
       setModal(false)
       setPendingData(null)
       load()
@@ -372,33 +330,27 @@ export function TripsPage() {
     load()
   }
 
-  async function edit(row: Trip) {
-    try {
-      const fuelStops = await window.api.trips.getFuelStops(row.id)
-      reset({
-        date: row.date,
-        truck_id: row.truck_id,
-        driver_id: row.driver_id,
-        product_id: row.product_id,
-        customer_id: row.customer_id ?? null,
-        supplier_id: row.supplier_id ?? null,
-        weight_ton: row.weight_ton,
-        overweight_ton: row.overweight_ton ?? null,
-        overweight_observation: row.overweight_observation ?? null,
-        price_charged: row.price_charged,
-        km_driven: row.km_driven,
-        ticket_number: row.ticket_number ?? '',
-        observation: row.observation ?? '',
-        has_percentage_tax: !!row.has_percentage_tax,
-        has_commission: !!row.has_commission,
-        fuel_stops: fuelStops,
-      })
-      setHasOverweight(!!(row.overweight_ton && row.overweight_ton > 0))
-      setEditing(row)
-      setModal(true)
-    } catch (e: any) {
-      show(e.message || 'Erro ao carregar lançamento', 'error')
-    }
+  function edit(row: Trip) {
+    reset({
+      date: row.date,
+      truck_id: row.truck_id,
+      driver_id: row.driver_id,
+      product_id: row.product_id,
+      customer_id: row.customer_id ?? null,
+      supplier_id: row.supplier_id ?? null,
+      weight_ton: row.weight_ton,
+      overweight_ton: row.overweight_ton ?? null,
+      overweight_observation: row.overweight_observation ?? null,
+      price_charged: row.price_charged,
+      km_driven: row.km_driven,
+      ticket_number: row.ticket_number ?? '',
+      observation: row.observation ?? '',
+      has_percentage_tax: !!row.has_percentage_tax,
+      has_commission: !!row.has_commission,
+    })
+    setHasOverweight(!!(row.overweight_ton && row.overweight_ton > 0))
+    setEditing(row)
+    setModal(true)
   }
 
   const handleEscape = () => {
@@ -412,29 +364,6 @@ export function TripsPage() {
   const handleConfirmDiscard = () => {
     setShowDiscardConfirm(false)
     setModal(false)
-  }
-
-  const handleAddStop = (supplierId: string | number) => {
-    if (!supplierId) {
-      return
-    }
-    const supplier = suppliers.find((s) => String(s.id) === String(supplierId))
-    if (supplier) {
-      append({ supplier_id: supplier.id, value: 0, liters: null, km_driven: 0 })
-    }
-  }
-
-  const handleAddPendingStop = (name: string) => {
-    if (!name.trim()) {
-      return
-    }
-    append({
-      supplier_id: undefined,
-      pendingSupplierName: name.trim(),
-      value: 0,
-      liters: null,
-      km_driven: 0,
-    } as any)
   }
 
   const totalRevenue = trips.reduce((s, t) => s + t.price_charged, 0)
@@ -1180,23 +1109,6 @@ export function TripsPage() {
                     value={field.value}
                     onChange={field.onChange}
                     error={errors.price_charged?.message}
-                    onKeyDown={(e) => e.key === 'Enter' && kmInputRef.current?.focus()}
-                  />
-                )}
-              />
-
-              <Controller
-                name="km_driven"
-                control={control}
-                render={({ field }) => (
-                  <Input
-                    ref={kmInputRef}
-                    label="Km total da viagem"
-                    type="number"
-                    placeholder="0"
-                    value={field.value}
-                    onChange={field.onChange}
-                    error={errors.km_driven?.message}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
                         e.preventDefault()
@@ -1208,18 +1120,25 @@ export function TripsPage() {
               />
 
               <div className="col-span-2">
-                <Input
-                  ref={ticketInputRef}
-                  label="Nº do Bilhete"
-                  placeholder="Ex: 000123"
-                  {...register('ticket_number')}
-                  error={errors.ticket_number?.message}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault()
-                      taxSelectRef.current?.open()
-                    }
-                  }}
+                <Controller
+                  name="ticket_number"
+                  control={control}
+                  render={({ field }) => (
+                    <Input
+                      ref={ticketInputRef}
+                      label="Nº do Bilhete"
+                      placeholder="Ex: 000123"
+                      value={field.value}
+                      onChange={field.onChange}
+                      error={errors.ticket_number?.message}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault()
+                          taxSelectRef.current?.open()
+                        }
+                      }}
+                    />
+                  )}
                 />
               </div>
 
@@ -1274,13 +1193,7 @@ export function TripsPage() {
                       icon="percent"
                       value={field.value ? 'true' : 'false'}
                       onChange={(v) => field.onChange(v === 'true')}
-                      onEnterSelect={async () => {
-                        const ok = await resolvePendingFuelStopSuppliers()
-                        if (!ok) {
-                          return
-                        }
-                        handleSubmit(onEnterSubmit as any)()
-                      }}
+                      onEnterSelect={() => handleSubmit(onEnterSubmit as any)()}
                       options={[
                         {
                           value: 'false',
@@ -1379,146 +1292,13 @@ export function TripsPage() {
               )}
             </div>
 
-            {/* Paradas e Custos */}
-            <div className="border-t border-outline-variant/10 pt-6">
-              <h3 className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant mb-4">
-                Paradas e Custos Extra (Postos, Oficinas, etc.)
-              </h3>
-
-              <div className="mb-6">
-                <SupplierCombobox
-                  key={fields.length}
-                  placeholder="Pesquisar local/fornecedor para adicionar..."
-                  suppliers={suppliers}
-                  onChange={(id) => {
-                    if (id) {
-                      handleAddStop(id)
-                    }
-                  }}
-                  onPendingChange={(name) => {
-                    if (name) {
-                      handleAddPendingStop(name)
-                    }
-                  }}
-                />
-              </div>
-
-              <div className="space-y-4">
-                {fields.map((field: any, index) => {
-                  const supplier = suppliers.find((s) => s.id === field.supplier_id)
-                  return (
-                    <div
-                      key={field.id}
-                      className="bg-surface-container-lowest border border-outline-variant/20 rounded-xl overflow-hidden shadow-sm"
-                    >
-                      <div className="px-4 py-2 bg-surface-container-low border-b border-outline-variant/10 flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <span className="material-symbols-outlined text-sm text-primary">
-                            {supplier ? typeIcon[supplier.type] : 'location_on'}
-                          </span>
-                          <span className="text-xs font-bold text-on-surface uppercase tracking-wider">
-                            {supplier?.name || field.pendingSupplierName || 'Local'}
-                          </span>
-                          {!supplier && field.pendingSupplierName && (
-                            <span className="text-[9px] px-1.5 py-0.5 bg-primary/10 text-primary rounded">
-                              novo
-                            </span>
-                          )}
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => remove(index)}
-                          className="text-on-surface-variant hover:text-error transition-colors"
-                          title="Remover parada"
-                        >
-                          <span className="material-symbols-outlined text-lg">close</span>
-                        </button>
-                      </div>
-
-                      <div className="p-4 grid grid-cols-3 gap-4 animate-in fade-in slide-in-from-top-1 duration-200">
-                        <div
-                          className={supplier?.type === 'gas_station' ? 'col-span-1' : 'col-span-3'}
-                        >
-                          <Controller
-                            name={`fuel_stops.${index}.value` as any}
-                            control={control}
-                            render={({ field }) => (
-                              <CurrencyInput
-                                label="Valor Gasto"
-                                value={field.value}
-                                onChange={field.onChange}
-                                error={(errors.fuel_stops as any)?.[index]?.value?.message}
-                              />
-                            )}
-                          />
-                        </div>
-                        {supplier?.type === 'gas_station' && (
-                          <>
-                            <div className="col-span-1">
-                              <Input
-                                label="Litros"
-                                optional
-                                type="number"
-                                step="0.01"
-                                placeholder="0,00"
-                                {...register(`fuel_stops.${index}.liters` as any)}
-                                error={(errors.fuel_stops as any)?.[index]?.liters?.message}
-                              />
-                            </div>
-                            <div className="col-span-1">
-                              <Input
-                                label="Andou (km)"
-                                optional
-                                type="number"
-                                placeholder="0"
-                                {...register(`fuel_stops.${index}.km_driven` as any)}
-                                error={(errors.fuel_stops as any)?.[index]?.km_driven?.message}
-                              />
-                            </div>
-                            <div className="col-span-3 flex items-center justify-between bg-tertiary-container/10 px-4 py-2 rounded-lg">
-                              <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
-                                Rendimento Estimado
-                              </span>
-                              <Badge
-                                color="green"
-                                label={`${(() => {
-                                  const liters = watch(`fuel_stops.${index}.liters` as any)
-                                  const km = watch(`fuel_stops.${index}.km_driven` as any)
-                                  if (!liters || !km || Number(liters) === 0) {
-                                    return '0.00'
-                                  }
-                                  return (Number(km) / Number(liters)).toFixed(2)
-                                })()} km/L`}
-                              />
-                            </div>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  )
-                })}
-
-                {fields.length === 0 && (
-                  <div className="py-8 text-center border-2 border-dashed border-outline-variant/10 rounded-xl text-on-surface-variant text-sm italic">
-                    Utilize a busca acima para registrar paradas (abastecimentos, gastos, etc.)
-                  </div>
-                )}
-              </div>
-            </div>
-
             <div className="flex justify-end gap-3 pt-4 border-t border-outline-variant/10">
               <Button variant="ghost" onClick={() => setModal(false)}>
                 Cancelar
               </Button>
               <button
                 type="button"
-                onClick={async () => {
-                  const ok = await resolvePendingFuelStopSuppliers()
-                  if (!ok) {
-                    return
-                  }
-                  handleSubmit(onSubmit as any)()
-                }}
+                onClick={handleSubmit(onSubmit as any)}
                 className="flex items-center gap-3 px-8 py-3 bg-primary text-on-primary font-extrabold rounded transition-all hover:brightness-110 active:scale-95 shadow-lg shadow-primary/20"
               >
                 {editing ? 'Salvar Alterações' : 'Salvar Lançamento'}
