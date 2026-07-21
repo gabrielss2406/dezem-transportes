@@ -40,11 +40,12 @@ interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
 export const Input = forwardRef<HTMLInputElement, InputProps>(
   ({ label, optional, error, mask, className = '', ...props }, ref) => {
     const id = React.useId()
+    const stateClasses = error
+      ? 'border-error focus:border-error focus:ring-error/30'
+      : 'border-outline-variant/30 focus:border-primary focus:ring-primary/30'
     const commonProps = {
       id,
-      className: `bg-surface-container-lowest border border-outline-variant/30 rounded-lg px-4 py-3 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all ${
-        error ? 'border-error' : ''
-      } ${className}`,
+      className: `bg-surface-container-lowest border ${stateClasses} rounded-lg px-4 py-3 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:outline-none focus:ring-2 transition-all ${className}`,
       ...props,
     }
 
@@ -92,6 +93,9 @@ interface DatePickerProps extends React.InputHTMLAttributes<HTMLInputElement> {
 export const DatePicker = forwardRef<HTMLInputElement, DatePickerProps>(
   ({ label, optional, error, className = '', ...props }, ref) => {
     const id = React.useId()
+    const stateClasses = error
+      ? 'border-error focus:border-error focus:ring-error/30'
+      : 'border-outline-variant/30 focus:border-primary focus:ring-primary/30'
     return (
       <div className="flex flex-col gap-1.5">
         {label && (
@@ -108,7 +112,7 @@ export const DatePicker = forwardRef<HTMLInputElement, DatePickerProps>(
             id={id}
             type="date"
             ref={ref}
-            className={`w-full bg-surface-container-lowest border border-outline-variant/30 rounded-lg px-4 py-3 text-sm text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all appearance-none ${error ? 'border-error' : ''} ${className}`}
+            className={`w-full bg-surface-container-lowest border ${stateClasses} rounded-lg px-4 py-3 text-sm text-on-surface focus:outline-none focus:ring-2 transition-all appearance-none ${className}`}
             {...props}
           />
           <span className="material-symbols-outlined absolute right-4 top-1/2 -translate-y-1/2 text-on-surface-variant/40 pointer-events-none group-hover:text-primary transition-colors text-lg">
@@ -139,6 +143,9 @@ export const CurrencyInput = forwardRef<HTMLInputElement, CurrencyInputProps>(
     ref,
   ) => {
     const id = React.useId()
+    const stateClasses = error
+      ? 'border-error focus:border-error focus:ring-error/30'
+      : 'border-outline-variant/30 focus:border-primary focus:ring-primary/30'
     const format = (val: number | string) => {
       const n = typeof val === 'number' ? val : Number(val) || 0
       return new Intl.NumberFormat('pt-BR', {
@@ -176,7 +183,7 @@ export const CurrencyInput = forwardRef<HTMLInputElement, CurrencyInputProps>(
             onChange={handleChange}
             onKeyDown={onKeyDown}
             placeholder={placeholder}
-            className={`w-full bg-surface-container-lowest border border-outline-variant/30 rounded-lg pl-10 pr-4 py-3 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all ${error ? 'border-error' : ''} ${className}`}
+            className={`w-full bg-surface-container-lowest border ${stateClasses} rounded-lg pl-10 pr-4 py-3 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:outline-none focus:ring-2 transition-all ${className}`}
           />
         </div>
         {error && <span className="text-xs text-error">{error}</span>}
@@ -378,38 +385,47 @@ export const Select = forwardRef<SelectRef, SelectProps>(
           </label>
         )}
 
-        <button
-          id={id}
-          ref={buttonRef}
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation()
-            const newIsOpen = !isOpen
-            setIsOpen(newIsOpen)
-            if (newIsOpen) {
-              document.dispatchEvent(
-                new CustomEvent('close-other-selects', { detail: { id: uniqueId.current } }),
-              )
-            }
-          }}
-          className={`flex items-center justify-between bg-surface-container-lowest border border-outline-variant/30 rounded-lg px-4 py-3 text-sm text-on-surface text-left focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all ${error ? 'border-error' : ''}`}
-        >
-          <div className="flex items-center gap-2 overflow-hidden">
-            {icon && (
-              <span className="material-symbols-outlined text-on-surface-variant/60 text-lg">
-                {icon}
+        {(() => {
+          const stateClasses = error
+            ? 'border-error focus:border-error focus:ring-error/30'
+            : 'border-outline-variant/30 focus:border-primary focus:ring-primary/30'
+          return (
+            <button
+              id={id}
+              ref={buttonRef}
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation()
+                const newIsOpen = !isOpen
+                setIsOpen(newIsOpen)
+                if (newIsOpen) {
+                  document.dispatchEvent(
+                    new CustomEvent('close-other-selects', { detail: { id: uniqueId.current } }),
+                  )
+                }
+              }}
+              className={`flex items-center justify-between bg-surface-container-lowest border ${stateClasses} rounded-lg px-4 py-3 text-sm text-on-surface text-left focus:outline-none focus:ring-2 transition-all`}
+            >
+              <div className="flex items-center gap-2 overflow-hidden">
+                {icon && (
+                  <span className="material-symbols-outlined text-on-surface-variant/60 text-lg">
+                    {icon}
+                  </span>
+                )}
+                <span className={`truncate ${!selectedOption ? 'text-on-surface-variant/40' : ''}`}>
+                  {selectedOption
+                    ? selectedOption.displayLabel || selectedOption.label
+                    : placeholder}
+                </span>
+              </div>
+              <span
+                className={`material-symbols-outlined text-on-surface-variant transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
+              >
+                expand_more
               </span>
-            )}
-            <span className={`truncate ${!selectedOption ? 'text-on-surface-variant/40' : ''}`}>
-              {selectedOption ? selectedOption.displayLabel || selectedOption.label : placeholder}
-            </span>
-          </div>
-          <span
-            className={`material-symbols-outlined text-on-surface-variant transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
-          >
-            expand_more
-          </span>
-        </button>
+            </button>
+          )
+        })()}
 
         {isOpen &&
           createPortal(

@@ -215,42 +215,49 @@ export const SupplierCombobox = React.forwardRef<SupplierComboboxRef, SupplierCo
           </div>
         )}
 
-        <button
-          id={id}
-          ref={buttonRef}
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation()
-            const newIsOpen = !isOpen
-            setIsOpen(newIsOpen)
-            if (newIsOpen) {
-              document.dispatchEvent(
-                new CustomEvent('close-other-suppliercombobox', {
-                  detail: { id: uniqueId.current },
-                }),
-              )
-            }
-          }}
-          className={`flex items-center justify-between bg-surface-container-lowest border border-outline-variant/30 rounded-lg px-4 py-3 text-sm text-on-surface text-left focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all ${error ? 'border-error' : ''}`}
-        >
-          <div className="flex items-center gap-2 overflow-hidden">
-            <span
-              className={`truncate flex items-center gap-2 ${!displayValue ? 'text-on-surface-variant/40' : ''}`}
+        {(() => {
+          const stateClasses = error
+            ? 'border-error focus:border-error focus:ring-error/30'
+            : 'border-outline-variant/30 focus:border-primary focus:ring-primary/30'
+          return (
+            <button
+              id={id}
+              ref={buttonRef}
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation()
+                const newIsOpen = !isOpen
+                setIsOpen(newIsOpen)
+                if (newIsOpen) {
+                  document.dispatchEvent(
+                    new CustomEvent('close-other-suppliercombobox', {
+                      detail: { id: uniqueId.current },
+                    }),
+                  )
+                }
+              }}
+              className={`flex items-center justify-between bg-surface-container-lowest border ${stateClasses} rounded-lg px-4 py-3 text-sm text-on-surface text-left focus:outline-none focus:ring-2 transition-all`}
             >
-              {displayValue || placeholder}
-              {pendingName && (
-                <span className="text-[9px] px-1.5 py-0.5 bg-primary/10 text-primary rounded whitespace-nowrap">
-                  novo
+              <div className="flex items-center gap-2 overflow-hidden">
+                <span
+                  className={`truncate flex items-center gap-2 ${!displayValue ? 'text-on-surface-variant/40' : ''}`}
+                >
+                  {displayValue || placeholder}
+                  {pendingName && (
+                    <span className="text-[9px] px-1.5 py-0.5 bg-primary/10 text-primary rounded whitespace-nowrap">
+                      novo
+                    </span>
+                  )}
                 </span>
-              )}
-            </span>
-          </div>
-          <span
-            className={`material-symbols-outlined text-on-surface-variant transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
-          >
-            expand_more
-          </span>
-        </button>
+              </div>
+              <span
+                className={`material-symbols-outlined text-on-surface-variant transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
+              >
+                expand_more
+              </span>
+            </button>
+          )
+        })()}
 
         {isOpen &&
           createPortal(
@@ -353,7 +360,7 @@ export const SupplierCombobox = React.forwardRef<SupplierComboboxRef, SupplierCo
             document.body,
           )}
 
-        {error && <span className="text-[10px] text-error">{error}</span>}
+        {error && <span className="text-xs text-error">{error}</span>}
       </div>
     )
   },
