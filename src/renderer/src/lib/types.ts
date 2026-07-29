@@ -175,6 +175,9 @@ export interface Cost {
   supplier_id?: number
   driver_id?: number
   description?: string
+  installment_group_id?: string | null
+  installment_number?: number | null
+  installment_total?: number | null
   // joins
   truck_license_plate?: string
   supplier_name?: string
@@ -236,6 +239,28 @@ export interface CommissionByDriver {
   name: string
   total_commission: number
   trip_count: number
+}
+
+export interface Receivable {
+  id: number
+  trip_id: number
+  customer_id?: number | null
+  amount: number
+  status: 'open' | 'paid'
+  due_date?: string | null
+  paid_date?: string | null
+  created_at?: string
+  // joins
+  trip_ticket_number?: string
+  trip_date?: string
+  customer_name?: string
+}
+
+export interface ReceivableCustomerSummary {
+  customer_id: number | null
+  customer_name: string | null
+  open_amount: number
+  open_count: number
 }
 
 // Augment Window
@@ -304,9 +329,9 @@ declare global {
       }
       trips: {
         list(filters?: any): Promise<Trip[]>
-        create(data: any): Promise<{ id: number }>
-        update(id: number, data: any): Promise<{ ok: boolean }>
-        delete(id: number): Promise<{ ok: boolean }>
+        create(data: any): Promise<{ id: number; ok?: boolean; errors?: any }>
+        update(id: number, data: any): Promise<{ ok: boolean; errors?: any }>
+        delete(id: number): Promise<{ ok: boolean; errors?: any }>
         getFuelStops(tripId: number): Promise<FuelStop[]>
       }
       fuel: {
@@ -333,6 +358,14 @@ declare global {
       dashboard: {
         summary(startDate: string, endDate: string): Promise<DashboardSummary>
         commissionByDriver(startDate: string, endDate: string): Promise<CommissionByDriver[]>
+      }
+      receivables: {
+        list(filters?: any): Promise<Receivable[]>
+        markPaid(data: { ids: number[]; paid_date: string }): Promise<{
+          ok: boolean
+          updated?: number
+        }>
+        summaryByCustomer(): Promise<ReceivableCustomerSummary[]>
       }
       backup: {
         getConfig(): Promise<import('../../../shared/types').BackupConfig | null>

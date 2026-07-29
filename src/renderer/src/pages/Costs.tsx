@@ -27,6 +27,7 @@ interface CostFormData {
   supplier_id: number | null
   driver_id: number | null
   description?: string
+  installments: number
 }
 
 interface FuelFormData {
@@ -47,6 +48,7 @@ const EMPTY_COST: CostFormData = {
   supplier_id: null,
   driver_id: null,
   description: '',
+  installments: 1,
 }
 
 const EMPTY_FUEL: FuelFormData = {
@@ -113,16 +115,19 @@ export function CostsPage() {
   const categorySelectRef = useRef<SelectRef>(null)
   const dateRef = useRef<HTMLInputElement>(null)
   const valueRef = useRef<HTMLInputElement>(null)
+  const installmentsRef = useRef<HTMLInputElement>(null)
   const truckSelectRef = useRef<SelectRef>(null)
   const supplierSelectRef = useRef<SelectRef>(null)
   const driverSelectRef = useRef<SelectRef>(null)
   const descRef = useRef<HTMLInputElement>(null)
+  const [isInstallment, setIsInstallment] = useState(false)
 
   const {
     handleSubmit: handleCostSubmit,
     formState: { errors: costErrors, isDirty: isCostDirty },
     reset: resetCost,
     control: costControl,
+    setValue: setCostValue,
   } = useForm<CostFormData>({
     resolver: zodResolver(costSchema) as any,
     defaultValues: { ...EMPTY_COST },
@@ -223,6 +228,7 @@ export function CostsPage() {
       }, 200)
     } else {
       resetCost(EMPTY_COST)
+      setIsInstallment(false)
     }
   }, [costModal, resetCost])
 
@@ -501,6 +507,11 @@ export function CostsPage() {
                         {row.supplier_name && (
                           <p className="text-[10px] text-on-surface-variant">{row.supplier_name}</p>
                         )}
+                        {row.installment_number && row.installment_total && (
+                          <p className="text-[10px] text-primary font-bold mt-0.5">
+                            Parcela {row.installment_number}/{row.installment_total}
+                          </p>
+                        )}
                       </td>
                       <td className="px-6 py-4 text-sm font-mono text-on-surface-variant">
                         {row.truck_license_plate ?? '—'}
@@ -761,7 +772,7 @@ export function CostsPage() {
               render={({ field }) => (
                 <DatePicker
                   ref={dateRef}
-                  label="Data"
+                  label={isInstallment ? 'Data da 1ª parcela' : 'Data'}
                   value={field.value}
                   onChange={field.onChange}
                   error={costErrors.date?.message}
@@ -780,19 +791,75 @@ export function CostsPage() {
               render={({ field }) => (
                 <CurrencyInput
                   ref={valueRef}
-                  label="Valor"
+                  label={isInstallment ? 'Valor total' : 'Valor'}
                   value={field.value}
                   onChange={field.onChange}
                   error={costErrors.value?.message}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') {
                       e.preventDefault()
-                      truckSelectRef.current?.open()
+                      if (isInstallment) {
+                        installmentsRef.current?.focus()
+                      } else {
+                        truckSelectRef.current?.open()
+                      }
                     }
                   }}
                 />
               )}
             />
+
+            {/* Installment toggle */}
+            <div className="col-span-2 flex items-center gap-3 py-1">
+              <button
+                type="button"
+                role="switch"
+                aria-checked={isInstallment}
+                onClick={() => {
+                  const next = !isInstallment
+                  setIsInstallment(next)
+                  setCostValue('installments', next ? 2 : 1)
+                }}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${
+                  isInstallment ? 'bg-primary' : 'bg-outline-variant'
+                }`}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+                    isInstallment ? 'translate-x-6' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+              <span className="text-sm text-on-surface-variant">Parcelar</span>
+            </div>
+
+            {isInstallment && (
+              <div className="col-span-2">
+                <Controller
+                  name="installments"
+                  control={costControl}
+                  render={({ field }) => (
+                    <Input
+                      ref={installmentsRef}
+                      label="Número de parcelas"
+                      type="number"
+                      min={1}
+                      max={360}
+                      value={field.value}
+                      onChange={(e) => field.onChange(Number(e.target.value))}
+                      error={costErrors.installments?.message}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault()
+                          truckSelectRef.current?.open()
+                        }
+                      }}
+                    />
+                  )}
+                />
+              </div>
+            )}
+
             <Controller
               name="truck_id"
               control={costControl}

@@ -324,7 +324,12 @@ export function TripsPage() {
     if (!deleteTarget) {
       return
     }
-    await window.api.trips.delete(deleteTarget.id)
+    const result = await window.api.trips.delete(deleteTarget.id)
+    if (result?.ok === false) {
+      setDeleteTarget(null)
+      show(result.errors?.form || 'Não foi possível excluir o lançamento', 'error')
+      return
+    }
     show('Lançamento excluído', 'success')
     setDeleteTarget(null)
     load()
