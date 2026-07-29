@@ -6,12 +6,14 @@ import { createIdValidatedHandler, createValidatedHandler } from '../../lib/util
 function recalcTruckOdometer(truckId: number): void {
   const database = getDb()
   const row = database
-    .prepare('SELECT MAX(odometer_at_service) as max_odo FROM fuel_records WHERE truck_id = ?')
-    .get(truckId) as { max_odo: number | null }
-  if (row.max_odo !== null) {
+    .prepare(
+      'SELECT odometer_at_service FROM fuel_records WHERE truck_id = ? ORDER BY date DESC, id DESC LIMIT 1',
+    )
+    .get(truckId) as { odometer_at_service: number } | undefined
+  if (row) {
     database
       .prepare('UPDATE trucks SET current_odometer = ? WHERE id = ?')
-      .run(row.max_odo, truckId)
+      .run(row.odometer_at_service, truckId)
   }
 }
 
@@ -49,15 +51,34 @@ export function registerFuelHandlers(): void {
   })
 
   createValidatedHandler('fuel:create', fuelRecordSchema, (data) => {
-    const maxRow = db()
-      .prepare('SELECT MAX(odometer_at_service) as max_odo FROM fuel_records WHERE truck_id = ?')
-      .get(data.truck_id) as { max_odo: number | null }
+    const previous = db()
+      .prepare(
+        `SELECT odometer_at_service FROM fuel_records
+         WHERE truck_id = ? AND date <= ?
+         ORDER BY date DESC, id DESC LIMIT 1`,
+      )
+      .get(data.truck_id, data.date) as { odometer_at_service: number } | undefined
 
-    if (maxRow.max_odo !== null && data.odometer_at_service <= maxRow.max_odo) {
+    if (previous && data.odometer_at_service <= previous.odometer_at_service) {
       return {
         ok: false,
         errors: {
-          odometer_at_service: `Hodômetro deve ser maior que o último registro (${maxRow.max_odo.toFixed(0)} km)`,
+          odometer_at_service: `Hodômetro deve ser maior que o registro anterior (${previous.odometer_at_service.toFixed(0)} km)`,
+        },
+      }
+    }
+
+    const next = db()
+      .prepare(
+        'SELECT odometer_at_service FROM fuel_records WHERE truck_id = ? AND date > ? ORDER BY date ASC, id ASC LIMIT 1',
+      )
+      .get(data.truck_id, data.date) as { odometer_at_service: number } | undefined
+
+    if (next && data.odometer_at_service >= next.odometer_at_service) {
+      return {
+        ok: false,
+        errors: {
+          odometer_at_service: `Hodômetro deve ser menor que o próximo registro (${next.odometer_at_service.toFixed(0)} km) para manter a ordem cronológica`,
         },
       }
     }

@@ -16,8 +16,8 @@ import {
   Toast,
   useToast,
 } from '../components/ui'
-import type { Cost, Driver, FuelRecord, Supplier, Truck } from '../lib/types'
-import { currentMonthKey, formatBRL, formatDate, today } from '../lib/utils'
+import type { CommissionByDriver, Cost, Driver, FuelRecord, Supplier, Truck } from '../lib/types'
+import { currentMonthKey, currentMonthRange, formatBRL, formatDate, today } from '../lib/utils'
 
 interface CostFormData {
   date: string
@@ -69,7 +69,11 @@ const categoryBadge: Record<string, string> = {
 }
 
 export function CostsPage() {
-  const [activeTab, setActiveTab] = useState<'costs' | 'fuel'>('costs')
+  const [activeTab, setActiveTab] = useState<'costs' | 'fuel' | 'commissions'>('costs')
+
+  // ── Commissions state ──
+  const [commissionData, setCommissionData] = useState<CommissionByDriver[]>([])
+  const [commissionDateFilters, setCommissionDateFilters] = useState(currentMonthRange())
 
   // ── Costs state ──
   const [costs, setCosts] = useState<Cost[]>([])
@@ -198,6 +202,18 @@ export function CostsPage() {
     loadFuel()
   }, [loadFuel])
 
+  const loadCommissions = useCallback(async () => {
+    const c = await window.api.dashboard.commissionByDriver(
+      commissionDateFilters.start,
+      commissionDateFilters.end,
+    )
+    setCommissionData(c)
+  }, [commissionDateFilters])
+
+  useEffect(() => {
+    loadCommissions()
+  }, [loadCommissions])
+
   // ── Cost modal lifecycle ──
   useEffect(() => {
     if (costModal) {
@@ -314,6 +330,7 @@ export function CostsPage() {
   const filteredCosts = filterCategory ? costs.filter((c) => c.category === filterCategory) : costs
   const totalCosts = filteredCosts.reduce((s, c) => s + c.value, 0)
   const totalFuel = fuelRecords.reduce((s, f) => s + f.value, 0)
+  const totalCommission = commissionData.reduce((s, c) => s + c.total_commission, 0)
 
   return (
     <div className="p-12 max-w-7xl mx-auto">
@@ -350,6 +367,18 @@ export function CostsPage() {
         >
           <span className="material-symbols-outlined text-lg">local_gas_station</span>
           Abastecimentos
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('commissions')}
+          className={`flex items-center gap-2 px-5 py-3 text-sm font-bold transition-all border-b-2 -mb-px ${
+            activeTab === 'commissions'
+              ? 'border-primary text-primary'
+              : 'border-transparent text-on-surface-variant hover:text-on-surface'
+          }`}
+        >
+          <span className="material-symbols-outlined text-lg">payments</span>
+          Comissões
         </button>
       </div>
 
@@ -626,6 +655,76 @@ export function CostsPage() {
                           <span className="material-symbols-outlined text-xl">delete</span>
                         </button>
                       </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* ── COMMISSIONS TAB ── */}
+      {activeTab === 'commissions' && (
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div className="bg-surface-container-low px-5 py-3 rounded-xl">
+              <p className="text-xs text-on-surface-variant mb-0.5">Total de Comissões</p>
+              <p className="text-2xl font-black font-headline text-primary">
+                {formatBRL(totalCommission)}
+              </p>
+            </div>
+          </div>
+
+          {/* Filters */}
+          <div className="bg-surface-container-low p-4 rounded-xl border border-outline-variant/10 flex flex-wrap items-end gap-4">
+            <div className="flex-1 min-w-[160px]">
+              <DatePicker
+                label="Data Inicial"
+                value={commissionDateFilters.start}
+                onChange={(e) => setCommissionDateFilters((f) => ({ ...f, start: e.target.value }))}
+              />
+            </div>
+            <div className="flex-1 min-w-[160px]">
+              <DatePicker
+                label="Data Final"
+                value={commissionDateFilters.end}
+                onChange={(e) => setCommissionDateFilters((f) => ({ ...f, end: e.target.value }))}
+              />
+            </div>
+          </div>
+
+          <div className="bg-surface-container rounded-2xl overflow-hidden border border-outline-variant/10">
+            <table className="w-full text-left">
+              <thead>
+                <tr className="bg-surface-container-high">
+                  {['Motorista', 'Viagens', 'Comissão Total'].map((h) => (
+                    <th
+                      key={h}
+                      className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-on-surface-variant"
+                    >
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-outline-variant/10">
+                {commissionData.length === 0 && (
+                  <tr>
+                    <td
+                      colSpan={3}
+                      className="px-6 py-12 text-center text-on-surface-variant text-sm"
+                    >
+                      Nenhuma comissão no período
+                    </td>
+                  </tr>
+                )}
+                {commissionData.map((row) => (
+                  <tr key={row.id} className="hover:bg-surface-bright/5 transition-colors">
+                    <td className="px-6 py-4 font-bold text-on-surface text-sm">{row.name}</td>
+                    <td className="px-6 py-4 text-sm text-on-surface-variant">{row.trip_count}</td>
+                    <td className="px-6 py-4 font-black font-headline text-on-surface text-sm">
+                      {formatBRL(row.total_commission)}
                     </td>
                   </tr>
                 ))}

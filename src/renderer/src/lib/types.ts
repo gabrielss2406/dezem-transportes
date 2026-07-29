@@ -231,6 +231,13 @@ export interface DashboardSummary {
   }>
 }
 
+export interface CommissionByDriver {
+  id: number
+  name: string
+  total_commission: number
+  trip_count: number
+}
+
 // Augment Window
 declare global {
   interface Window {
@@ -325,6 +332,7 @@ declare global {
       }
       dashboard: {
         summary(startDate: string, endDate: string): Promise<DashboardSummary>
+        commissionByDriver(startDate: string, endDate: string): Promise<CommissionByDriver[]>
       }
       backup: {
         getConfig(): Promise<import('../../../shared/types').BackupConfig | null>

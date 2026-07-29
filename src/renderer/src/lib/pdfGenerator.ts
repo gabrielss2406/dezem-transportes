@@ -6,10 +6,11 @@ interface PdfOptions {
   subtitle?: string
   headers: string[]
   data: (string | number)[][]
+  foot?: (string | number)[][]
   // fileName: string // Removido
 }
 
-export function generatePdf({ title, subtitle, headers, data }: PdfOptions): ArrayBuffer {
+export function generatePdf({ title, subtitle, headers, data, foot }: PdfOptions): ArrayBuffer {
   // Alterada a assinatura
   const doc = new jsPDF()
 
@@ -41,6 +42,7 @@ export function generatePdf({ title, subtitle, headers, data }: PdfOptions): Arr
     startY: startY,
     head: [headers],
     body: data,
+    foot: foot,
     theme: 'striped',
     styles: {
       font: 'helvetica',
@@ -55,6 +57,12 @@ export function generatePdf({ title, subtitle, headers, data }: PdfOptions): Arr
     },
     alternateRowStyles: {
       fillColor: surfaceLow,
+    },
+    footStyles: {
+      fillColor: surfaceLow,
+      textColor: primaryColor,
+      fontStyle: 'bold',
+      halign: 'left',
     },
   })
 
