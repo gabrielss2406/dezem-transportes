@@ -119,6 +119,18 @@ export function setupDatabase(): void {
       created_at    TEXT DEFAULT (datetime('now'))
     );
 
+    -- Receivables (Contas a Receber) — 1:1 mirror of trips
+    CREATE TABLE IF NOT EXISTS receivables (
+      id           INTEGER PRIMARY KEY AUTOINCREMENT,
+      trip_id      INTEGER NOT NULL UNIQUE REFERENCES trips(id) ON DELETE CASCADE,
+      customer_id  INTEGER REFERENCES customers(id),
+      amount       REAL NOT NULL DEFAULT 0,
+      status       TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open','paid')),
+      due_date     TEXT DEFAULT NULL,
+      paid_date    TEXT DEFAULT NULL,
+      created_at   TEXT DEFAULT (datetime('now'))
+    );
+
     -- Cost Categories (for settings)
     CREATE TABLE IF NOT EXISTS cost_categories (
       id            INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -215,6 +227,16 @@ export function setupDatabase(): void {
     CREATE INDEX IF NOT EXISTS idx_maintenance_records_type  ON maintenance_records(maintenance_type_id);
     CREATE INDEX IF NOT EXISTS idx_fuel_records_truck ON fuel_records(truck_id);
     CREATE INDEX IF NOT EXISTS idx_fuel_records_date  ON fuel_records(date);
+    CREATE INDEX IF NOT EXISTS idx_receivables_customer ON receivables(customer_id);
+    CREATE INDEX IF NOT EXISTS idx_receivables_status ON receivables(status);
+  `)
+
+  // Backfill: create an 'open' receivable for any pre-existing trip that doesn't have one yet.
+  // Plain SQL, naturally idempotent — safe to run on every startup.
+  db.exec(`
+    INSERT INTO receivables (trip_id, customer_id, amount, status, created_at)
+    SELECT id, customer_id, price_charged, 'open', created_at FROM trips
+    WHERE id NOT IN (SELECT trip_id FROM receivables)
   `)
 
   // Seed: default admin user if none exists
@@ -375,6 +397,19 @@ export function setupDatabase(): void {
   if (!driverInfo.some((col) => col.name === 'commission_rate_override')) {
     db.exec('ALTER TABLE drivers ADD COLUMN commission_rate_override REAL DEFAULT NULL')
   }
+
+  // Migration: Add installment fields to costs if missing
+  const costInfo = db.pragma('table_info(costs)') as { name: string }[]
+  if (!costInfo.some((col) => col.name === 'installment_group_id')) {
+    db.exec('ALTER TABLE costs ADD COLUMN installment_group_id TEXT DEFAULT NULL')
+  }
+  if (!costInfo.some((col) => col.name === 'installment_number')) {
+    db.exec('ALTER TABLE costs ADD COLUMN installment_number INTEGER DEFAULT NULL')
+  }
+  if (!costInfo.some((col) => col.name === 'installment_total')) {
+    db.exec('ALTER TABLE costs ADD COLUMN installment_total INTEGER DEFAULT NULL')
+  }
+  db.exec('CREATE INDEX IF NOT EXISTS idx_costs_installment_group ON costs(installment_group_id)')
 
   // Seed: default supplier types if none exist
   const supplierTypeCount = (db.prepare('SELECT COUNT(*) as c FROM supplier_types').get() as any).c

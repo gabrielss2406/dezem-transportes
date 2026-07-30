@@ -217,11 +217,20 @@ export const maintenanceRecordSchema = z.object({
 export const costSchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data inválida'),
   category: z.string().min(1, 'Selecione uma categoria'),
-  value: requiredNumber(1000000, 'Valor máximo de R$ 1.000.000'),
+  value: requiredNumber(1000000, 'Valor máximo de R$ 1.000.000'), // "valor total" quando installments > 1
   truck_id: optionalNumber(999999999, 'ID inválido'),
   supplier_id: optionalNumber(999999999, 'ID inválido'),
   driver_id: optionalNumber(999999999, 'ID inválido'),
   description: z.string().max(255).optional(),
+  installments: z.preprocess(
+    (val) => (val === '' || val === null || val === undefined ? 1 : Number(val)),
+    z.number().int().min(1, 'Mínimo de 1 parcela').max(360, 'Máximo de 360 parcelas'),
+  ),
+})
+
+export const receivablesMarkPaidSchema = z.object({
+  ids: z.array(idSchema).min(1, 'Selecione ao menos um item'),
+  paid_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data inválida'),
 })
 
 export const customerPriceSchema = z.object({

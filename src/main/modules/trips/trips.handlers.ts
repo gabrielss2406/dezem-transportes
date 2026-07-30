@@ -135,6 +135,12 @@ export function registerTripHandlers(): void {
 
       const tripId = res.lastInsertRowid
 
+      db()
+        .prepare(
+          `INSERT INTO receivables (trip_id, customer_id, amount, status) VALUES (?, ?, ?, 'open')`,
+        )
+        .run(tripId, tripData.customer_id || null, tripData.price_charged)
+
       if (fuel_stops && fuel_stops.length > 0) {
         const insertStop = db().prepare(
           'INSERT INTO trip_fuel_stops (trip_id, supplier_id, value, liters, km_driven) VALUES (?, ?, ?, ?, ?)',
@@ -191,6 +197,14 @@ export function registerTripHandlers(): void {
           id,
         )
 
+      // Only sync while the receivable is still open — a receivable already marked
+      // 'paid' must not be reopened/changed by a later edit of the trip.
+      db()
+        .prepare(
+          `UPDATE receivables SET customer_id = ?, amount = ? WHERE trip_id = ? AND status = 'open'`,
+        )
+        .run(tripData.customer_id || null, tripData.price_charged, id)
+
       // The trip entry form no longer manages fuel stops (handled by the Cost Records
       // module), so it never sends `fuel_stops`. Only touch existing stops when a
       // caller explicitly provides the field, to avoid wiping historical records.
@@ -210,6 +224,17 @@ export function registerTripHandlers(): void {
   })
 
   createIdValidatedHandler('trips:delete', (id) => {
+    const receivable = db().prepare('SELECT status FROM receivables WHERE trip_id = ?').get(id) as
+      | { status: string }
+      | undefined
+    if (receivable?.status === 'paid') {
+      return {
+        ok: false,
+        errors: {
+          form: 'Não é possível excluir: o recebível desta viagem já foi baixado (pago).',
+        },
+      }
+    }
     db().prepare('DELETE FROM trips WHERE id = ?').run(id)
     return { ok: true }
   })

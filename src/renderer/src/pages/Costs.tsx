@@ -16,8 +16,8 @@ import {
   Toast,
   useToast,
 } from '../components/ui'
-import type { Cost, Driver, FuelRecord, Supplier, Truck } from '../lib/types'
-import { currentMonthKey, formatBRL, formatDate, today } from '../lib/utils'
+import type { CommissionByDriver, Cost, Driver, FuelRecord, Supplier, Truck } from '../lib/types'
+import { currentMonthKey, currentMonthRange, formatBRL, formatDate, today } from '../lib/utils'
 
 interface CostFormData {
   date: string
@@ -27,6 +27,7 @@ interface CostFormData {
   supplier_id: number | null
   driver_id: number | null
   description?: string
+  installments: number
 }
 
 interface FuelFormData {
@@ -47,6 +48,7 @@ const EMPTY_COST: CostFormData = {
   supplier_id: null,
   driver_id: null,
   description: '',
+  installments: 1,
 }
 
 const EMPTY_FUEL: FuelFormData = {
@@ -69,7 +71,11 @@ const categoryBadge: Record<string, string> = {
 }
 
 export function CostsPage() {
-  const [activeTab, setActiveTab] = useState<'costs' | 'fuel'>('costs')
+  const [activeTab, setActiveTab] = useState<'costs' | 'fuel' | 'commissions'>('costs')
+
+  // ── Commissions state ──
+  const [commissionData, setCommissionData] = useState<CommissionByDriver[]>([])
+  const [commissionDateFilters, setCommissionDateFilters] = useState(currentMonthRange())
 
   // ── Costs state ──
   const [costs, setCosts] = useState<Cost[]>([])
@@ -109,16 +115,19 @@ export function CostsPage() {
   const categorySelectRef = useRef<SelectRef>(null)
   const dateRef = useRef<HTMLInputElement>(null)
   const valueRef = useRef<HTMLInputElement>(null)
+  const installmentsRef = useRef<HTMLInputElement>(null)
   const truckSelectRef = useRef<SelectRef>(null)
   const supplierSelectRef = useRef<SelectRef>(null)
   const driverSelectRef = useRef<SelectRef>(null)
   const descRef = useRef<HTMLInputElement>(null)
+  const [isInstallment, setIsInstallment] = useState(false)
 
   const {
     handleSubmit: handleCostSubmit,
     formState: { errors: costErrors, isDirty: isCostDirty },
     reset: resetCost,
     control: costControl,
+    setValue: setCostValue,
   } = useForm<CostFormData>({
     resolver: zodResolver(costSchema) as any,
     defaultValues: { ...EMPTY_COST },
@@ -198,6 +207,18 @@ export function CostsPage() {
     loadFuel()
   }, [loadFuel])
 
+  const loadCommissions = useCallback(async () => {
+    const c = await window.api.dashboard.commissionByDriver(
+      commissionDateFilters.start,
+      commissionDateFilters.end,
+    )
+    setCommissionData(c)
+  }, [commissionDateFilters])
+
+  useEffect(() => {
+    loadCommissions()
+  }, [loadCommissions])
+
   // ── Cost modal lifecycle ──
   useEffect(() => {
     if (costModal) {
@@ -207,6 +228,7 @@ export function CostsPage() {
       }, 200)
     } else {
       resetCost(EMPTY_COST)
+      setIsInstallment(false)
     }
   }, [costModal, resetCost])
 
@@ -314,6 +336,7 @@ export function CostsPage() {
   const filteredCosts = filterCategory ? costs.filter((c) => c.category === filterCategory) : costs
   const totalCosts = filteredCosts.reduce((s, c) => s + c.value, 0)
   const totalFuel = fuelRecords.reduce((s, f) => s + f.value, 0)
+  const totalCommission = commissionData.reduce((s, c) => s + c.total_commission, 0)
 
   return (
     <div className="p-12 max-w-7xl mx-auto">
@@ -350,6 +373,18 @@ export function CostsPage() {
         >
           <span className="material-symbols-outlined text-lg">local_gas_station</span>
           Abastecimentos
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('commissions')}
+          className={`flex items-center gap-2 px-5 py-3 text-sm font-bold transition-all border-b-2 -mb-px ${
+            activeTab === 'commissions'
+              ? 'border-primary text-primary'
+              : 'border-transparent text-on-surface-variant hover:text-on-surface'
+          }`}
+        >
+          <span className="material-symbols-outlined text-lg">payments</span>
+          Comissões
         </button>
       </div>
 
@@ -471,6 +506,11 @@ export function CostsPage() {
                         </p>
                         {row.supplier_name && (
                           <p className="text-[10px] text-on-surface-variant">{row.supplier_name}</p>
+                        )}
+                        {row.installment_number && row.installment_total && (
+                          <p className="text-[10px] text-primary font-bold mt-0.5">
+                            Parcela {row.installment_number}/{row.installment_total}
+                          </p>
                         )}
                       </td>
                       <td className="px-6 py-4 text-sm font-mono text-on-surface-variant">
@@ -635,6 +675,76 @@ export function CostsPage() {
         </div>
       )}
 
+      {/* ── COMMISSIONS TAB ── */}
+      {activeTab === 'commissions' && (
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div className="bg-surface-container-low px-5 py-3 rounded-xl">
+              <p className="text-xs text-on-surface-variant mb-0.5">Total de Comissões</p>
+              <p className="text-2xl font-black font-headline text-primary">
+                {formatBRL(totalCommission)}
+              </p>
+            </div>
+          </div>
+
+          {/* Filters */}
+          <div className="bg-surface-container-low p-4 rounded-xl border border-outline-variant/10 flex flex-wrap items-end gap-4">
+            <div className="flex-1 min-w-[160px]">
+              <DatePicker
+                label="Data Inicial"
+                value={commissionDateFilters.start}
+                onChange={(e) => setCommissionDateFilters((f) => ({ ...f, start: e.target.value }))}
+              />
+            </div>
+            <div className="flex-1 min-w-[160px]">
+              <DatePicker
+                label="Data Final"
+                value={commissionDateFilters.end}
+                onChange={(e) => setCommissionDateFilters((f) => ({ ...f, end: e.target.value }))}
+              />
+            </div>
+          </div>
+
+          <div className="bg-surface-container rounded-2xl overflow-hidden border border-outline-variant/10">
+            <table className="w-full text-left">
+              <thead>
+                <tr className="bg-surface-container-high">
+                  {['Motorista', 'Viagens', 'Comissão Total'].map((h) => (
+                    <th
+                      key={h}
+                      className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-on-surface-variant"
+                    >
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-outline-variant/10">
+                {commissionData.length === 0 && (
+                  <tr>
+                    <td
+                      colSpan={3}
+                      className="px-6 py-12 text-center text-on-surface-variant text-sm"
+                    >
+                      Nenhuma comissão no período
+                    </td>
+                  </tr>
+                )}
+                {commissionData.map((row) => (
+                  <tr key={row.id} className="hover:bg-surface-bright/5 transition-colors">
+                    <td className="px-6 py-4 font-bold text-on-surface text-sm">{row.name}</td>
+                    <td className="px-6 py-4 text-sm text-on-surface-variant">{row.trip_count}</td>
+                    <td className="px-6 py-4 font-black font-headline text-on-surface text-sm">
+                      {formatBRL(row.total_commission)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
       {/* ── COST MODAL ── */}
       {costModal && (
         <Modal title="Novo Custo" onClose={() => setCostModal(false)} onEscape={handleCostEscape}>
@@ -662,7 +772,7 @@ export function CostsPage() {
               render={({ field }) => (
                 <DatePicker
                   ref={dateRef}
-                  label="Data"
+                  label={isInstallment ? 'Data da 1ª parcela' : 'Data'}
                   value={field.value}
                   onChange={field.onChange}
                   error={costErrors.date?.message}
@@ -681,19 +791,75 @@ export function CostsPage() {
               render={({ field }) => (
                 <CurrencyInput
                   ref={valueRef}
-                  label="Valor"
+                  label={isInstallment ? 'Valor total' : 'Valor'}
                   value={field.value}
                   onChange={field.onChange}
                   error={costErrors.value?.message}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') {
                       e.preventDefault()
-                      truckSelectRef.current?.open()
+                      if (isInstallment) {
+                        installmentsRef.current?.focus()
+                      } else {
+                        truckSelectRef.current?.open()
+                      }
                     }
                   }}
                 />
               )}
             />
+
+            {/* Installment toggle */}
+            <div className="col-span-2 flex items-center gap-3 py-1">
+              <button
+                type="button"
+                role="switch"
+                aria-checked={isInstallment}
+                onClick={() => {
+                  const next = !isInstallment
+                  setIsInstallment(next)
+                  setCostValue('installments', next ? 2 : 1)
+                }}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${
+                  isInstallment ? 'bg-primary' : 'bg-outline-variant'
+                }`}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+                    isInstallment ? 'translate-x-6' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+              <span className="text-sm text-on-surface-variant">Parcelar</span>
+            </div>
+
+            {isInstallment && (
+              <div className="col-span-2">
+                <Controller
+                  name="installments"
+                  control={costControl}
+                  render={({ field }) => (
+                    <Input
+                      ref={installmentsRef}
+                      label="Número de parcelas"
+                      type="number"
+                      min={1}
+                      max={360}
+                      value={field.value}
+                      onChange={(e) => field.onChange(Number(e.target.value))}
+                      error={costErrors.installments?.message}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault()
+                          truckSelectRef.current?.open()
+                        }
+                      }}
+                    />
+                  )}
+                />
+              </div>
+            )}
+
             <Controller
               name="truck_id"
               control={costControl}

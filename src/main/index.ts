@@ -18,6 +18,7 @@ import { registerDriverHandlers } from './modules/drivers/drivers.handlers'
 import { registerFuelHandlers } from './modules/fuel/fuel.handlers'
 import { registerMaintenanceHandlers } from './modules/maintenance/maintenance.handlers'
 import { registerProductHandlers } from './modules/products/products.handlers'
+import { registerReceivablesHandlers } from './modules/receivables/receivables.handlers'
 import { registerSettingsHandlers } from './modules/settings/settings.handlers'
 import { registerSupplierTypesHandlers } from './modules/supplier-types/supplier-types.handlers'
 import { registerSupplierHandlers } from './modules/suppliers/suppliers.handlers'
@@ -55,6 +56,7 @@ app.whenReady().then(async () => {
   registerDashboardHandlers()
   registerDriverHandlers()
   registerProductHandlers()
+  registerReceivablesHandlers()
   registerSettingsHandlers()
   registerSupplierHandlers()
   registerSupplierTypesHandlers()

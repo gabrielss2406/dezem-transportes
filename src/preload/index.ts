@@ -129,6 +129,16 @@ contextBridge.exposeInMainWorld('api', {
   dashboard: {
     summary: (startDate: string, endDate: string) =>
       ipcRenderer.invoke('dashboard:summary', startDate, endDate),
+    commissionByDriver: (startDate: string, endDate: string) =>
+      ipcRenderer.invoke('dashboard:commissionByDriver', startDate, endDate),
+  },
+
+  // Receivables
+  receivables: {
+    list: (filters?: any) => ipcRenderer.invoke('receivables:list', filters),
+    markPaid: (data: { ids: number[]; paid_date: string }) =>
+      ipcRenderer.invoke('receivables:markPaid', data),
+    summaryByCustomer: () => ipcRenderer.invoke('receivables:summaryByCustomer'),
   },
 
   // Backup

@@ -324,7 +324,12 @@ export function TripsPage() {
     if (!deleteTarget) {
       return
     }
-    await window.api.trips.delete(deleteTarget.id)
+    const result = await window.api.trips.delete(deleteTarget.id)
+    if (result?.ok === false) {
+      setDeleteTarget(null)
+      show(result.errors?.form || 'Não foi possível excluir o lançamento', 'error')
+      return
+    }
     show('Lançamento excluído', 'success')
     setDeleteTarget(null)
     load()
@@ -415,23 +420,26 @@ export function TripsPage() {
         }}
         secondaryActionLabel="Exportar para PDF"
         onSecondaryAction={async () => {
-          const headers = [
+          const isCustomerScoped = !!filters.customer_id
+
+          const baseHeaders = [
             'Data',
+            'Bilhete',
             'Caminhão',
             'Motorista',
             'Produto',
             'Peso',
             'Km',
             'Valor',
-            'Imposto',
-            'Comissão',
-            'Cliente',
           ]
+          const headers = isCustomerScoped
+            ? [...baseHeaders, 'Cliente']
+            : [...baseHeaders, 'Imposto', 'Comissão', 'Cliente']
+
           const data = trips.map((trip) => {
-            const imposto = trip.tax_value ? formatBRL(trip.tax_value) : '—'
-            const comissao = trip.commission_value ? formatBRL(trip.commission_value) : '—'
-            return [
+            const baseRow = [
               formatDate(trip.date),
+              trip.ticket_number || '—',
               trip.truck_license_plate ?? '—',
               trip.driver_name ?? '—',
               trip.product_name ?? '—',
@@ -440,11 +448,42 @@ export function TripsPage() {
                 : `${trip.weight_ton} ton`,
               `${trip.km_driven} km`,
               formatBRL(trip.price_charged),
-              imposto,
-              comissao,
-              trip.customer_name ?? '—',
             ]
+            if (isCustomerScoped) {
+              return [...baseRow, trip.customer_name ?? '—']
+            }
+            const imposto = trip.tax_value ? formatBRL(trip.tax_value) : '—'
+            const comissao = trip.commission_value ? formatBRL(trip.commission_value) : '—'
+            return [...baseRow, imposto, comissao, trip.customer_name ?? '—']
           })
+
+          const totalWeight = trips.reduce(
+            (sum, trip) => sum + trip.weight_ton + (trip.overweight_ton || 0),
+            0,
+          )
+          const totalKm = trips.reduce((sum, trip) => sum + trip.km_driven, 0)
+          const totalValue = trips.reduce((sum, trip) => sum + trip.price_charged, 0)
+
+          const footBaseRow = [
+            'TOTAL',
+            '',
+            '',
+            '',
+            '',
+            `${totalWeight} ton`,
+            `${totalKm} km`,
+            formatBRL(totalValue),
+          ]
+          const foot = isCustomerScoped
+            ? [[...footBaseRow, '']]
+            : [
+                [
+                  ...footBaseRow,
+                  formatBRL(trips.reduce((sum, trip) => sum + (trip.tax_value || 0), 0)),
+                  formatBRL(trips.reduce((sum, trip) => sum + (trip.commission_value || 0), 0)),
+                  '',
+                ],
+              ]
 
           // Resolver nomes dos filtros
           const filterParts: string[] = []
@@ -506,6 +545,7 @@ export function TripsPage() {
             subtitle,
             headers,
             data,
+            foot,
           })
 
           try {

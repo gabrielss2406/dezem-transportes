@@ -13,6 +13,7 @@ const navItems = [
   { path: '/trips', label: 'Lançamentos', icon: 'route' },
   { path: '/maintenance', label: 'Manutenção', icon: 'build' },
   { path: '/costs', label: 'Custos', icon: 'payments' },
+  { path: '/receivables', label: 'Contas a Receber', icon: 'account_balance_wallet' },
   { path: '/settings', label: 'Configurações', icon: 'settings' },
 ]
 
