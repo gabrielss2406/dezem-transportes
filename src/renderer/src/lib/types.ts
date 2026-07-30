@@ -357,7 +357,11 @@ declare global {
       }
       dashboard: {
         summary(startDate: string, endDate: string): Promise<DashboardSummary>
-        commissionByDriver(startDate: string, endDate: string): Promise<CommissionByDriver[]>
+        commissionByDriver(
+          startDate: string,
+          endDate: string,
+          driverId?: number | string,
+        ): Promise<CommissionByDriver[]>
       }
       receivables: {
         list(filters?: any): Promise<Receivable[]>

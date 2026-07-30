@@ -129,8 +129,8 @@ contextBridge.exposeInMainWorld('api', {
   dashboard: {
     summary: (startDate: string, endDate: string) =>
       ipcRenderer.invoke('dashboard:summary', startDate, endDate),
-    commissionByDriver: (startDate: string, endDate: string) =>
-      ipcRenderer.invoke('dashboard:commissionByDriver', startDate, endDate),
+    commissionByDriver: (startDate: string, endDate: string, driverId?: number | string) =>
+      ipcRenderer.invoke('dashboard:commissionByDriver', startDate, endDate, driverId),
   },
 
   // Receivables

@@ -75,7 +75,10 @@ export function CostsPage() {
 
   // ── Commissions state ──
   const [commissionData, setCommissionData] = useState<CommissionByDriver[]>([])
-  const [commissionDateFilters, setCommissionDateFilters] = useState(currentMonthRange())
+  const [commissionDateFilters, setCommissionDateFilters] = useState({
+    ...currentMonthRange(),
+    driver_id: '',
+  })
 
   // ── Costs state ──
   const [costs, setCosts] = useState<Cost[]>([])
@@ -211,6 +214,7 @@ export function CostsPage() {
     const c = await window.api.dashboard.commissionByDriver(
       commissionDateFilters.start,
       commissionDateFilters.end,
+      commissionDateFilters.driver_id || undefined,
     )
     setCommissionData(c)
   }, [commissionDateFilters])
@@ -701,6 +705,27 @@ export function CostsPage() {
                 label="Data Final"
                 value={commissionDateFilters.end}
                 onChange={(e) => setCommissionDateFilters((f) => ({ ...f, end: e.target.value }))}
+              />
+            </div>
+            <div className="flex-1 min-w-[150px]">
+              <Select
+                label="Motorista"
+                value={commissionDateFilters.driver_id}
+                onChange={(v) => setCommissionDateFilters((f) => ({ ...f, driver_id: v }))}
+                options={drivers.map((d) => ({
+                  value: d.id,
+                  label: (
+                    <div className="flex justify-between">
+                      <span>{d.name}</span>
+                      {d.customId && (
+                        <span className="text-on-surface-variant/50">#{d.customId}</span>
+                      )}
+                    </div>
+                  ),
+                  displayLabel: d.name,
+                  searchableLabel: `${d.name} ${d.customId || ''}`,
+                }))}
+                optional
               />
             </div>
           </div>
