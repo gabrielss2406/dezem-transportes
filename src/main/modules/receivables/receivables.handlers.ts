@@ -26,6 +26,14 @@ export function registerReceivablesHandlers(): void {
       query += ' AND r.status = ?'
       params.push(filters.status)
     }
+    if (filters.startDate) {
+      query += ' AND t.date >= ?'
+      params.push(filters.startDate)
+    }
+    if (filters.endDate) {
+      query += ' AND t.date <= ?'
+      params.push(filters.endDate)
+    }
     query += ' ORDER BY t.date DESC'
     return db()
       .prepare(query)

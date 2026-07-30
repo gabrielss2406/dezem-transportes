@@ -1,14 +1,21 @@
 import { useCallback, useEffect, useState } from 'react'
 import { PageHeader } from '../components/PageHeader'
-import { Button, DatePicker, KpiCard, Modal, Select, Toast, useToast } from '../components/ui'
+import { Button, DatePicker, Modal, Select, Toast, useToast } from '../components/ui'
 import type { Customer, Receivable } from '../lib/types'
 import { formatBRL, formatDate, today } from '../lib/utils'
 
 export function ReceivablesPage() {
   const [customers, setCustomers] = useState<Customer[]>([])
-  const [filters, setFilters] = useState<{ customer_id: string; status: string }>({
+  const [filters, setFilters] = useState<{
+    customer_id: string
+    status: string
+    startDate: string
+    endDate: string
+  }>({
     customer_id: '',
     status: 'open',
+    startDate: '',
+    endDate: '',
   })
   const [receivables, setReceivables] = useState<Receivable[]>([])
   const [openTotals, setOpenTotals] = useState({ amount: 0, count: 0 })
@@ -25,6 +32,8 @@ export function ReceivablesPage() {
     const r = await window.api.receivables.list({
       customer_id: filters.customer_id || undefined,
       status: filters.status || undefined,
+      startDate: filters.startDate || undefined,
+      endDate: filters.endDate || undefined,
     })
     setReceivables(r)
     setSelectedIds(new Set())
@@ -73,6 +82,11 @@ export function ReceivablesPage() {
     .filter((r) => selectedIds.has(r.id))
     .reduce((s, r) => s + r.amount, 0)
 
+  const markSingleAsPaid = (id: number) => {
+    setSelectedIds(new Set([id]))
+    setMarkPaidModal(true)
+  }
+
   const handleMarkPaid = async () => {
     const result = await window.api.receivables.markPaid({
       ids: Array.from(selectedIds),
@@ -100,8 +114,29 @@ export function ReceivablesPage() {
       />
 
       <div className="grid grid-cols-2 gap-4 mb-8">
-        <KpiCard label="Total em Aberto" value={formatBRL(openTotals.amount)} accent />
-        <KpiCard label="Qtde em Aberto" value={String(openTotals.count)} />
+        {[
+          {
+            label: 'Total em Aberto',
+            value: formatBRL(openTotals.amount),
+            icon: 'account_balance_wallet',
+          },
+          { label: 'Qtde em Aberto', value: String(openTotals.count), icon: 'receipt_long' },
+        ].map(({ label, value, icon }) => (
+          <div
+            key={label}
+            className="bg-surface-container-low p-6 rounded-xl flex items-center gap-4 border border-outline-variant/5 shadow-sm"
+          >
+            <div className="w-12 h-12 bg-surface-container rounded-lg flex items-center justify-center shrink-0">
+              <span className="material-symbols-outlined text-primary">{icon}</span>
+            </div>
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant">
+                {label}
+              </p>
+              <p className="text-xl font-black text-on-surface font-headline">{value}</p>
+            </div>
+          </div>
+        ))}
       </div>
 
       <div className="bg-surface-container-low p-4 rounded-xl border border-outline-variant/10 flex flex-wrap items-end gap-4 mb-6">
@@ -131,16 +166,36 @@ export function ReceivablesPage() {
             ]}
           />
         </div>
+        <div className="flex-1 min-w-[160px]">
+          <DatePicker
+            label="Data Inicial"
+            value={filters.startDate}
+            onChange={(e) => setFilters((f) => ({ ...f, startDate: e.target.value }))}
+          />
+        </div>
+        <div className="flex-1 min-w-[160px]">
+          <DatePicker
+            label="Data Final"
+            value={filters.endDate}
+            onChange={(e) => setFilters((f) => ({ ...f, endDate: e.target.value }))}
+          />
+        </div>
       </div>
 
-      {selectedIds.size > 0 && (
-        <div className="flex items-center justify-between bg-primary/10 border border-primary/20 rounded-xl px-5 py-3 mb-4">
-          <p className="text-sm font-bold text-primary">
-            {selectedIds.size} selecionado(s) · {formatBRL(selectedTotal)}
-          </p>
-          <Button onClick={() => setMarkPaidModal(true)}>Dar baixa</Button>
+      <div
+        className={`grid transition-[grid-template-rows] duration-200 ease-in-out ${
+          selectedIds.size > 0 ? 'grid-rows-[1fr] mb-4' : 'grid-rows-[0fr]'
+        }`}
+      >
+        <div className="overflow-hidden">
+          <div className="flex items-center justify-between bg-primary/10 border border-primary/20 rounded-xl px-5 py-3">
+            <p className="text-sm font-bold text-primary">
+              {selectedIds.size} selecionado(s) · {formatBRL(selectedTotal)}
+            </p>
+            <Button onClick={() => setMarkPaidModal(true)}>Dar baixa</Button>
+          </div>
         </div>
-      )}
+      </div>
 
       <div className="bg-surface-container rounded-xl overflow-hidden border border-outline-variant/10">
         <table className="w-full text-left border-collapse">
@@ -156,7 +211,7 @@ export function ReceivablesPage() {
                   />
                 )}
               </th>
-              {['Data', 'Bilhete', 'Cliente', 'Valor', 'Status'].map((h) => (
+              {['Data', 'Bilhete', 'Cliente', 'Valor', 'Status', ''].map((h) => (
                 <th
                   key={h}
                   className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-on-surface-variant"
@@ -169,13 +224,13 @@ export function ReceivablesPage() {
           <tbody className="divide-y divide-outline-variant/10">
             {receivables.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-6 py-12 text-center text-on-surface-variant text-sm">
+                <td colSpan={7} className="px-6 py-12 text-center text-on-surface-variant text-sm">
                   Nenhum recebível encontrado
                 </td>
               </tr>
             )}
             {receivables.map((row) => (
-              <tr key={row.id} className="hover:bg-surface-bright/5 transition-colors">
+              <tr key={row.id} className="hover:bg-surface-bright/5 transition-colors group">
                 <td className="px-6 py-4">
                   {row.status === 'open' && (
                     <input
@@ -206,6 +261,20 @@ export function ReceivablesPage() {
                   >
                     {row.status === 'paid' ? 'Pago' : 'Aberto'}
                   </span>
+                </td>
+                <td className="px-6 py-4">
+                  {row.status === 'open' && (
+                    <div className="flex justify-end opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button
+                        type="button"
+                        onClick={() => markSingleAsPaid(row.id)}
+                        className="p-2 text-outline hover:text-primary hover:bg-primary/10 rounded-lg transition-all"
+                        title="Dar baixa"
+                      >
+                        <span className="material-symbols-outlined text-xl">paid</span>
+                      </button>
+                    </div>
+                  )}
                 </td>
               </tr>
             ))}
