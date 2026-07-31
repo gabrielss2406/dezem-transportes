@@ -500,20 +500,26 @@ export function registerDashboardHandlers(): void {
   // Commission earned per driver, for payroll purposes — read-only aggregation.
   // Must never write to 'costs': commission is already folded into per-truck
   // profitability via trips.commission_value in the query above.
-  ipcMain.handle('dashboard:commissionByDriver', (_e, startDate: string, endDate: string) => {
-    return db()
-      .prepare(
-        `
+  ipcMain.handle(
+    'dashboard:commissionByDriver',
+    (_e, startDate: string, endDate: string, driverId?: number | string) => {
+      let query = `
       SELECT d.id, d.name,
         COALESCE(SUM(tr.commission_value), 0) as total_commission,
         COUNT(tr.id) as trip_count
       FROM trips tr
       JOIN drivers d ON tr.driver_id = d.id
       WHERE tr.has_commission = 1 AND tr.date BETWEEN ? AND ?
-      GROUP BY d.id
-      ORDER BY total_commission DESC
-    `,
-      )
-      .all(startDate, endDate)
-  })
+    `
+      const params: (string | number)[] = [startDate, endDate]
+      if (driverId) {
+        query += ' AND d.id = ?'
+        params.push(driverId)
+      }
+      query += ' GROUP BY d.id ORDER BY total_commission DESC'
+      return db()
+        .prepare(query)
+        .all(...params)
+    },
+  )
 }
