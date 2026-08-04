@@ -167,4 +167,11 @@ contextBridge.exposeInMainWorld('api', {
 
   // PDF
   exportPdf: (data: PdfExportData) => ipcRenderer.invoke('export-pdf', data),
+
+  // Cross-window data change notifications (fired after any create/update/delete mutation)
+  onDataChanged: (callback: (entity: string) => void) => {
+    const listener = (_event: any, entity: string) => callback(entity)
+    ipcRenderer.on('data:changed', listener)
+    return () => ipcRenderer.removeListener('data:changed', listener)
+  },
 })

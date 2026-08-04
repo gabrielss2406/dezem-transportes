@@ -81,9 +81,32 @@ export function DashboardPage() {
 
   useEffect(() => {
     setLoading(true)
-    window.api.dashboard.summary(range.start, range.end).then((r) => {
-      setSummary(r)
-      setLoading(false)
+    window.api.dashboard
+      .summary(range.start, range.end)
+      .then((r) => {
+        setSummary(r)
+      })
+      .catch((err) => {
+        console.error('Failed to load dashboard summary:', err)
+      })
+      .finally(() => {
+        setLoading(false)
+      })
+  }, [range])
+
+  // Trucks/trips/costs/fuel/maintenance all feed into this summary — refetch whenever any
+  // of them change elsewhere in the app, instead of only on mount or date-range change.
+  useEffect(() => {
+    const relevantEntities = new Set(['trucks', 'trips', 'costs', 'fuel', 'maintenance', 'drivers'])
+    return window.api.onDataChanged((entity) => {
+      if (relevantEntities.has(entity)) {
+        window.api.dashboard
+          .summary(range.start, range.end)
+          .then(setSummary)
+          .catch((err) => {
+            console.error('Failed to refresh dashboard summary:', err)
+          })
+      }
     })
   }, [range])
 
@@ -452,39 +475,41 @@ export function DashboardPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-outline-variant/10">
-                  {displayedTrucks.map((t) => {
-                    const trips = summary.perTruck.filter(
-                      (truck) => truck.license_plate === t.license_plate,
-                    ).length
-                    return (
-                      <tr
-                        key={t.license_plate}
-                        className="hover:bg-surface-bright/5 transition-colors"
+                  {displayedTrucks.map((t) => (
+                    <tr
+                      key={t.license_plate}
+                      className="hover:bg-surface-bright/5 transition-colors"
+                    >
+                      <td className="px-8 py-5">
+                        <p className="font-black text-on-surface">{t.license_plate}</p>
+                        <p className="text-xs text-on-surface-variant opacity-60">
+                          {t.model} · {t.km.toFixed(0)} km
+                        </p>
+                      </td>
+                      <td className="px-8 py-5 text-right font-bold text-on-surface">
+                        {t.trip_count}
+                      </td>
+                      <td className="px-8 py-5 text-right font-headline font-bold text-on-surface">
+                        {t.cpk != null ? (
+                          `R$ ${t.cpk.toFixed(2)}`
+                        ) : (
+                          <span
+                            className="text-on-surface-variant opacity-50"
+                            title="Sem leituras de odômetro suficientes no período"
+                          >
+                            N/D
+                          </span>
+                        )}
+                      </td>
+                      <td
+                        className={`px-8 py-5 text-right font-headline font-black ${
+                          t.profit >= 0 ? 'text-primary' : 'text-error'
+                        }`}
                       >
-                        <td className="px-8 py-5">
-                          <p className="font-black text-on-surface">{t.license_plate}</p>
-                          <p className="text-xs text-on-surface-variant opacity-60">
-                            {t.model} · {t.km.toFixed(0)} km
-                          </p>
-                        </td>
-                        <td className="px-8 py-5 text-right font-bold text-on-surface">
-                          {summary.totalTrips > 0
-                            ? Math.floor((t.km / summary.totalKm) * summary.totalTrips)
-                            : 0}
-                        </td>
-                        <td className="px-8 py-5 text-right font-headline font-bold text-on-surface">
-                          R$ {t.cpk.toFixed(2)}
-                        </td>
-                        <td
-                          className={`px-8 py-5 text-right font-headline font-black ${
-                            t.profit >= 0 ? 'text-primary' : 'text-error'
-                          }`}
-                        >
-                          {formatBRL(t.profit)}
-                        </td>
-                      </tr>
-                    )
-                  })}
+                        {formatBRL(t.profit)}
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
 
