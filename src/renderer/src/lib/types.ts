@@ -402,6 +402,8 @@ declare global {
       settings: {
         getApp(): Promise<import('../../../shared/types').AppSettings>
         saveApp(data: import('../../../shared/types').AppSettings): Promise<{ ok: boolean }>
+        getTripExportFields(): Promise<import('../../../shared/types').TripExportFieldsConfig>
+        saveTripExportFields(fields: string[]): Promise<{ ok: boolean }>
       }
       exportPdf(data: import('../../../shared/types').PdfExportData): Promise<{
         success: boolean

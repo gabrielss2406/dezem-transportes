@@ -20,3 +20,5 @@ export interface PdfExportData {
   fileName: string
   data: ArrayBuffer
 }
+
+export type TripExportFieldsConfig = string[] | null
