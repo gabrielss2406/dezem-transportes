@@ -163,6 +163,10 @@ contextBridge.exposeInMainWorld('api', {
   settings: {
     getApp: () => ipcRenderer.invoke('settings:get-app'),
     saveApp: (data: unknown) => ipcRenderer.invoke('settings:save-app', data),
+    getTripExportFields: (): Promise<string[] | null> =>
+      ipcRenderer.invoke('settings:get-trip-export-fields'),
+    saveTripExportFields: (fields: string[]) =>
+      ipcRenderer.invoke('settings:save-trip-export-fields', fields),
   },
 
   // PDF

@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Controller, useForm } from 'react-hook-form'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { tripSchema } from '../../../shared/schemas'
+import { FieldSelectionModal } from '../components/FieldSelectionModal'
 import { PageHeader } from '../components/PageHeader'
 import {
   Badge,
@@ -17,6 +18,7 @@ import {
   useToast,
 } from '../components/ui'
 import { generatePdf } from '../lib/pdfGenerator'
+import { TRIP_EXPORT_FIELDS, getDefaultTripExportFieldKeys } from '../lib/tripExportFields'
 import type { Customer, Driver, Product, Trip, Truck } from '../lib/types'
 import { formatBRL, formatDate, today } from '../lib/utils'
 
@@ -103,6 +105,8 @@ export function TripsPage() {
   const [appSettings, setAppSettings] = useState({ taxRate: 0, commissionRate: 0 })
   const [pendingData, setPendingData] = useState<any>(null)
   const [deleteTarget, setDeleteTarget] = useState<Trip | null>(null)
+  const [exportFieldsConfig, setExportFieldsConfig] = useState<string[] | null>(null)
+  const [showExportFieldsModal, setShowExportFieldsModal] = useState(false)
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false)
   const [showTruckBreakdown, setShowTruckBreakdown] = useState(false)
   const [showDriverBreakdown, setShowDriverBreakdown] = useState(false)
@@ -240,13 +244,14 @@ export function TripsPage() {
   }, [manualUnitPrice, noPriceRegistered, currentWeight, currentOverweight, setValue])
 
   const load = useCallback(async () => {
-    const [t, tr, d, p, c, settings] = await Promise.all([
+    const [t, tr, d, p, c, settings, exportFields] = await Promise.all([
       window.api.trips.list(filters),
       window.api.trucks.list(),
       window.api.drivers.list(),
       window.api.products.list(),
       window.api.customers.list(),
       window.api.settings.getApp(),
+      window.api.settings.getTripExportFields(),
     ])
     setTrips(t)
     setTrucks(tr)
@@ -254,6 +259,7 @@ export function TripsPage() {
     setProducts(p)
     setCustomers(c)
     setAppSettings(settings)
+    setExportFieldsConfig(exportFields)
   }, [filters])
 
   useEffect(() => {
@@ -404,6 +410,107 @@ export function TripsPage() {
     }, {}),
   ).sort((a, b) => b.count - a.count)
 
+  const buildExportFileMeta = () => {
+    const filterParts: string[] = []
+    const subtitleParts: string[] = []
+
+    if (filters.startDate || filters.endDate) {
+      const start = filters.startDate ? formatDate(filters.startDate) : 'Início'
+      const end = filters.endDate ? formatDate(filters.endDate) : 'Fim'
+      filterParts.push(`${start}_a_${end}`)
+      subtitleParts.push(`Período: ${start} a ${end}`)
+    }
+
+    if (filters.truck_id) {
+      const truck = trucks.find((t) => String(t.id) === String(filters.truck_id))
+      if (truck) {
+        filterParts.push(truck.license_plate)
+        subtitleParts.push(`Caminhão: ${truck.license_plate}`)
+      }
+    }
+
+    if (filters.driver_id) {
+      const driver = drivers.find((d) => String(d.id) === String(filters.driver_id))
+      if (driver) {
+        filterParts.push(driver.name)
+        subtitleParts.push(`Motorista: ${driver.name}`)
+      }
+    }
+
+    if (filters.customer_id) {
+      const customer = customers.find((c) => String(c.id) === String(filters.customer_id))
+      if (customer) {
+        filterParts.push(customer.name)
+        subtitleParts.push(`Cliente: ${customer.name}`)
+      }
+    }
+
+    if (filters.product_id) {
+      const product = products.find((p) => String(p.id) === String(filters.product_id))
+      if (product) {
+        filterParts.push(product.name)
+        subtitleParts.push(`Produto: ${product.name}`)
+      }
+    }
+
+    const safeFilterName = filterParts
+      .join('_')
+      .normalize('NFD')
+      .replace(/\p{Diacritic}/gu, '') // Remover acentos (Unicode Property Escape)
+      .replace(/\s+/g, '_')
+      .replace(/[^\w-]/g, '')
+
+    const fileName = safeFilterName
+      ? `relatorio_lancamentos_${safeFilterName}`
+      : 'relatorio_lancamentos'
+    const subtitle = subtitleParts.join(' | ')
+
+    return { fileName, subtitle }
+  }
+
+  const handleGenerateExport = async (selectedKeys: string[], saveAsDefault: boolean) => {
+    setShowExportFieldsModal(false)
+
+    if (saveAsDefault) {
+      setExportFieldsConfig(selectedKeys)
+      window.api.settings.saveTripExportFields(selectedKeys).catch((error) => {
+        console.error(error)
+        show('Erro ao salvar a configuração padrão de exportação.', 'error')
+      })
+    }
+
+    const fields = TRIP_EXPORT_FIELDS.filter((field) => selectedKeys.includes(field.key))
+    const headers = fields.map((field) => field.label)
+    const data = trips.map((trip) => fields.map((field) => field.getValue(trip)))
+    const foot = [fields.map((field, i) => (i === 0 ? 'TOTAL' : (field.getTotal?.(trips) ?? '')))]
+
+    const { fileName, subtitle } = buildExportFileMeta()
+
+    const pdfData = generatePdf({
+      title: 'Relatório de Lançamentos',
+      subtitle,
+      headers,
+      data,
+      foot,
+    })
+
+    try {
+      const result = await window.api.exportPdf({
+        fileName,
+        data: pdfData,
+      })
+
+      if (result.success) {
+        show(`PDF salvo e aberto com sucesso em: ${result.path}`, 'success')
+      } else {
+        show(`Erro ao exportar PDF: ${result.error}`, 'error')
+      }
+    } catch (error) {
+      show('Ocorreu um erro inesperado ao exportar o PDF.', 'error')
+      console.error(error)
+    }
+  }
+
   return (
     <div className="p-12 max-w-7xl mx-auto">
       {toast && <Toast message={toast.message} type={toast.type} />}
@@ -419,151 +526,7 @@ export function TripsPage() {
           setModal(true)
         }}
         secondaryActionLabel="Exportar para PDF"
-        onSecondaryAction={async () => {
-          const isCustomerScoped = !!filters.customer_id
-
-          const baseHeaders = [
-            'Data',
-            'Bilhete',
-            'Caminhão',
-            'Motorista',
-            'Produto',
-            'Peso',
-            'Km',
-            'Valor',
-          ]
-          const headers = isCustomerScoped
-            ? [...baseHeaders, 'Cliente']
-            : [...baseHeaders, 'Imposto', 'Comissão', 'Cliente']
-
-          const data = trips.map((trip) => {
-            const baseRow = [
-              formatDate(trip.date),
-              trip.ticket_number || '—',
-              trip.truck_license_plate ?? '—',
-              trip.driver_name ?? '—',
-              trip.product_name ?? '—',
-              trip.overweight_ton
-                ? `${trip.weight_ton} + ${trip.overweight_ton} ton (excesso)`
-                : `${trip.weight_ton} ton`,
-              `${trip.km_driven} km`,
-              formatBRL(trip.price_charged),
-            ]
-            if (isCustomerScoped) {
-              return [...baseRow, trip.customer_name ?? '—']
-            }
-            const imposto = trip.tax_value ? formatBRL(trip.tax_value) : '—'
-            const comissao = trip.commission_value ? formatBRL(trip.commission_value) : '—'
-            return [...baseRow, imposto, comissao, trip.customer_name ?? '—']
-          })
-
-          const totalWeight = trips.reduce(
-            (sum, trip) => sum + trip.weight_ton + (trip.overweight_ton || 0),
-            0,
-          )
-          const totalKm = trips.reduce((sum, trip) => sum + trip.km_driven, 0)
-          const totalValue = trips.reduce((sum, trip) => sum + trip.price_charged, 0)
-
-          const footBaseRow = [
-            'TOTAL',
-            '',
-            '',
-            '',
-            '',
-            `${totalWeight} ton`,
-            `${totalKm} km`,
-            formatBRL(totalValue),
-          ]
-          const foot = isCustomerScoped
-            ? [[...footBaseRow, '']]
-            : [
-                [
-                  ...footBaseRow,
-                  formatBRL(trips.reduce((sum, trip) => sum + (trip.tax_value || 0), 0)),
-                  formatBRL(trips.reduce((sum, trip) => sum + (trip.commission_value || 0), 0)),
-                  '',
-                ],
-              ]
-
-          // Resolver nomes dos filtros
-          const filterParts: string[] = []
-          const subtitleParts: string[] = []
-
-          if (filters.startDate || filters.endDate) {
-            const start = filters.startDate ? formatDate(filters.startDate) : 'Início'
-            const end = filters.endDate ? formatDate(filters.endDate) : 'Fim'
-            filterParts.push(`${start}_a_${end}`)
-            subtitleParts.push(`Período: ${start} a ${end}`)
-          }
-
-          if (filters.truck_id) {
-            const truck = trucks.find((t) => String(t.id) === String(filters.truck_id))
-            if (truck) {
-              filterParts.push(truck.license_plate)
-              subtitleParts.push(`Caminhão: ${truck.license_plate}`)
-            }
-          }
-
-          if (filters.driver_id) {
-            const driver = drivers.find((d) => String(d.id) === String(filters.driver_id))
-            if (driver) {
-              filterParts.push(driver.name)
-              subtitleParts.push(`Motorista: ${driver.name}`)
-            }
-          }
-
-          if (filters.customer_id) {
-            const customer = customers.find((c) => String(c.id) === String(filters.customer_id))
-            if (customer) {
-              filterParts.push(customer.name)
-              subtitleParts.push(`Cliente: ${customer.name}`)
-            }
-          }
-
-          if (filters.product_id) {
-            const product = products.find((p) => String(p.id) === String(filters.product_id))
-            if (product) {
-              filterParts.push(product.name)
-              subtitleParts.push(`Produto: ${product.name}`)
-            }
-          }
-
-          const safeFilterName = filterParts
-            .join('_')
-            .normalize('NFD')
-            .replace(/\p{Diacritic}/gu, '') // Remover acentos (Unicode Property Escape)
-            .replace(/\s+/g, '_')
-            .replace(/[^\w-]/g, '')
-
-          const fileName = safeFilterName
-            ? `relatorio_lancamentos_${safeFilterName}`
-            : 'relatorio_lancamentos'
-          const subtitle = subtitleParts.join(' | ')
-
-          const pdfData = generatePdf({
-            title: 'Relatório de Lançamentos',
-            subtitle,
-            headers,
-            data,
-            foot,
-          })
-
-          try {
-            const result = await window.api.exportPdf({
-              fileName,
-              data: pdfData,
-            })
-
-            if (result.success) {
-              show(`PDF salvo e aberto com sucesso em: ${result.path}`, 'success')
-            } else {
-              show(`Erro ao exportar PDF: ${result.error}`, 'error')
-            }
-          } catch (error) {
-            show('Ocorreu um erro inesperado ao exportar o PDF.', 'error')
-            console.error(error)
-          }
-        }}
+        onSecondaryAction={() => setShowExportFieldsModal(true)}
       />
 
       {/* Filters */}
@@ -1370,6 +1333,16 @@ export function TripsPage() {
           message="Existem alterações não salvas. Deseja realmente fechar?"
           onConfirm={handleConfirmDiscard}
           onCancel={() => setShowDiscardConfirm(false)}
+        />
+      )}
+
+      {showExportFieldsModal && (
+        <FieldSelectionModal
+          title="Exportar para PDF"
+          fields={TRIP_EXPORT_FIELDS.map((field) => ({ key: field.key, label: field.label }))}
+          initialSelected={exportFieldsConfig ?? getDefaultTripExportFieldKeys(filters)}
+          onCancel={() => setShowExportFieldsModal(false)}
+          onConfirm={handleGenerateExport}
         />
       )}
     </div>
