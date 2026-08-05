@@ -11,7 +11,7 @@ export function registerDashboardHandlers(): void {
     const INTERNAL_DRIVER = '(d.is_outsourced = 0 OR d.is_outsourced IS NULL)'
 
     // 1. Total Revenue — trips with internal trucks only
-    const revenue = (
+    const tripRevenue = (
       db()
         .prepare(
           `
@@ -24,6 +24,23 @@ export function registerDashboardHandlers(): void {
         )
         .get(startDate, endDate) as any
     ).total
+
+    // Standalone (avulsa) receivables — not tied to a trip, contribute directly to revenue
+    const avulsaReceivables = db()
+      .prepare(
+        `
+        SELECT r.customer_id, COALESCE(c.name, 'Sem cliente') as customer_name,
+               r.amount, r.due_date
+        FROM receivables r
+        LEFT JOIN customers c ON r.customer_id = c.id
+        WHERE r.trip_id IS NULL AND r.due_date BETWEEN ? AND ?
+      `,
+      )
+      .all(startDate, endDate) as any[]
+
+    const avulsaTotal = avulsaReceivables.reduce((s, r) => s + (Number(r.amount) || 0), 0)
+
+    const revenue = tripRevenue + avulsaTotal
 
     const allTrips = db()
       .prepare(
@@ -180,7 +197,8 @@ export function registerDashboardHandlers(): void {
         .get(startDate, endDate) as any
     ).total
 
-    const totalCost = directCosts + fuelCosts + commissionCost + fuelRecordsCost
+    const operationalCost = directCosts + fuelCosts + commissionCost + fuelRecordsCost
+    const totalCost = operationalCost + totalTax
 
     const totalTrips = (
       db()
@@ -238,6 +256,12 @@ export function registerDashboardHandlers(): void {
           SELECT COALESCE(SUM(fr.value), 0)
           FROM fuel_records fr
           WHERE fr.truck_id = t.id AND fr.date BETWEEN ? AND ?
+        ) + (
+          SELECT COALESCE(SUM(tr4.tax_value), 0)
+          FROM trips tr4
+          JOIN drivers d4 ON tr4.driver_id = d4.id
+          WHERE tr4.truck_id = t.id AND tr4.has_percentage_tax = 1 AND tr4.date BETWEEN ? AND ?
+            AND (d4.is_outsourced = 0 OR d4.is_outsourced IS NULL)
         ) as cost
       FROM trucks t
       LEFT JOIN trips tr ON tr.truck_id = t.id AND tr.date BETWEEN ? AND ?
@@ -247,6 +271,8 @@ export function registerDashboardHandlers(): void {
     `,
       )
       .all(
+        startDate,
+        endDate,
         startDate,
         endDate,
         startDate,
@@ -282,6 +308,17 @@ export function registerDashboardHandlers(): void {
       )
       .all() as any[]
 
+    const avulsaMonthlyRevenueRaw = db()
+      .prepare(
+        `
+      SELECT strftime('%Y-%m', due_date) as month, SUM(amount) as revenue
+      FROM receivables
+      WHERE trip_id IS NULL AND due_date >= date('now', '-6 months')
+      GROUP BY month
+    `,
+      )
+      .all() as any[]
+
     const monthlyRevenue: Array<{ month: string; revenue: number }> = []
     const now = new Date()
     for (let i = 5; i >= 0; i--) {
@@ -291,9 +328,10 @@ export function registerDashboardHandlers(): void {
       const monthStr = `${year}-${month}`
 
       const found = monthlyRevenueRaw.find((r) => r.month === monthStr)
+      const avulsaFound = avulsaMonthlyRevenueRaw.find((r) => r.month === monthStr)
       monthlyRevenue.push({
         month: monthStr,
-        revenue: Number(found?.revenue) || 0,
+        revenue: (Number(found?.revenue) || 0) + (Number(avulsaFound?.revenue) || 0),
       })
     }
 
@@ -419,6 +457,11 @@ export function registerDashboardHandlers(): void {
       categoryTotals.set('commission', currentCommission + (Number(commissionCost) || 0))
     }
 
+    if (totalTax > 0) {
+      const currentTax = categoryTotals.get('tax') || 0
+      categoryTotals.set('tax', currentTax + (Number(totalTax) || 0))
+    }
+
     const categoryLabels: Record<string, string> = {
       fuel: 'Combustível',
       oil: 'Óleo',
@@ -426,6 +469,7 @@ export function registerDashboardHandlers(): void {
       salary: 'Salário',
       toll: 'Pedágio',
       commission: 'Comissão',
+      tax: 'Imposto',
       others: 'Outros',
     }
 
@@ -436,11 +480,12 @@ export function registerDashboardHandlers(): void {
       }))
       .sort((a, b) => b.total - a.total)
 
-    // 6. Revenue by Customer (Top 5) — includes outsourced trips
-    const perCustomer = db()
+    // 6. Revenue by Customer (Top 5) — includes outsourced trips, plus standalone receivables
+    const perCustomerRaw = db()
       .prepare(
         `
       SELECT
+        tr.customer_id as customer_id,
         COALESCE(c.name, 'Sem cliente') as customer_name,
         COALESCE(SUM(tr.price_charged), 0) as revenue,
         COALESCE(SUM(tr.price_charged - COALESCE(tr.tax_value, 0)), 0) as netRevenue,
@@ -452,11 +497,43 @@ export function registerDashboardHandlers(): void {
       LEFT JOIN customers c ON tr.customer_id = c.id
       WHERE tr.date BETWEEN ? AND ?
       GROUP BY tr.customer_id
-      ORDER BY revenue DESC
-      LIMIT 5
     `,
       )
       .all(startDate, endDate) as any[]
+
+    const customerTotals = new Map<
+      string,
+      { customer_name: string; revenue: number; netRevenue: number; tonnage: number; trips: number }
+    >()
+
+    for (const row of perCustomerRaw) {
+      const key = String(row.customer_id ?? 'null')
+      customerTotals.set(key, {
+        customer_name: row.customer_name,
+        revenue: Number(row.revenue) || 0,
+        netRevenue: Number(row.netRevenue) || 0,
+        tonnage: Number(row.tonnage) || 0,
+        trips: Number(row.trips) || 0,
+      })
+    }
+
+    for (const r of avulsaReceivables) {
+      const key = String(r.customer_id ?? 'null')
+      const current = customerTotals.get(key) || {
+        customer_name: r.customer_name,
+        revenue: 0,
+        netRevenue: 0,
+        tonnage: 0,
+        trips: 0,
+      }
+      current.revenue += Number(r.amount) || 0
+      current.netRevenue += Number(r.amount) || 0
+      customerTotals.set(key, current)
+    }
+
+    const perCustomer = Array.from(customerTotals.values())
+      .sort((a, b) => b.revenue - a.revenue)
+      .slice(0, 5)
 
     // 7. Revenue by Product (Top 5) — includes outsourced trips
     const perProduct = db()
@@ -484,8 +561,8 @@ export function registerDashboardHandlers(): void {
       netRevenue: revenue - totalTax,
       tax: totalTax,
       cost: totalCost,
-      profit: revenue - totalCost,
-      netProfit: revenue - totalTax - totalCost,
+      profit: revenue - operationalCost,
+      netProfit: revenue - totalCost,
       totalTrips,
       totalKm,
       perTruck: trucksWithMetrics,
