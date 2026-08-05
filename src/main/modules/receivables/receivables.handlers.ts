@@ -1,7 +1,7 @@
 import { ipcMain } from 'electron'
-import { receivablesMarkPaidSchema } from '../../../shared/schemas'
+import { receivableSchema, receivablesMarkPaidSchema } from '../../../shared/schemas'
 import { getDb } from '../../database'
-import { createValidatedHandler } from '../../lib/utils'
+import { createIdValidatedHandler, createValidatedHandler } from '../../lib/utils'
 
 export function registerReceivablesHandlers(): void {
   const db = () => getDb()
@@ -13,7 +13,7 @@ export function registerReceivablesHandlers(): void {
         t.date          as trip_date,
         c.name          as customer_name
       FROM receivables r
-      JOIN trips t ON r.trip_id = t.id
+      LEFT JOIN trips t ON r.trip_id = t.id
       LEFT JOIN customers c ON r.customer_id = c.id
       WHERE 1=1
     `
@@ -27,14 +27,14 @@ export function registerReceivablesHandlers(): void {
       params.push(filters.status)
     }
     if (filters.startDate) {
-      query += ' AND t.date >= ?'
+      query += ' AND COALESCE(t.date, r.due_date) >= ?'
       params.push(filters.startDate)
     }
     if (filters.endDate) {
-      query += ' AND t.date <= ?'
+      query += ' AND COALESCE(t.date, r.due_date) <= ?'
       params.push(filters.endDate)
     }
-    query += ' ORDER BY t.date DESC'
+    query += ' ORDER BY COALESCE(t.date, r.due_date) DESC'
     return db()
       .prepare(query)
       .all(...params)
@@ -48,6 +48,29 @@ export function registerReceivablesHandlers(): void {
       )
       .run(data.paid_date, ...data.ids)
     return { ok: true, updated: r.changes }
+  })
+
+  createValidatedHandler('receivables:create', receivableSchema, (data) => {
+    const r = db()
+      .prepare(
+        `INSERT INTO receivables (customer_id, amount, status, due_date, description, created_at)
+         VALUES (?, ?, 'open', ?, ?, datetime('now'))`,
+      )
+      .run(data.customer_id, data.amount, data.due_date, data.description || null)
+    return { ok: true, id: r.lastInsertRowid }
+  })
+
+  createIdValidatedHandler('receivables:delete', (id) => {
+    const r = db().prepare('DELETE FROM receivables WHERE id = ? AND trip_id IS NULL').run(id)
+    if (r.changes === 0) {
+      return {
+        ok: false,
+        errors: {
+          form: 'Este recebível está vinculado a uma viagem e não pode ser excluído aqui.',
+        },
+      }
+    }
+    return { ok: true }
   })
 
   ipcMain.handle('receivables:summaryByCustomer', () => {

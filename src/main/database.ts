@@ -119,15 +119,16 @@ export function setupDatabase(): void {
       created_at    TEXT DEFAULT (datetime('now'))
     );
 
-    -- Receivables (Contas a Receber) — 1:1 mirror of trips
+    -- Receivables (Contas a Receber) — 1:1 mirror of trips, plus standalone (avulsa) entries
     CREATE TABLE IF NOT EXISTS receivables (
       id           INTEGER PRIMARY KEY AUTOINCREMENT,
-      trip_id      INTEGER NOT NULL UNIQUE REFERENCES trips(id) ON DELETE CASCADE,
+      trip_id      INTEGER UNIQUE REFERENCES trips(id) ON DELETE CASCADE,
       customer_id  INTEGER REFERENCES customers(id),
       amount       REAL NOT NULL DEFAULT 0,
       status       TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open','paid')),
       due_date     TEXT DEFAULT NULL,
       paid_date    TEXT DEFAULT NULL,
+      description  TEXT DEFAULT NULL,
       created_at   TEXT DEFAULT (datetime('now'))
     );
 
@@ -378,6 +379,51 @@ export function setupDatabase(): void {
       }
     } catch (error) {
       // Ensure foreign_keys is restored even on error
+      db.pragma('foreign_keys = ON')
+      throw error
+    }
+  }
+
+  // Migration: Add description column to receivables if missing (label for standalone/avulsa entries)
+  const receivableInfo = db.pragma('table_info(receivables)') as { name: string }[]
+  if (!receivableInfo.some((col) => col.name === 'description')) {
+    db.exec('ALTER TABLE receivables ADD COLUMN description TEXT DEFAULT NULL')
+  }
+
+  // Migration: Make trip_id nullable in receivables table, to allow standalone (avulsa) entries
+  // not tied to a trip.
+  const receivableTripIdColumn = (receivableInfo as any[]).find((col) => col.name === 'trip_id')
+  if (receivableTripIdColumn && receivableTripIdColumn.notnull === 1) {
+    try {
+      const fkState = db.pragma('foreign_keys', { simple: true })
+      db.pragma('foreign_keys = OFF')
+
+      db.exec(`
+        BEGIN TRANSACTION;
+        CREATE TABLE receivables_new AS SELECT * FROM receivables;
+        DROP TABLE receivables;
+        CREATE TABLE receivables (
+          id           INTEGER PRIMARY KEY AUTOINCREMENT,
+          trip_id      INTEGER UNIQUE REFERENCES trips(id) ON DELETE CASCADE,
+          customer_id  INTEGER REFERENCES customers(id),
+          amount       REAL NOT NULL DEFAULT 0,
+          status       TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open','paid')),
+          due_date     TEXT DEFAULT NULL,
+          paid_date    TEXT DEFAULT NULL,
+          description  TEXT DEFAULT NULL,
+          created_at   TEXT DEFAULT (datetime('now'))
+        );
+        INSERT INTO receivables SELECT
+          id, trip_id, customer_id, amount, status, due_date, paid_date, description, created_at
+        FROM receivables_new;
+        DROP TABLE receivables_new;
+        COMMIT;
+      `)
+
+      if (fkState) {
+        db.pragma('foreign_keys = ON')
+      }
+    } catch (error) {
       db.pragma('foreign_keys = ON')
       throw error
     }
