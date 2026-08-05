@@ -1,8 +1,35 @@
+import { zodResolver } from '@hookform/resolvers/zod'
 import { useCallback, useEffect, useState } from 'react'
+import { Controller, useForm } from 'react-hook-form'
+import { receivableSchema } from '../../../shared/schemas'
 import { PageHeader } from '../components/PageHeader'
-import { Button, DatePicker, Modal, Select, Toast, useToast } from '../components/ui'
+import {
+  Button,
+  ConfirmModal,
+  CurrencyInput,
+  DatePicker,
+  Input,
+  Modal,
+  Select,
+  Toast,
+  useToast,
+} from '../components/ui'
 import type { Customer, Receivable } from '../lib/types'
 import { formatBRL, formatDate, today } from '../lib/utils'
+
+interface ReceivableFormData {
+  customer_id?: number
+  amount?: number
+  due_date: string
+  description?: string
+}
+
+const EMPTY_RECEIVABLE: ReceivableFormData = {
+  customer_id: undefined,
+  amount: undefined,
+  due_date: today(),
+  description: '',
+}
 
 export function ReceivablesPage() {
   const [customers, setCustomers] = useState<Customer[]>([])
@@ -22,7 +49,20 @@ export function ReceivablesPage() {
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
   const [markPaidModal, setMarkPaidModal] = useState(false)
   const [paidDate, setPaidDate] = useState(today())
+  const [createModal, setCreateModal] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState<Receivable | null>(null)
   const { toast, show } = useToast()
+
+  const {
+    handleSubmit,
+    control,
+    reset,
+    setError,
+    formState: { errors },
+  } = useForm<ReceivableFormData>({
+    resolver: zodResolver(receivableSchema) as any,
+    defaultValues: EMPTY_RECEIVABLE,
+  })
 
   const loadCustomers = useCallback(async () => {
     setCustomers(await window.api.customers.list())
@@ -103,6 +143,45 @@ export function ReceivablesPage() {
     loadOpenTotals()
   }
 
+  const openCreateModal = () => {
+    reset(EMPTY_RECEIVABLE)
+    setCreateModal(true)
+  }
+
+  const saveReceivable = async (data: ReceivableFormData) => {
+    const result = await window.api.receivables.create(data)
+    if (result?.ok === false) {
+      if (result.errors) {
+        for (const [field, message] of Object.entries(result.errors)) {
+          setError(field as any, { type: 'manual', message })
+        }
+      } else {
+        show('Erro ao criar conta a receber', 'error')
+      }
+      return
+    }
+    show('Conta a receber criada!')
+    setCreateModal(false)
+    loadReceivables()
+    loadOpenTotals()
+  }
+
+  const handleDeleteReceivable = async () => {
+    if (!deleteTarget) {
+      return
+    }
+    const result = await window.api.receivables.delete(deleteTarget.id)
+    if (result?.ok === false) {
+      show(result.errors?.form || 'Erro ao excluir', 'error')
+      setDeleteTarget(null)
+      return
+    }
+    show('Conta a receber excluída!')
+    setDeleteTarget(null)
+    loadReceivables()
+    loadOpenTotals()
+  }
+
   return (
     <div className="p-12 max-w-7xl mx-auto">
       {toast && <Toast message={toast.message} type={toast.type} />}
@@ -111,6 +190,8 @@ export function ReceivablesPage() {
         pretitle="Gestão Financeira"
         title="Contas a Receber"
         subtitle="Acompanhe os recebíveis gerados por lançamento e dê baixa nos pagamentos."
+        actionLabel="Nova Conta"
+        onAction={openCreateModal}
       />
 
       <div className="grid grid-cols-2 gap-4 mb-8">
@@ -242,10 +323,10 @@ export function ReceivablesPage() {
                   )}
                 </td>
                 <td className="px-6 py-4 text-sm text-on-surface-variant">
-                  {formatDate(row.trip_date || '')}
+                  {formatDate(row.trip_date || row.due_date || '')}
                 </td>
                 <td className="px-6 py-4 text-sm font-mono text-on-surface-variant">
-                  {row.trip_ticket_number ?? '—'}
+                  {row.trip_ticket_number ?? row.description ?? '—'}
                 </td>
                 <td className="px-6 py-4 text-sm text-on-surface">{row.customer_name ?? '—'}</td>
                 <td className="px-6 py-4 font-black font-headline text-on-surface text-sm">
@@ -263,8 +344,8 @@ export function ReceivablesPage() {
                   </span>
                 </td>
                 <td className="px-6 py-4">
-                  {row.status === 'open' && (
-                    <div className="flex justify-end opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    {row.status === 'open' && (
                       <button
                         type="button"
                         onClick={() => markSingleAsPaid(row.id)}
@@ -273,8 +354,18 @@ export function ReceivablesPage() {
                       >
                         <span className="material-symbols-outlined text-xl">paid</span>
                       </button>
-                    </div>
-                  )}
+                    )}
+                    {!row.trip_id && (
+                      <button
+                        type="button"
+                        onClick={() => setDeleteTarget(row)}
+                        className="p-2 text-outline hover:text-error hover:bg-error-container/20 rounded-lg transition-all"
+                        title="Excluir"
+                      >
+                        <span className="material-symbols-outlined text-xl">delete</span>
+                      </button>
+                    )}
+                  </div>
                 </td>
               </tr>
             ))}
@@ -300,6 +391,76 @@ export function ReceivablesPage() {
             <Button onClick={handleMarkPaid}>Confirmar</Button>
           </div>
         </Modal>
+      )}
+
+      {createModal && (
+        <Modal title="Nova Conta a Receber" onClose={() => setCreateModal(false)}>
+          <form onSubmit={handleSubmit(saveReceivable)} className="flex flex-col gap-4">
+            <Controller
+              name="customer_id"
+              control={control}
+              render={({ field }) => (
+                <Select
+                  label="Cliente"
+                  value={field.value}
+                  onChange={field.onChange}
+                  error={errors.customer_id?.message}
+                  options={customers.map((c) => ({
+                    value: c.id,
+                    label: c.name,
+                    displayLabel: c.name,
+                    searchableLabel: c.name,
+                  }))}
+                />
+              )}
+            />
+            <Controller
+              name="amount"
+              control={control}
+              render={({ field }) => (
+                <CurrencyInput
+                  label="Valor"
+                  value={field.value ?? ''}
+                  onChange={field.onChange}
+                  error={errors.amount?.message}
+                />
+              )}
+            />
+            <Controller
+              name="due_date"
+              control={control}
+              render={({ field }) => (
+                <DatePicker
+                  label="Vencimento"
+                  value={field.value}
+                  onChange={field.onChange}
+                  error={errors.due_date?.message}
+                />
+              )}
+            />
+            <Controller
+              name="description"
+              control={control}
+              render={({ field }) => (
+                <Input label="Descrição" optional {...field} error={errors.description?.message} />
+              )}
+            />
+            <div className="flex justify-end gap-3 mt-2">
+              <Button type="button" variant="ghost" onClick={() => setCreateModal(false)}>
+                Cancelar
+              </Button>
+              <Button type="submit">Salvar</Button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {deleteTarget && (
+        <ConfirmModal
+          message={`Excluir conta a receber de ${formatBRL(deleteTarget.amount)}?`}
+          onConfirm={handleDeleteReceivable}
+          onCancel={() => setDeleteTarget(null)}
+        />
       )}
     </div>
   )

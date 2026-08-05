@@ -246,12 +246,13 @@ export interface CommissionByDriver {
 
 export interface Receivable {
   id: number
-  trip_id: number
+  trip_id?: number | null
   customer_id?: number | null
   amount: number
   status: 'open' | 'paid'
   due_date?: string | null
   paid_date?: string | null
+  description?: string | null
   created_at?: string
   // joins
   trip_ticket_number?: string
@@ -371,6 +372,15 @@ declare global {
         markPaid(data: { ids: number[]; paid_date: string }): Promise<{
           ok: boolean
           updated?: number
+        }>
+        create(data: any): Promise<{
+          ok: boolean
+          id?: number
+          errors?: Record<string, string>
+        }>
+        delete(id: number): Promise<{
+          ok: boolean
+          errors?: Record<string, string>
         }>
         summaryByCustomer(): Promise<ReceivableCustomerSummary[]>
       }

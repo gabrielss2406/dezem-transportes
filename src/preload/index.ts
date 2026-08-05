@@ -138,6 +138,8 @@ contextBridge.exposeInMainWorld('api', {
     list: (filters?: any) => ipcRenderer.invoke('receivables:list', filters),
     markPaid: (data: { ids: number[]; paid_date: string }) =>
       ipcRenderer.invoke('receivables:markPaid', data),
+    create: (data: any) => ipcRenderer.invoke('receivables:create', data),
+    delete: (id: number) => ipcRenderer.invoke('receivables:delete', id),
     summaryByCustomer: () => ipcRenderer.invoke('receivables:summaryByCustomer'),
   },
 
