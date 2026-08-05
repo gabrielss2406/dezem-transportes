@@ -200,7 +200,10 @@ export interface DashboardSummary {
     km: number
     cost: number
     profit: number
-    cpk: number
+    cpk: number | null
+    trip_count: number
+    startOdometer: number | null
+    endOdometer: number | null
   }>
   monthlyRevenue: Array<{ month: string; revenue: number }>
   maintenanceSummary: {
@@ -420,6 +423,7 @@ declare global {
         path?: string
         error?: string
       }>
+      onDataChanged(callback: (entity: string) => void): () => void
     }
   }
 }

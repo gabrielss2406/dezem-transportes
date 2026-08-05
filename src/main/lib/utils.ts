@@ -1,4 +1,4 @@
-import { ipcMain } from 'electron'
+import { BrowserWindow, ipcMain } from 'electron'
 import { ZodError, z } from 'zod'
 
 // Type guard for SqliteError
@@ -30,6 +30,21 @@ function getUniqueConstraintField(message: string): string | null {
   return match ? match[1] : null
 }
 
+// A handler result of { ok: false, ... } means the mutation was rejected (validation/constraint
+// error), so nothing actually changed and no refresh notification should be sent.
+function wasMutationApplied(result: unknown): boolean {
+  return !(result && typeof result === 'object' && (result as any).ok === false)
+}
+
+// Notifies all renderer windows that an entity changed, so views like the Dashboard
+// (which aggregate data across many tables) can refetch instead of showing stale data.
+function broadcastDataChanged(channel: string): void {
+  const entity = channel.split(':')[0]
+  for (const win of BrowserWindow.getAllWindows()) {
+    win.webContents.send('data:changed', entity)
+  }
+}
+
 export function createValidatedHandler<T extends z.ZodRawShape>(
   channel: string,
   schema: z.ZodObject<T>,
@@ -38,7 +53,11 @@ export function createValidatedHandler<T extends z.ZodRawShape>(
   ipcMain.handle(channel, async (_event, data) => {
     try {
       const validatedData = await schema.parseAsync(data)
-      return await handler(validatedData)
+      const result = await handler(validatedData)
+      if (wasMutationApplied(result)) {
+        broadcastDataChanged(channel)
+      }
+      return result
     } catch (error) {
       if (error instanceof ZodError) {
         return { ok: false, errors: formatZodError(error) }
@@ -67,7 +86,11 @@ export function createValidatedHandlerWithId<T extends z.ZodRawShape>(
     try {
       const validatedId = await z.number().int().positive().parseAsync(id)
       const validatedData = await schema.parseAsync(data)
-      return await handler(validatedId, validatedData)
+      const result = await handler(validatedId, validatedData)
+      if (wasMutationApplied(result)) {
+        broadcastDataChanged(channel)
+      }
+      return result
     } catch (error) {
       if (error instanceof ZodError) {
         return { ok: false, errors: formatZodError(error) }
@@ -90,7 +113,11 @@ export function createIdValidatedHandler(channel: string, handler: (id: number) 
   ipcMain.handle(channel, async (_event, id) => {
     try {
       const validatedId = await z.number().int().positive().parseAsync(id)
-      return await handler(validatedId)
+      const result = await handler(validatedId)
+      if (wasMutationApplied(result)) {
+        broadcastDataChanged(channel)
+      }
+      return result
     } catch (error) {
       if (error instanceof ZodError) {
         // Since this handler only validates an ID, we can return a simpler error

@@ -228,7 +228,11 @@ export function registerDashboardHandlers(): void {
         .get(startDate, endDate) as any
     ).total
 
-    // 3. Profitability and CPK per internal Truck
+    // 3. Profitability and CPK per internal Truck.
+    // CPK is distance-based: distance = last odometer reading in range - first odometer
+    // reading in range. fuel_records.odometer_at_service is the only real timestamped
+    // odometer history in the schema (trucks.current_odometer is a single "latest" value,
+    // and trips.km_driven is a legacy field no longer captured by the trip form).
     const perTruck = db()
       .prepare(
         `
@@ -236,7 +240,21 @@ export function registerDashboardHandlers(): void {
         t.license_plate,
         t.model,
         COALESCE(SUM(tr.price_charged), 0) as revenue,
-        COALESCE(SUM(tr.km_driven), 0) as km,
+        COUNT(tr.id) as trip_count,
+        (
+          SELECT fr_start.odometer_at_service
+          FROM fuel_records fr_start
+          WHERE fr_start.truck_id = t.id AND fr_start.date BETWEEN ? AND ?
+          ORDER BY fr_start.date ASC, fr_start.id ASC
+          LIMIT 1
+        ) as start_odometer,
+        (
+          SELECT fr_end.odometer_at_service
+          FROM fuel_records fr_end
+          WHERE fr_end.truck_id = t.id AND fr_end.date BETWEEN ? AND ?
+          ORDER BY fr_end.date DESC, fr_end.id DESC
+          LIMIT 1
+        ) as end_odometer,
         (
           SELECT COALESCE(SUM(c.value), 0)
           FROM costs c
@@ -283,13 +301,33 @@ export function registerDashboardHandlers(): void {
         endDate,
         startDate,
         endDate,
+        startDate,
+        endDate,
+        startDate,
+        endDate,
       ) as any[]
 
-    const trucksWithMetrics = perTruck.map((t) => ({
-      ...t,
-      profit: t.revenue - t.cost,
-      cpk: t.km > 0 ? t.cost / t.km : 0,
-    }))
+    const trucksWithMetrics = perTruck.map((t) => {
+      const hasOdometerRange = t.start_odometer != null && t.end_odometer != null
+      const rawDistance = hasOdometerRange ? Number(t.end_odometer) - Number(t.start_odometer) : 0
+      // Negative distance shouldn't happen (fuel records enforce chronological monotonicity),
+      // but guard it anyway rather than surfacing a nonsensical negative CPK.
+      const km = rawDistance > 0 ? rawDistance : 0
+      return {
+        license_plate: t.license_plate,
+        model: t.model,
+        revenue: t.revenue,
+        trip_count: t.trip_count,
+        cost: t.cost,
+        profit: t.revenue - t.cost,
+        km,
+        // null (not 0) when distance can't be determined — 0 would misleadingly read as
+        // "free to operate" instead of "not enough odometer data in this period".
+        cpk: km > 0 ? t.cost / km : null,
+        startOdometer: t.start_odometer ?? null,
+        endOdometer: t.end_odometer ?? null,
+      }
+    })
 
     // 4. Monthly Revenue (Last 6 months) — internal trucks only
     const monthlyRevenueRaw = db()
