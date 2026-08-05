@@ -221,7 +221,7 @@ export function DashboardPage() {
               <KpiBlock
                 label="Custos Totais"
                 value={formatBRL(summary.cost).replace('R$ ', '')}
-                info="Combustível, despesas, comissão"
+                info="Combustível, despesas, deduções"
               />
 
               <div className="rounded-xl p-6 bg-primary border border-outline-variant/5 shadow-sm">
