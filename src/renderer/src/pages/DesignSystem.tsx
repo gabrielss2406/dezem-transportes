@@ -81,7 +81,7 @@ export function DesignSystemPage() {
   }
 
   return (
-    <div className="p-12 max-w-7xl mx-auto space-y-16 pb-24">
+    <div className="px-6 py-12 max-w-7xl mx-auto space-y-16 pb-24">
       {toastVisible && (
         <Toast
           message={

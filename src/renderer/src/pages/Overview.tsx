@@ -38,7 +38,7 @@ const sections = [
 
 export function OverviewPage({ user, onNavigate }: OverviewProps) {
   return (
-    <div className="p-12 max-w-7xl mx-auto">
+    <div className="px-6 py-12 max-w-7xl mx-auto">
       {/* Header */}
       <div className="mb-8">
         <h1 className="text-4xl font-black font-headline tracking-tighter text-on-surface mb-2">

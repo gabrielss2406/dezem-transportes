@@ -372,7 +372,7 @@ export function MaintenancePage() {
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
-    <div className="p-12 max-w-7xl mx-auto">
+    <div className="px-6 py-12 max-w-7xl mx-auto">
       {toast && <Toast message={toast.message} type={toast.type} />}
 
       <PageHeader

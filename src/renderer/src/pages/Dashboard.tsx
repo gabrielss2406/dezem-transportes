@@ -142,7 +142,7 @@ export function DashboardPage() {
     : (summary?.perTruck || []).slice(0, 5)
 
   return (
-    <div className="p-8 lg:p-12 max-w-[1600px] mx-auto">
+    <div className="px-4 py-8 lg:px-6 lg:py-12 max-w-[1600px] mx-auto">
       <PageHeader title="Visão Geral Operacional" subtitle={monthLabel}>
         <div className="flex gap-3 items-center">
           <button
