@@ -12,6 +12,7 @@ interface FieldSelectionModalProps {
   initialSelected: string[]
   onCancel: () => void
   onConfirm: (selectedKeys: string[], saveAsDefault: boolean) => void
+  extraOption?: { label: string; checked: boolean; onChange: (checked: boolean) => void }
 }
 
 export function FieldSelectionModal({
@@ -20,6 +21,7 @@ export function FieldSelectionModal({
   initialSelected,
   onCancel,
   onConfirm,
+  extraOption,
 }: FieldSelectionModalProps) {
   const [selected, setSelected] = useState<Set<string>>(new Set(initialSelected))
   const [saveAsDefault, setSaveAsDefault] = useState(false)
@@ -73,6 +75,18 @@ export function FieldSelectionModal({
             </label>
           ))}
         </div>
+
+        {extraOption && (
+          <label className="flex items-center gap-2 text-sm text-on-surface-variant cursor-pointer">
+            <input
+              type="checkbox"
+              checked={extraOption.checked}
+              onChange={(e) => extraOption.onChange(e.target.checked)}
+              className="accent-primary"
+            />
+            {extraOption.label}
+          </label>
+        )}
 
         <label className="flex items-center gap-2 text-sm text-on-surface-variant cursor-pointer">
           <input

@@ -108,6 +108,7 @@ export function TripsPage() {
   const [deleteTarget, setDeleteTarget] = useState<Trip | null>(null)
   const [exportFieldsConfig, setExportFieldsConfig] = useState<string[] | null>(null)
   const [showExportFieldsModal, setShowExportFieldsModal] = useState(false)
+  const [includeClientHeader, setIncludeClientHeader] = useState(false)
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false)
   const [showTruckBreakdown, setShowTruckBreakdown] = useState(false)
   const [showDriverBreakdown, setShowDriverBreakdown] = useState(false)
@@ -446,7 +447,9 @@ export function TripsPage() {
       const customer = customers.find((c) => String(c.id) === String(filters.customer_id))
       if (customer) {
         filterParts.push(customer.name)
-        subtitleParts.push(`Cliente: ${customer.name}`)
+        if (!includeClientHeader) {
+          subtitleParts.push(`Cliente: ${customer.name}`)
+        }
       }
     }
 
@@ -491,6 +494,16 @@ export function TripsPage() {
 
     const { fileName, subtitle } = buildExportFileMeta()
 
+    const clientHeader =
+      includeClientHeader && filters.customer_id
+        ? (() => {
+            const customer = customers.find((c) => String(c.id) === String(filters.customer_id))
+            return customer
+              ? { name: customer.name, cnpj: customer.cnpj, address: customer.address }
+              : undefined
+          })()
+        : undefined
+
     const pdfData = generatePdf({
       title: 'Relatório de Lançamentos',
       subtitle,
@@ -498,6 +511,7 @@ export function TripsPage() {
       data,
       foot,
       orientation: 'landscape',
+      clientHeader,
     })
 
     try {
@@ -532,7 +546,10 @@ export function TripsPage() {
           setModal(true)
         }}
         secondaryActionLabel="Exportar para PDF"
-        onSecondaryAction={() => setShowExportFieldsModal(true)}
+        onSecondaryAction={() => {
+          setIncludeClientHeader(!!filters.customer_id)
+          setShowExportFieldsModal(true)
+        }}
       />
 
       {/* Filters */}
@@ -619,7 +636,10 @@ export function TripsPage() {
             <Select
               label="Cliente"
               value={filters.customer_id}
-              onChange={(v) => setFilters((f) => ({ ...f, customer_id: v }))}
+              onChange={(v) => {
+                setFilters((f) => ({ ...f, customer_id: v }))
+                setIncludeClientHeader(!!v)
+              }}
               options={customers.map((c) => ({
                 value: c.id,
                 label: (
@@ -1355,6 +1375,15 @@ export function TripsPage() {
           initialSelected={exportFieldsConfig ?? getDefaultTripExportFieldKeys(filters)}
           onCancel={() => setShowExportFieldsModal(false)}
           onConfirm={handleGenerateExport}
+          extraOption={
+            filters.customer_id
+              ? {
+                  label: 'Incluir dados cadastrais do cliente no PDF',
+                  checked: includeClientHeader,
+                  onChange: setIncludeClientHeader,
+                }
+              : undefined
+          }
         />
       )}
     </div>

@@ -826,7 +826,9 @@ export function CostsPage() {
                     onChange={field.onChange}
                     onEnterSelect={() => dateRef.current?.focus()}
                     error={costErrors.category?.message}
-                    options={costCategories}
+                    options={costCategories.filter(
+                      (c) => c.value !== 'fuel' || editingCost?.category === 'fuel',
+                    )}
                   />
                 )}
               />

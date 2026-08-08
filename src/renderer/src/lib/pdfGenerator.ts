@@ -8,6 +8,7 @@ interface PdfOptions {
   data: (string | number)[][]
   foot?: (string | number)[][]
   orientation?: 'portrait' | 'landscape'
+  clientHeader?: { name: string; cnpj?: string; address?: string }
   // fileName: string // Removido
 }
 
@@ -18,6 +19,7 @@ export function generatePdf({
   data,
   foot,
   orientation = 'portrait',
+  clientHeader,
 }: PdfOptions): ArrayBuffer {
   // Alterada a assinatura
   const doc = new jsPDF({ orientation, unit: 'mm', format: 'a4' })
@@ -43,6 +45,21 @@ export function generatePdf({
     doc.setFont('helvetica', 'normal')
     doc.text(subtitle, 14, 30)
     startY = 38
+  }
+
+  // Cabeçalho de dados do cliente (opcional)
+  if (clientHeader) {
+    const parts = [
+      `Cliente: ${clientHeader.name}`,
+      clientHeader.cnpj ? `CNPJ: ${clientHeader.cnpj}` : null,
+      clientHeader.address ? `Endereço: ${clientHeader.address}` : null,
+    ].filter((part): part is string => !!part)
+
+    doc.setFontSize(9)
+    doc.setTextColor(...mutedColor)
+    doc.setFont('helvetica', 'normal')
+    doc.text(parts.join('  |  '), 14, startY - 2)
+    startY += 5
   }
 
   // Tabela

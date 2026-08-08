@@ -71,6 +71,7 @@ export function registerDashboardHandlers(): void {
         LEFT JOIN trucks t ON c.truck_id = t.id
         LEFT JOIN drivers d ON c.driver_id = d.id
         WHERE c.date BETWEEN ? AND ?
+          AND c.category != 'fuel'
           AND (c.truck_id IS NULL OR ${INTERNAL_TRUCK})
           AND (c.driver_id IS NULL OR ${INTERNAL_DRIVER})
       `,
