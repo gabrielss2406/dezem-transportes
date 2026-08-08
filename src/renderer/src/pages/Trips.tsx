@@ -104,6 +104,7 @@ export function TripsPage() {
   const [hasOverweight, setHasOverweight] = useState(false)
   const [appSettings, setAppSettings] = useState({ taxRate: 0, commissionRate: 0 })
   const [pendingData, setPendingData] = useState<any>(null)
+  const [showNewEntryPrompt, setShowNewEntryPrompt] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<Trip | null>(null)
   const [exportFieldsConfig, setExportFieldsConfig] = useState<string[] | null>(null)
   const [showExportFieldsModal, setShowExportFieldsModal] = useState(false)
@@ -289,6 +290,7 @@ export function TripsPage() {
 
   const save = async (data: TripFormData) => {
     try {
+      const wasEditing = !!editing
       let res: any
       if (editing) {
         res = await window.api.trips.update(editing.id, data as any)
@@ -308,10 +310,14 @@ export function TripsPage() {
         return
       }
 
-      show(editing ? 'Lançamento atualizado!' : 'Lançamento registrado!')
+      show(wasEditing ? 'Lançamento atualizado!' : 'Lançamento registrado!')
       setModal(false)
       setPendingData(null)
       load()
+
+      if (!wasEditing) {
+        setShowNewEntryPrompt(true)
+      }
     } catch (e: any) {
       setPendingData(null)
       show(e.message || 'Erro ao salvar', 'error')
@@ -381,7 +387,6 @@ export function TripsPage() {
   const totalTaxes = trips.reduce((s, t) => s + (t.tax_value || 0), 0)
   const totalNetRevenue = totalRevenue - totalTaxes
   const totalCommissions = trips.reduce((s, t) => s + (t.commission_value || 0), 0)
-  const totalKm = trips.reduce((s, t) => s + t.km_driven, 0)
   const totalTon = trips.reduce((s, t) => s + t.weight_ton + (t.overweight_ton || 0), 0)
 
   const perTruck = Object.values(
@@ -492,6 +497,7 @@ export function TripsPage() {
       headers,
       data,
       foot,
+      orientation: 'landscape',
     })
 
     try {
@@ -688,25 +694,24 @@ export function TripsPage() {
           </button>
         </div>
 
-        {[
-          { label: 'Km Total', value: `${totalKm.toFixed(0)} km`, icon: 'route' },
-          { label: 'Tonelagem Total', value: `${totalTon} ton`, icon: 'scale' },
-        ].map(({ label, value, icon }) => (
-          <div
-            key={label}
-            className="bg-surface-container-low p-6 rounded-xl flex items-center gap-4 border border-outline-variant/5 shadow-sm"
-          >
-            <div className="w-12 h-12 bg-surface-container rounded-lg flex items-center justify-center shrink-0">
-              <span className="material-symbols-outlined text-primary">{icon}</span>
+        {[{ label: 'Tonelagem Total', value: `${totalTon} ton`, icon: 'scale' }].map(
+          ({ label, value, icon }) => (
+            <div
+              key={label}
+              className="bg-surface-container-low p-6 rounded-xl flex items-center gap-4 border border-outline-variant/5 shadow-sm"
+            >
+              <div className="w-12 h-12 bg-surface-container rounded-lg flex items-center justify-center shrink-0">
+                <span className="material-symbols-outlined text-primary">{icon}</span>
+              </div>
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant">
+                  {label}
+                </p>
+                <p className="text-xl font-black text-on-surface font-headline">{value}</p>
+              </div>
             </div>
-            <div>
-              <p className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant">
-                {label}
-              </p>
-              <p className="text-xl font-black text-on-surface font-headline">{value}</p>
-            </div>
-          </div>
-        ))}
+          ),
+        )}
       </div>
 
       {/* Breakdown section */}
@@ -792,7 +797,6 @@ export function TripsPage() {
                 'Motorista',
                 'Produto',
                 'Peso',
-                'Km',
                 'Valor',
                 'Deduções',
                 'Cliente',
@@ -810,7 +814,7 @@ export function TripsPage() {
           <tbody className="divide-y divide-outline-variant/10">
             {trips.length === 0 && (
               <tr>
-                <td colSpan={11} className="px-6 py-12 text-center text-on-surface-variant text-sm">
+                <td colSpan={10} className="px-6 py-12 text-center text-on-surface-variant text-sm">
                   Nenhum lançamento encontrado com os filtros selecionados
                 </td>
               </tr>
@@ -839,9 +843,6 @@ export function TripsPage() {
                         <Badge label={`+${row.overweight_ton} ton excesso`} color="amber" />
                       </div>
                     ) : null}
-                  </td>
-                  <td className="px-6 py-4 text-sm text-on-surface-variant">
-                    {row.km_driven} km
                     {row.fuel_stops_count
                       ? row.fuel_stops_count > 0 && (
                           <div className="mt-1">
@@ -1317,6 +1318,17 @@ export function TripsPage() {
           message="Tem certeza que deseja cadastrar este lançamento?"
           onConfirm={() => save(pendingData)}
           onCancel={() => setPendingData(null)}
+        />
+      )}
+
+      {showNewEntryPrompt && (
+        <ConfirmModal
+          message="Lançamento registrado! Deseja iniciar um novo lançamento agora?"
+          onConfirm={() => {
+            setShowNewEntryPrompt(false)
+            setModal(true)
+          }}
+          onCancel={() => setShowNewEntryPrompt(false)}
         />
       )}
 

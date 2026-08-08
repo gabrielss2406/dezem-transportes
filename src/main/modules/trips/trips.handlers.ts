@@ -74,7 +74,7 @@ export function registerTripHandlers(): void {
       query += ' AND t.ticket_number LIKE ?'
       params.push(`%${filters.ticket_number}%`)
     }
-    query += ' ORDER BY t.date DESC'
+    query += ' ORDER BY t.date ASC'
     return db()
       .prepare(query)
       .all(...params)

@@ -51,15 +51,13 @@ export const TRIP_EXPORT_FIELDS: TripExportField[] = [
       trip.overweight_ton
         ? `${trip.weight_ton} + ${trip.overweight_ton} ton (excesso)`
         : `${trip.weight_ton} ton`,
-    getTotal: (trips) =>
-      `${trips.reduce((sum, trip) => sum + trip.weight_ton + (trip.overweight_ton || 0), 0)} ton`,
-    defaultSelected: () => true,
-  },
-  {
-    key: 'km',
-    label: 'Km',
-    getValue: (trip) => `${trip.km_driven} km`,
-    getTotal: (trips) => `${trips.reduce((sum, trip) => sum + trip.km_driven, 0)} km`,
+    getTotal: (trips) => {
+      const total = trips.reduce(
+        (sum, trip) => sum + trip.weight_ton + (trip.overweight_ton || 0),
+        0,
+      )
+      return `${Number(total.toFixed(2))} ton`
+    },
     defaultSelected: () => true,
   },
   {

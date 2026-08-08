@@ -7,12 +7,20 @@ interface PdfOptions {
   headers: string[]
   data: (string | number)[][]
   foot?: (string | number)[][]
+  orientation?: 'portrait' | 'landscape'
   // fileName: string // Removido
 }
 
-export function generatePdf({ title, subtitle, headers, data, foot }: PdfOptions): ArrayBuffer {
+export function generatePdf({
+  title,
+  subtitle,
+  headers,
+  data,
+  foot,
+  orientation = 'portrait',
+}: PdfOptions): ArrayBuffer {
   // Alterada a assinatura
-  const doc = new jsPDF()
+  const doc = new jsPDF({ orientation, unit: 'mm', format: 'a4' })
 
   // Cores da Identidade Visual (Dezem Transportes)
   const primaryColor: [number, number, number] = [132, 84, 0] // --primary
@@ -43,11 +51,14 @@ export function generatePdf({ title, subtitle, headers, data, foot }: PdfOptions
     head: [headers],
     body: data,
     foot: foot,
-    theme: 'striped',
+    theme: 'grid',
     styles: {
       font: 'helvetica',
       fontSize: 8,
       textColor: textColor,
+      cellPadding: { top: 1.5, bottom: 1.5, left: 2, right: 2 },
+      lineColor: surfaceLow,
+      lineWidth: 0.1,
     },
     headStyles: {
       fillColor: primaryColor,

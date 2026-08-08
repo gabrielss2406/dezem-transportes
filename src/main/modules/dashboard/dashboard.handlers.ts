@@ -42,30 +42,6 @@ export function registerDashboardHandlers(): void {
 
     const revenue = tripRevenue + avulsaTotal
 
-    const allTrips = db()
-      .prepare(
-        `
-      SELECT tr.id, tr.date, tr.truck_id, tr.price_charged, tr.km_driven
-      FROM trips tr
-      JOIN trucks t ON tr.truck_id = t.id
-      JOIN drivers d ON tr.driver_id = d.id
-      WHERE tr.date BETWEEN ? AND ? AND ${INTERNAL_TRUCK} AND ${INTERNAL_DRIVER}
-    `,
-      )
-      .all(startDate, endDate) as any[]
-
-    // Costs linked to internal trucks only
-    const truckCosts = db()
-      .prepare(
-        `
-      SELECT c.date, c.truck_id, c.value
-      FROM costs c
-      JOIN trucks t ON c.truck_id = t.id
-      WHERE c.date BETWEEN ? AND ? AND c.truck_id IS NOT NULL AND ${INTERNAL_TRUCK}
-    `,
-      )
-      .all(startDate, endDate) as any[]
-
     // Fuel stops for internal-truck trips only
     const fuelCostsByTrip = db()
       .prepare(
@@ -84,45 +60,6 @@ export function registerDashboardHandlers(): void {
     const fuelCostPerTrip = new Map<number, number>(
       fuelCostsByTrip.map((r: any) => [r.trip_id, r.total]),
     )
-
-    const costsByTruckAndDate = new Map<string, number>()
-    for (const cost of truckCosts) {
-      const key = `${cost.truck_id}-${cost.date}`
-      const currentCost = Number(costsByTruckAndDate.get(key)) || 0
-      costsByTruckAndDate.set(key, currentCost + (Number(cost.value) || 0))
-    }
-
-    const tripsByTruckAndDate = new Map<string, any[]>()
-    const totalKmByTruckAndDate = new Map<string, number>()
-
-    for (const trip of allTrips) {
-      if (!trip.truck_id) {
-        continue
-      }
-      const key = `${trip.truck_id}-${trip.date}`
-
-      const trips = tripsByTruckAndDate.get(key) || []
-      trips.push(trip)
-      tripsByTruckAndDate.set(key, trips)
-
-      const currentKm = totalKmByTruckAndDate.get(key) || 0
-      totalKmByTruckAndDate.set(key, (Number(currentKm) || 0) + (Number(trip.km_driven) || 0))
-    }
-
-    const additionalCostPerTrip = new Map<number, number>()
-
-    for (const [key, trips] of tripsByTruckAndDate.entries()) {
-      const totalCost = costsByTruckAndDate.get(key)
-      const totalKm = totalKmByTruckAndDate.get(key)
-
-      if (totalCost && totalKm > 0) {
-        for (const trip of trips) {
-          const distributedCost =
-            ((Number(trip.km_driven) || 0) / (Number(totalKm) || 1)) * (Number(totalCost) || 0)
-          additionalCostPerTrip.set(trip.id, distributedCost)
-        }
-      }
-    }
 
     // 2. Total Costs — exclude outsourced trucks and outsourced driver salaries
     const directCosts = (
@@ -518,7 +455,7 @@ export function registerDashboardHandlers(): void {
       }))
       .sort((a, b) => b.total - a.total)
 
-    // 6. Revenue by Customer (Top 5) — includes outsourced trips, plus standalone receivables
+    // 6. Revenue by Customer (Top 5) — internal trips only, plus standalone receivables
     const perCustomerRaw = db()
       .prepare(
         `
@@ -533,7 +470,7 @@ export function registerDashboardHandlers(): void {
       JOIN trucks t ON tr.truck_id = t.id
       JOIN drivers d ON tr.driver_id = d.id
       LEFT JOIN customers c ON tr.customer_id = c.id
-      WHERE tr.date BETWEEN ? AND ?
+      WHERE tr.date BETWEEN ? AND ? AND ${INTERNAL_TRUCK} AND ${INTERNAL_DRIVER}
       GROUP BY tr.customer_id
     `,
       )
