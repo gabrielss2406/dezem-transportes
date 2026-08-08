@@ -56,7 +56,7 @@ export const TRIP_EXPORT_FIELDS: TripExportField[] = [
         (sum, trip) => sum + trip.weight_ton + (trip.overweight_ton || 0),
         0,
       )
-      return `${Number(total.toFixed(2))} ton`
+      return `${Number(total.toFixed(4))} ton`
     },
     defaultSelected: () => true,
   },

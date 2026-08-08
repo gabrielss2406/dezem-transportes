@@ -388,7 +388,9 @@ export function TripsPage() {
   const totalTaxes = trips.reduce((s, t) => s + (t.tax_value || 0), 0)
   const totalNetRevenue = totalRevenue - totalTaxes
   const totalCommissions = trips.reduce((s, t) => s + (t.commission_value || 0), 0)
-  const totalTon = trips.reduce((s, t) => s + t.weight_ton + (t.overweight_ton || 0), 0)
+  const totalTon = Number(
+    trips.reduce((s, t) => s + t.weight_ton + (t.overweight_ton || 0), 0).toFixed(4),
+  )
 
   const perTruck = Object.values(
     trips.reduce<Record<number, { license_plate: string; count: number }>>((acc, t) => {
@@ -668,7 +670,7 @@ export function TripsPage() {
       </div>
 
       {/* KPI row */}
-      <div className="grid grid-cols-3 lg:grid-cols-5 gap-6 mb-10">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
         {[
           { label: 'Receita Bruta', value: formatBRL(totalRevenue), icon: 'payments' },
           { label: 'Receita Líquida', value: formatBRL(totalNetRevenue), icon: 'trending_up' },

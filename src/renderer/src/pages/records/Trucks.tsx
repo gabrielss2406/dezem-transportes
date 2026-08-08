@@ -342,7 +342,7 @@ export function TrucksPage() {
               },
               {
                 label: 'Capacidade Total',
-                value: `${rows.reduce((s, r) => s + (r.capacity_ton ?? 0), 0)} ton`,
+                value: `${Number(rows.reduce((s, r) => s + (r.capacity_ton ?? 0), 0).toFixed(4))} ton`,
                 icon: 'scale',
               },
             ]
@@ -355,7 +355,7 @@ export function TrucksPage() {
               },
               {
                 label: 'Capacidade Total',
-                value: `${rows.reduce((s, r) => s + (r.capacity_ton ?? 0), 0)} ton`,
+                value: `${Number(rows.reduce((s, r) => s + (r.capacity_ton ?? 0), 0).toFixed(4))} ton`,
                 icon: 'scale',
               },
             ]
