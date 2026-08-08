@@ -136,7 +136,7 @@ export function DashboardPage() {
     year: 'numeric',
   })
 
-  const fleetCpk = summary ? (summary.totalKm > 0 ? summary.cost / summary.totalKm : 0) : 0
+  const fleetCpk = summary ? (summary.totalKm > 0 ? summary.fuelCost / summary.totalKm : 0) : 0
   const displayedTrucks = showAllTrucks
     ? summary?.perTruck || []
     : (summary?.perTruck || []).slice(0, 5)
@@ -249,10 +249,10 @@ export function DashboardPage() {
 
               <KpiBlock
                 label="Despesas"
-                value={formatBRL(summary.expenseCost).replace('R$ ', '')}
+                value={formatBRL(summary.expenseCost ?? 0).replace('R$ ', '')}
                 info={
-                  summary.expenseOpenCount > 0
-                    ? `${summary.expenseOpenCount} em aberto (${formatBRL(summary.expenseOpenValue)})`
+                  (summary.expenseOpenCount ?? 0) > 0
+                    ? `${summary.expenseOpenCount} em aberto (${formatBRL(summary.expenseOpenValue ?? 0)})`
                     : 'Custos avulsos, fora da operação'
                 }
               />
@@ -277,9 +277,9 @@ export function DashboardPage() {
               </div>
 
               <KpiBlock
-                label="Custo Médio / KM"
+                label="CPK (Combustível)"
                 value={fleetCpk.toFixed(2)}
-                trend="CPK Médio da Frota"
+                trend="Combustível / KM da Frota"
                 info={`${summary.totalKm.toFixed(0)} km percorridos`}
               />
             </div>

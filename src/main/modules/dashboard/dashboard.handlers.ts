@@ -182,20 +182,6 @@ export function registerDashboardHandlers(): void {
         .get(startDate, endDate) as any
     ).c
 
-    const totalKm = (
-      db()
-        .prepare(
-          `
-        SELECT COALESCE(SUM(tr.km_driven), 0) as total
-        FROM trips tr
-        JOIN trucks t ON tr.truck_id = t.id
-        JOIN drivers d ON tr.driver_id = d.id
-        WHERE tr.date BETWEEN ? AND ? AND ${INTERNAL_TRUCK} AND ${INTERNAL_DRIVER}
-      `,
-        )
-        .get(startDate, endDate) as any
-    ).total
-
     // 3. Profitability and CPK per internal Truck.
     // CPK is distance-based: distance = last odometer reading in range - first odometer
     // reading in range. fuel_records.odometer_at_service is the only real timestamped
@@ -223,6 +209,17 @@ export function registerDashboardHandlers(): void {
           ORDER BY fr_end.date DESC, fr_end.id DESC
           LIMIT 1
         ) as end_odometer,
+        (
+          SELECT COALESCE(SUM(fs.value), 0)
+          FROM trip_fuel_stops fs
+          JOIN trips tr2 ON fs.trip_id = tr2.id
+          WHERE tr2.truck_id = t.id AND tr2.date BETWEEN ? AND ?
+        ) as fuel_stops_cost,
+        (
+          SELECT COALESCE(SUM(fr.value), 0)
+          FROM fuel_records fr
+          WHERE fr.truck_id = t.id AND fr.date BETWEEN ? AND ?
+        ) as fuel_records_cost,
         (
           SELECT COALESCE(SUM(c.value), 0)
           FROM costs c
@@ -273,6 +270,10 @@ export function registerDashboardHandlers(): void {
         endDate,
         startDate,
         endDate,
+        startDate,
+        endDate,
+        startDate,
+        endDate,
       ) as any[]
 
     const trucksWithMetrics = perTruck.map((t) => {
@@ -281,21 +282,27 @@ export function registerDashboardHandlers(): void {
       // Negative distance shouldn't happen (fuel records enforce chronological monotonicity),
       // but guard it anyway rather than surfacing a nonsensical negative CPK.
       const km = rawDistance > 0 ? rawDistance : 0
+      const fuelCost = Number(t.fuel_stops_cost) + Number(t.fuel_records_cost)
       return {
         license_plate: t.license_plate,
         model: t.model,
         revenue: t.revenue,
         trip_count: t.trip_count,
         cost: t.cost,
+        fuelCost,
         profit: t.revenue - t.cost,
         km,
         // null (not 0) when distance can't be determined — 0 would misleadingly read as
         // "free to operate" instead of "not enough odometer data in this period".
-        cpk: km > 0 ? t.cost / km : null,
+        // CPK is fuel-cost-based (not total cost) — how much fuel it takes per km.
+        cpk: km > 0 ? fuelCost / km : null,
         startOdometer: t.start_odometer ?? null,
         endOdometer: t.end_odometer ?? null,
       }
     })
+
+    const totalKm = trucksWithMetrics.reduce((s, t) => s + t.km, 0)
+    const totalFuelCost = trucksWithMetrics.reduce((s, t) => s + t.fuelCost, 0)
 
     // 4. Monthly Revenue (Last 6 months) — internal trucks only
     const monthlyRevenueRaw = db()
@@ -575,6 +582,7 @@ export function registerDashboardHandlers(): void {
       expenseOpenValue: Number(expenseOpen.total) || 0,
       totalTrips,
       totalKm,
+      fuelCost: totalFuelCost,
       perTruck: trucksWithMetrics,
       monthlyRevenue,
       maintenanceSummary,

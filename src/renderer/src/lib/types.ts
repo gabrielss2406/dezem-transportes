@@ -199,12 +199,14 @@ export interface DashboardSummary {
   expenseOpenValue: number
   totalTrips: number
   totalKm: number
+  fuelCost: number
   perTruck: Array<{
     license_plate: string
     model: string
     revenue: number
     km: number
     cost: number
+    fuelCost: number
     profit: number
     cpk: number | null
     trip_count: number
