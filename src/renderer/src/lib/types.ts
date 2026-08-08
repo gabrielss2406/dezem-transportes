@@ -178,6 +178,9 @@ export interface Cost {
   installment_group_id?: string | null
   installment_number?: number | null
   installment_total?: number | null
+  kind: 'operational' | 'expense'
+  status: 'open' | 'paid'
+  paid_date?: string | null
   // joins
   truck_license_plate?: string
   supplier_name?: string
@@ -191,6 +194,9 @@ export interface DashboardSummary {
   cost: number
   profit: number
   netProfit: number
+  expenseCost: number
+  expenseOpenCount: number
+  expenseOpenValue: number
   totalTrips: number
   totalKm: number
   perTruck: Array<{
@@ -358,6 +364,10 @@ declare global {
         create(data: any): Promise<{ id: number }>
         update(id: number, data: any): Promise<{ ok: boolean }>
         delete(id: number): Promise<{ ok: boolean }>
+        markPaid(data: { ids: number[]; paid_date: string }): Promise<{
+          ok: boolean
+          updated?: number
+        }>
         issueMonthlySalaries(monthYear: string): Promise<{ ok: boolean; issued: number }>
       }
       dashboard: {

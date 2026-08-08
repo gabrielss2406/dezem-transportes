@@ -222,7 +222,7 @@ export function DashboardPage() {
         {summary && (
           <div className="space-y-12">
             {/* KPI Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
               <div className="rounded-xl p-6 bg-surface-container-low border border-outline-variant/5 shadow-sm">
                 <span className="text-[10px] font-black uppercase tracking-widest mb-4 text-on-surface-variant block">
                   Receita
@@ -244,7 +244,17 @@ export function DashboardPage() {
               <KpiBlock
                 label="Custos Totais"
                 value={formatBRL(summary.cost).replace('R$ ', '')}
-                info="Combustível, despesas, deduções"
+                info="Combustível, manutenção, comissões, impostos"
+              />
+
+              <KpiBlock
+                label="Despesas"
+                value={formatBRL(summary.expenseCost).replace('R$ ', '')}
+                info={
+                  summary.expenseOpenCount > 0
+                    ? `${summary.expenseOpenCount} em aberto (${formatBRL(summary.expenseOpenValue)})`
+                    : 'Custos avulsos, fora da operação'
+                }
               />
 
               <div className="rounded-xl p-6 bg-primary border border-outline-variant/5 shadow-sm">

@@ -72,6 +72,7 @@ export function registerDashboardHandlers(): void {
         LEFT JOIN drivers d ON c.driver_id = d.id
         WHERE c.date BETWEEN ? AND ?
           AND c.category != 'fuel'
+          AND c.kind = 'operational'
           AND (c.truck_id IS NULL OR ${INTERNAL_TRUCK})
           AND (c.driver_id IS NULL OR ${INTERNAL_DRIVER})
       `,
@@ -137,6 +138,35 @@ export function registerDashboardHandlers(): void {
 
     const operationalCost = directCosts + fuelCosts + commissionCost + fuelRecordsCost
     const totalCost = operationalCost + totalTax
+
+    // Despesas avulsas (kind = 'expense') — não entram no custo operacional/CPK,
+    // mas são mostradas à parte no Dashboard pra visibilidade financeira.
+    const expenseCost = (
+      db()
+        .prepare(
+          `
+        SELECT COALESCE(SUM(c.value), 0) as total
+        FROM costs c
+        LEFT JOIN trucks t ON c.truck_id = t.id
+        LEFT JOIN drivers d ON c.driver_id = d.id
+        WHERE c.date BETWEEN ? AND ?
+          AND c.kind = 'expense'
+          AND (c.truck_id IS NULL OR ${INTERNAL_TRUCK})
+          AND (c.driver_id IS NULL OR ${INTERNAL_DRIVER})
+      `,
+        )
+        .get(startDate, endDate) as any
+    ).total
+
+    const expenseOpen = db()
+      .prepare(
+        `
+        SELECT COUNT(*) as c, COALESCE(SUM(value), 0) as total
+        FROM costs
+        WHERE date BETWEEN ? AND ? AND kind = 'expense' AND status = 'open'
+      `,
+      )
+      .get(startDate, endDate) as any
 
     const totalTrips = (
       db()
@@ -384,6 +414,7 @@ export function registerDashboardHandlers(): void {
       LEFT JOIN trucks t ON c.truck_id = t.id
       LEFT JOIN drivers d ON c.driver_id = d.id
       WHERE c.date BETWEEN ? AND ?
+        AND c.kind = 'operational'
         AND (c.truck_id IS NULL OR ${INTERNAL_TRUCK})
         AND (c.driver_id IS NULL OR ${INTERNAL_DRIVER})
       GROUP BY c.category
@@ -539,6 +570,9 @@ export function registerDashboardHandlers(): void {
       cost: totalCost,
       profit: revenue - operationalCost,
       netProfit: revenue - totalCost,
+      expenseCost: Number(expenseCost) || 0,
+      expenseOpenCount: Number(expenseOpen.c) || 0,
+      expenseOpenValue: Number(expenseOpen.total) || 0,
       totalTrips,
       totalKm,
       perTruck: trucksWithMetrics,

@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { ipcMain } from 'electron'
-import { costSchema } from '../../../shared/schemas'
+import { costSchema, costsMarkPaidSchema } from '../../../shared/schemas'
 import { getDb } from '../../database'
 import {
   createIdValidatedHandler,
@@ -52,6 +52,14 @@ export function registerCostHandlers(): void {
       query += ' AND co.truck_id = ?'
       params.push(filters.truck_id)
     }
+    if (filters.supplier_id) {
+      query += ' AND co.supplier_id = ?'
+      params.push(filters.supplier_id)
+    }
+    if (filters.status) {
+      query += ' AND co.status = ?'
+      params.push(filters.status)
+    }
     query += ' ORDER BY co.date DESC'
     return db()
       .prepare(query)
@@ -60,8 +68,8 @@ export function registerCostHandlers(): void {
 
   createValidatedHandler('costs:create', costSchema, (data) => {
     const insert = db().prepare(`
-      INSERT INTO costs (date, category, value, truck_id, supplier_id, driver_id, description, installment_group_id, installment_number, installment_total)
-      VALUES (?,?,?,?,?,?,?,?,?,?)
+      INSERT INTO costs (date, category, value, truck_id, supplier_id, driver_id, description, installment_group_id, installment_number, installment_total, kind, status, paid_date)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
     `)
 
     if (data.installments <= 1) {
@@ -76,6 +84,9 @@ export function registerCostHandlers(): void {
         null,
         null,
         null,
+        data.kind,
+        'paid',
+        data.date,
       )
       return { id: r.lastInsertRowid }
     }
@@ -103,6 +114,9 @@ export function registerCostHandlers(): void {
           groupId,
           i + 1,
           data.installments,
+          data.kind,
+          'open',
+          null,
         )
         if (i === 0) {
           firstInsertedId = r.lastInsertRowid as number
@@ -118,7 +132,7 @@ export function registerCostHandlers(): void {
     db()
       .prepare(
         `
-      UPDATE costs SET date=?, category=?, value=?, truck_id=?, supplier_id=?, driver_id=?, description=?
+      UPDATE costs SET date=?, category=?, value=?, truck_id=?, supplier_id=?, driver_id=?, description=?, kind=?
       WHERE id=?
     `,
       )
@@ -130,9 +144,20 @@ export function registerCostHandlers(): void {
         data.supplier_id || null,
         data.driver_id || null,
         data.description || null,
+        data.kind,
         id,
       )
     return { ok: true }
+  })
+
+  createValidatedHandler('costs:markPaid', costsMarkPaidSchema, (data) => {
+    const placeholders = data.ids.map(() => '?').join(',')
+    const r = db()
+      .prepare(
+        `UPDATE costs SET status = 'paid', paid_date = ? WHERE status = 'open' AND id IN (${placeholders})`,
+      )
+      .run(data.paid_date, ...data.ids)
+    return { ok: true, updated: r.changes }
   })
 
   createIdValidatedHandler('costs:delete', (id) => {

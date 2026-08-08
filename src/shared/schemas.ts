@@ -226,9 +226,15 @@ export const costSchema = z.object({
     (val) => (val === '' || val === null || val === undefined ? 1 : Number(val)),
     z.number().int().min(1, 'Mínimo de 1 parcela').max(360, 'Máximo de 360 parcelas'),
   ),
+  kind: z.enum(['operational', 'expense']).default('operational'),
 })
 
 export const receivablesMarkPaidSchema = z.object({
+  ids: z.array(idSchema).min(1, 'Selecione ao menos um item'),
+  paid_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data inválida'),
+})
+
+export const costsMarkPaidSchema = z.object({
   ids: z.array(idSchema).min(1, 'Selecione ao menos um item'),
   paid_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data inválida'),
 })

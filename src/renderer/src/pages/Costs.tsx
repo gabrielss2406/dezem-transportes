@@ -28,6 +28,7 @@ interface CostFormData {
   driver_id: number | null
   description?: string
   installments: number
+  kind: 'operational' | 'expense'
 }
 
 interface FuelFormData {
@@ -49,6 +50,7 @@ const EMPTY_COST: CostFormData = {
   driver_id: null,
   description: '',
   installments: 1,
+  kind: 'operational',
 }
 
 const EMPTY_FUEL: FuelFormData = {
@@ -85,12 +87,15 @@ export function CostsPage() {
   const [costCategories, setCostCategories] = useState<{ value: string; label: string }[]>([])
   const [filterCategory, setFilterCategory] = useState('')
   const [filterSupplierId, setFilterSupplierId] = useState('')
+  const [filterStatus, setFilterStatus] = useState('')
   const [costDateFilters, setCostDateFilters] = useState({ startDate: '', endDate: '' })
   const [costModal, setCostModal] = useState(false)
   const [editingCost, setEditingCost] = useState<Cost | null>(null)
   const [pendingCost, setPendingCost] = useState<any>(null)
   const [deleteCostTarget, setDeleteCostTarget] = useState<Cost | null>(null)
   const [showCostDiscardConfirm, setShowCostDiscardConfirm] = useState(false)
+  const [markPaidTarget, setMarkPaidTarget] = useState<Cost | null>(null)
+  const [markPaidDate, setMarkPaidDate] = useState(today())
 
   // ── Fuel state ──
   const [fuelRecords, setFuelRecords] = useState<FuelRecord[]>([])
@@ -184,9 +189,10 @@ export function CostsPage() {
       startDate: costDateFilters.startDate || undefined,
       endDate: costDateFilters.endDate || undefined,
       supplier_id: filterSupplierId || undefined,
+      status: filterStatus || undefined,
     })
     setCosts(c)
-  }, [costDateFilters, filterSupplierId])
+  }, [costDateFilters, filterSupplierId, filterStatus])
 
   const loadFuel = useCallback(async () => {
     const f = await window.api.fuel.list(
@@ -287,10 +293,29 @@ export function CostsPage() {
       driver_id: row.driver_id ?? null,
       description: row.description ?? '',
       installments: 1,
+      kind: row.kind,
     })
     setIsInstallment(false)
     window.focus()
     setCostModal(true)
+  }
+
+  const handleMarkCostPaid = async () => {
+    if (!markPaidTarget) {
+      return
+    }
+    const result = await window.api.costs.markPaid({
+      ids: [markPaidTarget.id],
+      paid_date: markPaidDate,
+    })
+    if (result?.ok === false) {
+      show('Erro ao dar baixa', 'error')
+      return
+    }
+    show('Parcela baixada!')
+    setMarkPaidTarget(null)
+    setMarkPaidDate(today())
+    loadCosts()
   }
 
   const handleDeleteCost = async () => {
@@ -499,6 +524,18 @@ export function CostsPage() {
                 optional
               />
             </div>
+            <div className="flex-1 min-w-[160px]">
+              <Select
+                label="Status"
+                value={filterStatus}
+                onChange={(v) => setFilterStatus(String(v))}
+                options={[
+                  { value: 'open', label: 'Em aberto' },
+                  { value: 'paid', label: 'Pago' },
+                ]}
+                optional
+              />
+            </div>
           </div>
 
           <div className="bg-surface-container rounded-xl overflow-hidden border border-outline-variant/10">
@@ -545,6 +582,18 @@ export function CostsPage() {
                             Parcela {row.installment_number}/{row.installment_total}
                           </p>
                         )}
+                        <div className="flex gap-1 mt-1">
+                          {row.kind === 'expense' && (
+                            <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-tertiary-container/30 text-tertiary">
+                              Despesa
+                            </span>
+                          )}
+                          {row.status === 'open' && (
+                            <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-amber-500/15 text-amber-700">
+                              Em aberto
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="px-6 py-4 text-sm font-mono text-on-surface-variant">
                         {row.truck_license_plate ?? '—'}
@@ -561,6 +610,19 @@ export function CostsPage() {
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          {row.status === 'open' && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setMarkPaidDate(today())
+                                setMarkPaidTarget(row)
+                              }}
+                              className="p-2 text-on-surface-variant hover:text-tertiary hover:bg-tertiary/10 rounded-lg transition-all"
+                              title="Dar baixa"
+                            >
+                              <span className="material-symbols-outlined text-xl">paid</span>
+                            </button>
+                          )}
                           <button
                             type="button"
                             onClick={() => openEditCost(row)}
@@ -898,6 +960,42 @@ export function CostsPage() {
                 />
               </button>
               <span className="text-sm text-on-surface-variant">Parcelar</span>
+            </div>
+
+            {/* Custo vs Despesa */}
+            <div className="col-span-2">
+              <Controller
+                name="kind"
+                control={costControl}
+                render={({ field }) => (
+                  <div className="flex flex-col gap-1.5">
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
+                      Tipo
+                    </span>
+                    <div className="flex bg-surface-container-lowest border border-outline-variant/30 rounded-lg p-1 gap-1">
+                      {(
+                        [
+                          { value: 'operational', label: 'Custo' },
+                          { value: 'expense', label: 'Despesa' },
+                        ] as const
+                      ).map((opt) => (
+                        <button
+                          key={opt.value}
+                          type="button"
+                          onClick={() => field.onChange(opt.value)}
+                          className={`flex-1 py-2 rounded text-sm font-bold transition-colors ${
+                            field.value === opt.value
+                              ? 'bg-primary text-on-primary'
+                              : 'text-on-surface-variant hover:bg-surface-container-high'
+                          }`}
+                        >
+                          {opt.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              />
             </div>
 
             {isInstallment && (
@@ -1259,6 +1357,29 @@ export function CostsPage() {
           }}
           onCancel={() => setShowCostDiscardConfirm(false)}
         />
+      )}
+      {markPaidTarget && (
+        <Modal title="Dar Baixa" onClose={() => setMarkPaidTarget(null)}>
+          <p className="text-sm text-on-surface-variant mb-4">
+            Dar baixa na parcela de{' '}
+            <span className="font-bold text-on-surface">{formatBRL(markPaidTarget.value)}</span>
+            {markPaidTarget.installment_number && markPaidTarget.installment_total
+              ? ` (${markPaidTarget.installment_number}/${markPaidTarget.installment_total})`
+              : ''}
+            .
+          </p>
+          <DatePicker
+            label="Data do pagamento"
+            value={markPaidDate}
+            onChange={(e) => setMarkPaidDate(e.target.value)}
+          />
+          <div className="flex justify-end gap-3 mt-6">
+            <Button variant="ghost" onClick={() => setMarkPaidTarget(null)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleMarkCostPaid}>Confirmar</Button>
+          </div>
+        </Modal>
       )}
       {pendingFuel && (
         <ConfirmModal

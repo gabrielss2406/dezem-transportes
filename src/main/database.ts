@@ -457,6 +457,17 @@ export function setupDatabase(): void {
   }
   db.exec('CREATE INDEX IF NOT EXISTS idx_costs_installment_group ON costs(installment_group_id)')
 
+  // Migration: Add kind (Custo/Despesa) and payment status fields to costs if missing
+  if (!costInfo.some((col) => col.name === 'kind')) {
+    db.exec("ALTER TABLE costs ADD COLUMN kind TEXT NOT NULL DEFAULT 'operational'")
+  }
+  if (!costInfo.some((col) => col.name === 'status')) {
+    db.exec("ALTER TABLE costs ADD COLUMN status TEXT NOT NULL DEFAULT 'paid'")
+  }
+  if (!costInfo.some((col) => col.name === 'paid_date')) {
+    db.exec('ALTER TABLE costs ADD COLUMN paid_date TEXT DEFAULT NULL')
+  }
+
   // Seed: default supplier types if none exist
   const supplierTypeCount = (db.prepare('SELECT COUNT(*) as c FROM supplier_types').get() as any).c
   if (supplierTypeCount === 0) {
