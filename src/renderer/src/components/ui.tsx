@@ -613,8 +613,9 @@ interface ModalProps {
   onClose: () => void
   onEscape?: () => void
   children: React.ReactNode
+  size?: 'md' | 'xl'
 }
-export function Modal({ title, onClose, onEscape, children }: ModalProps) {
+export function Modal({ title, onClose, onEscape, children, size = 'md' }: ModalProps) {
   useEffect(() => {
     const handleEsc = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -631,7 +632,9 @@ export function Modal({ title, onClose, onEscape, children }: ModalProps) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div className="bg-surface-container-low border border-outline-variant/20 rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+      <div
+        className={`bg-surface-container-low border border-outline-variant/20 rounded-xl shadow-2xl w-full ${size === 'xl' ? 'max-w-3xl' : 'max-w-lg'} max-h-[90vh] overflow-y-auto`}
+      >
         <div className="flex items-center justify-between px-6 py-4 border-b border-outline-variant/10">
           <h2 className="font-headline font-bold text-on-surface text-lg">{title}</h2>
           <button

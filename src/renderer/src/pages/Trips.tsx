@@ -918,9 +918,10 @@ export function TripsPage() {
           title={editing ? 'Editar Lançamento' : 'Novo Lançamento'}
           onClose={() => setModal(false)}
           onEscape={handleEscape}
+          size="xl"
         >
           <div className="space-y-6">
-            <div className="grid grid-cols-2 gap-5">
+            <div className="grid grid-cols-3 gap-5">
               <Controller
                 name="date"
                 control={control}
@@ -1108,7 +1109,7 @@ export function TripsPage() {
               />
 
               {noPriceRegistered && (
-                <div className="col-span-2 border border-amber-500/30 bg-amber-500/5 rounded-xl p-4 space-y-3 animate-in fade-in slide-in-from-top-1 duration-200">
+                <div className="col-span-3 border border-amber-500/30 bg-amber-500/5 rounded-xl p-4 space-y-3 animate-in fade-in slide-in-from-top-1 duration-200">
                   <p className="text-xs text-amber-700">
                     Nenhum preço cadastrado para esse produto/cliente. Informe o valor unitário para
                     calcular o valor cobrado automaticamente.
@@ -1143,7 +1144,7 @@ export function TripsPage() {
                 )}
               />
 
-              <div className="col-span-2">
+              <div className="col-span-3">
                 <Controller
                   name="ticket_number"
                   control={control}
@@ -1166,7 +1167,7 @@ export function TripsPage() {
                 />
               </div>
 
-              <div className="col-span-2">
+              <div className="col-span-3">
                 <Input
                   label="Observação"
                   optional
@@ -1244,7 +1245,7 @@ export function TripsPage() {
               </div>
 
               {/* Overweight toggle */}
-              <div className="col-span-2 pt-1">
+              <div className="col-span-3 pt-1">
                 <button
                   type="button"
                   onClick={() => {
@@ -1273,7 +1274,7 @@ export function TripsPage() {
 
               {/* Overweight section */}
               {hasOverweight && (
-                <div className="col-span-2 border border-amber-500/30 bg-amber-500/5 rounded-xl p-4 space-y-4 animate-in fade-in slide-in-from-top-1 duration-200">
+                <div className="col-span-3 border border-amber-500/30 bg-amber-500/5 rounded-xl p-4 space-y-4 animate-in fade-in slide-in-from-top-1 duration-200">
                   <h4 className="text-[10px] font-black uppercase tracking-widest text-amber-600 flex items-center gap-2">
                     <span className="material-symbols-outlined text-sm">warning</span>
                     Informações do Excesso de Peso
