@@ -84,8 +84,10 @@ export function CostsPage() {
   const [costs, setCosts] = useState<Cost[]>([])
   const [costCategories, setCostCategories] = useState<{ value: string; label: string }[]>([])
   const [filterCategory, setFilterCategory] = useState('')
+  const [filterSupplierId, setFilterSupplierId] = useState('')
   const [costDateFilters, setCostDateFilters] = useState({ startDate: '', endDate: '' })
   const [costModal, setCostModal] = useState(false)
+  const [editingCost, setEditingCost] = useState<Cost | null>(null)
   const [pendingCost, setPendingCost] = useState<any>(null)
   const [deleteCostTarget, setDeleteCostTarget] = useState<Cost | null>(null)
   const [showCostDiscardConfirm, setShowCostDiscardConfirm] = useState(false)
@@ -181,9 +183,10 @@ export function CostsPage() {
     const c = await window.api.costs.list({
       startDate: costDateFilters.startDate || undefined,
       endDate: costDateFilters.endDate || undefined,
+      supplier_id: filterSupplierId || undefined,
     })
     setCosts(c)
-  }, [costDateFilters])
+  }, [costDateFilters, filterSupplierId])
 
   const loadFuel = useCallback(async () => {
     const f = await window.api.fuel.list(
@@ -226,15 +229,18 @@ export function CostsPage() {
   // ── Cost modal lifecycle ──
   useEffect(() => {
     if (costModal) {
-      setTimeout(() => {
-        window.focus()
-        categorySelectRef.current?.open()
-      }, 200)
+      if (!editingCost) {
+        setTimeout(() => {
+          window.focus()
+          categorySelectRef.current?.open()
+        }, 200)
+      }
     } else {
       resetCost(EMPTY_COST)
       setIsInstallment(false)
+      setEditingCost(null)
     }
-  }, [costModal, resetCost])
+  }, [costModal, editingCost, resetCost])
 
   // ── Fuel modal lifecycle ──
   useEffect(() => {
@@ -251,19 +257,41 @@ export function CostsPage() {
   // ── Cost handlers ──
   const saveCost = async (data: CostFormData) => {
     try {
-      await window.api.costs.create(data as any)
-      show('Custo lançado!')
+      if (editingCost) {
+        await window.api.costs.update(editingCost.id, data as any)
+        show('Custo atualizado!')
+      } else {
+        await window.api.costs.create(data as any)
+        show('Custo lançado!')
+      }
       setCostModal(false)
       setPendingCost(null)
       loadCosts()
     } catch (e: any) {
       setPendingCost(null)
-      show(e.message || 'Erro ao lançar custo', 'error')
+      show(e.message || 'Erro ao salvar custo', 'error')
     }
   }
 
   const onCostSubmit = (data: CostFormData) => saveCost(data)
   const onCostEnterSubmit = (data: CostFormData) => setPendingCost(data)
+
+  const openEditCost = (row: Cost) => {
+    setEditingCost(row)
+    resetCost({
+      date: row.date,
+      category: row.category,
+      value: row.value,
+      truck_id: row.truck_id ?? null,
+      supplier_id: row.supplier_id ?? null,
+      driver_id: row.driver_id ?? null,
+      description: row.description ?? '',
+      installments: 1,
+    })
+    setIsInstallment(false)
+    window.focus()
+    setCostModal(true)
+  }
 
   const handleDeleteCost = async () => {
     if (!deleteCostTarget) {
@@ -425,7 +453,7 @@ export function CostsPage() {
             </div>
           </div>
 
-          {/* Date filters */}
+          {/* Date + category + supplier filters */}
           <div className="bg-surface-container-low p-4 rounded-xl border border-outline-variant/10 flex flex-wrap items-end gap-4">
             <div className="flex-1 min-w-[140px]">
               <DatePicker
@@ -441,35 +469,36 @@ export function CostsPage() {
                 onChange={(e) => setCostDateFilters((f) => ({ ...f, endDate: e.target.value }))}
               />
             </div>
-          </div>
-
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={() => setFilterCategory('')}
-              className={`px-4 py-2 rounded text-xs font-bold flex items-center gap-1.5 transition-colors ${
-                !filterCategory
-                  ? 'bg-primary text-on-primary'
-                  : 'bg-surface-container-highest text-on-surface hover:bg-surface-bright cursor-pointer'
-              }`}
-            >
-              {!filterCategory && <span className="material-symbols-outlined text-sm">check</span>}
-              Todos
-            </button>
-            {costCategories.map((c) => (
-              <button
-                type="button"
-                key={c.value}
-                onClick={() => setFilterCategory(filterCategory === c.value ? '' : c.value)}
-                className={`px-4 py-2 rounded text-xs font-bold transition-colors ${
-                  filterCategory === c.value
-                    ? 'bg-primary text-on-primary'
-                    : 'bg-surface-container-highest text-on-surface hover:bg-surface-bright cursor-pointer'
-                }`}
-              >
-                {c.label}
-              </button>
-            ))}
+            <div className="flex-1 min-w-[180px]">
+              <Select
+                label="Categoria"
+                value={filterCategory}
+                onChange={(v) => setFilterCategory(String(v))}
+                options={costCategories}
+                optional
+              />
+            </div>
+            <div className="flex-1 min-w-[180px]">
+              <Select
+                label="Fornecedor"
+                value={filterSupplierId}
+                onChange={(v) => setFilterSupplierId(String(v))}
+                options={suppliers.map((s) => ({
+                  value: s.id,
+                  label: (
+                    <div className="flex justify-between">
+                      <span>{s.name}</span>
+                      {s.customId && (
+                        <span className="text-on-surface-variant/50">#{s.customId}</span>
+                      )}
+                    </div>
+                  ),
+                  displayLabel: s.name,
+                  searchableLabel: `${s.name} ${s.customId || ''}`,
+                }))}
+                optional
+              />
+            </div>
           </div>
 
           <div className="bg-surface-container rounded-xl overflow-hidden border border-outline-variant/10">
@@ -531,7 +560,14 @@ export function CostsPage() {
                         {formatBRL(row.value)}
                       </td>
                       <td className="px-6 py-4">
-                        <div className="flex justify-end opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button
+                            type="button"
+                            onClick={() => openEditCost(row)}
+                            className="p-2 text-on-surface-variant hover:text-primary hover:bg-primary/10 rounded-lg transition-all"
+                          >
+                            <span className="material-symbols-outlined text-xl">edit</span>
+                          </button>
                           <button
                             type="button"
                             onClick={() => setDeleteCostTarget(row)}
@@ -772,7 +808,11 @@ export function CostsPage() {
 
       {/* ── COST MODAL ── */}
       {costModal && (
-        <Modal title="Novo Custo" onClose={() => setCostModal(false)} onEscape={handleCostEscape}>
+        <Modal
+          title={editingCost ? 'Editar Custo' : 'Novo Custo'}
+          onClose={() => setCostModal(false)}
+          onEscape={handleCostEscape}
+        >
           <div className="grid grid-cols-2 gap-4">
             <div className="col-span-2">
               <Controller
@@ -996,7 +1036,9 @@ export function CostsPage() {
             <Button variant="ghost" onClick={() => setCostModal(false)}>
               Cancelar
             </Button>
-            <Button onClick={handleCostSubmit(onCostSubmit as any)}>Salvar Custo</Button>
+            <Button onClick={handleCostSubmit(onCostSubmit as any)}>
+              {editingCost ? 'Salvar Alterações' : 'Salvar Custo'}
+            </Button>
           </div>
         </Modal>
       )}

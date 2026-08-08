@@ -356,6 +356,7 @@ declare global {
       costs: {
         list(filters?: any): Promise<Cost[]>
         create(data: any): Promise<{ id: number }>
+        update(id: number, data: any): Promise<{ ok: boolean }>
         delete(id: number): Promise<{ ok: boolean }>
         issueMonthlySalaries(monthYear: string): Promise<{ ok: boolean; issued: number }>
       }

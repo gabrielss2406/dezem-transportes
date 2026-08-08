@@ -238,6 +238,7 @@ export const Select = forwardRef<SelectRef, SelectProps>(
     const containerRef = useRef<HTMLDivElement>(null)
     const buttonRef = useRef<HTMLButtonElement>(null)
     const searchInputRef = useRef<HTMLInputElement>(null)
+    const optionRefs = useRef<(HTMLButtonElement | null)[]>([])
     const [coords, setCoords] = useState({ top: 0, left: 0, width: 0 })
     const uniqueId = useRef(Math.random())
     const id = React.useId()
@@ -360,6 +361,12 @@ export const Select = forwardRef<SelectRef, SelectProps>(
         window.removeEventListener('scroll', updateCoords, true)
       }
     }, [isOpen, updateCoords])
+
+    useEffect(() => {
+      if (isOpen) {
+        optionRefs.current[highlightedIndex]?.scrollIntoView({ block: 'nearest' })
+      }
+    }, [isOpen, highlightedIndex])
 
     useEffect(() => {
       const handleClickOutside = (event: MouseEvent) => {
@@ -494,6 +501,9 @@ export const Select = forwardRef<SelectRef, SelectProps>(
                     <button
                       key={option.value}
                       type="button"
+                      ref={(el) => {
+                        optionRefs.current[index] = el
+                      }}
                       onClick={(e) => {
                         e.preventDefault()
                         e.stopPropagation()

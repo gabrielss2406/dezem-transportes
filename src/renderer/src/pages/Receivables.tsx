@@ -14,6 +14,7 @@ import {
   Toast,
   useToast,
 } from '../components/ui'
+import { generatePdf } from '../lib/pdfGenerator'
 import type { Customer, Receivable } from '../lib/types'
 import { formatBRL, formatDate, today } from '../lib/utils'
 
@@ -143,6 +144,68 @@ export function ReceivablesPage() {
     loadOpenTotals()
   }
 
+  const handleExportPdf = async () => {
+    const subtitleParts: string[] = []
+    const fileNameParts: string[] = []
+
+    if (filters.startDate || filters.endDate) {
+      const start = filters.startDate ? formatDate(filters.startDate) : 'Início'
+      const end = filters.endDate ? formatDate(filters.endDate) : 'Fim'
+      subtitleParts.push(`Período: ${start} a ${end}`)
+      fileNameParts.push(`${start}_a_${end}`)
+    }
+    if (filters.customer_id) {
+      const customer = customers.find((c) => String(c.id) === String(filters.customer_id))
+      if (customer) {
+        subtitleParts.push(`Cliente: ${customer.name}`)
+        fileNameParts.push(customer.name)
+      }
+    }
+    if (filters.status) {
+      subtitleParts.push(`Status: ${filters.status === 'paid' ? 'Pago' : 'Aberto'}`)
+    }
+
+    const safeFileName = fileNameParts
+      .join('_')
+      .normalize('NFD')
+      .replace(/\p{Diacritic}/gu, '')
+      .replace(/\s+/g, '_')
+      .replace(/[^\w-]/g, '')
+
+    const fileName = safeFileName ? `contas_a_receber_${safeFileName}` : 'contas_a_receber'
+
+    const headers = ['Data', 'Bilhete/Descrição', 'Cliente', 'Valor', 'Status']
+    const data = receivables.map((row) => [
+      formatDate(row.trip_date || row.due_date || ''),
+      row.trip_ticket_number ?? row.description ?? '—',
+      row.customer_name ?? '—',
+      formatBRL(row.amount),
+      row.status === 'paid' ? 'Pago' : 'Aberto',
+    ])
+    const total = receivables.reduce((s, r) => s + r.amount, 0)
+    const foot = [['TOTAL', '', '', formatBRL(total), '']]
+
+    const pdfData = generatePdf({
+      title: 'Contas a Receber',
+      subtitle: subtitleParts.join(' | '),
+      headers,
+      data,
+      foot,
+    })
+
+    try {
+      const result = await window.api.exportPdf({ fileName, data: pdfData })
+      if (result.success) {
+        show(`PDF salvo e aberto com sucesso em: ${result.path}`, 'success')
+      } else {
+        show(`Erro ao exportar PDF: ${result.error}`, 'error')
+      }
+    } catch (error) {
+      show('Ocorreu um erro inesperado ao exportar o PDF.', 'error')
+      console.error(error)
+    }
+  }
+
   const openCreateModal = () => {
     reset(EMPTY_RECEIVABLE)
     setCreateModal(true)
@@ -192,6 +255,8 @@ export function ReceivablesPage() {
         subtitle="Acompanhe os recebíveis gerados por lançamento e dê baixa nos pagamentos."
         actionLabel="Nova Conta"
         onAction={openCreateModal}
+        secondaryActionLabel="Exportar PDF"
+        onSecondaryAction={handleExportPdf}
       />
 
       <div className="grid grid-cols-2 gap-4 mb-8">
@@ -282,7 +347,7 @@ export function ReceivablesPage() {
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-surface-container-low">
-              <th className="px-6 py-4 w-10">
+              <th className="px-6 py-2.5 w-10">
                 {selectableRows.length > 0 && (
                   <input
                     type="checkbox"
@@ -295,7 +360,7 @@ export function ReceivablesPage() {
               {['Data', 'Bilhete', 'Cliente', 'Valor', 'Status', ''].map((h) => (
                 <th
                   key={h}
-                  className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-on-surface-variant"
+                  className="px-6 py-2.5 text-[10px] font-black uppercase tracking-widest text-on-surface-variant"
                 >
                   {h}
                 </th>
@@ -312,7 +377,7 @@ export function ReceivablesPage() {
             )}
             {receivables.map((row) => (
               <tr key={row.id} className="hover:bg-surface-bright/5 transition-colors group">
-                <td className="px-6 py-4">
+                <td className="px-6 py-2.5">
                   {row.status === 'open' && (
                     <input
                       type="checkbox"
@@ -322,17 +387,17 @@ export function ReceivablesPage() {
                     />
                   )}
                 </td>
-                <td className="px-6 py-4 text-sm text-on-surface-variant">
+                <td className="px-6 py-2.5 text-sm text-on-surface-variant">
                   {formatDate(row.trip_date || row.due_date || '')}
                 </td>
-                <td className="px-6 py-4 text-sm font-mono text-on-surface-variant">
+                <td className="px-6 py-2.5 text-sm font-mono text-on-surface-variant">
                   {row.trip_ticket_number ?? row.description ?? '—'}
                 </td>
-                <td className="px-6 py-4 text-sm text-on-surface">{row.customer_name ?? '—'}</td>
-                <td className="px-6 py-4 font-black font-headline text-on-surface text-sm">
+                <td className="px-6 py-2.5 text-sm text-on-surface">{row.customer_name ?? '—'}</td>
+                <td className="px-6 py-2.5 font-black font-headline text-on-surface text-sm">
                   {formatBRL(row.amount)}
                 </td>
-                <td className="px-6 py-4">
+                <td className="px-6 py-2.5">
                   <span
                     className={`text-[10px] font-black uppercase px-2.5 py-1 rounded ${
                       row.status === 'paid'
@@ -343,7 +408,7 @@ export function ReceivablesPage() {
                     {row.status === 'paid' ? 'Pago' : 'Aberto'}
                   </span>
                 </td>
-                <td className="px-6 py-4">
+                <td className="px-6 py-2.5">
                   <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                     {row.status === 'open' && (
                       <button
