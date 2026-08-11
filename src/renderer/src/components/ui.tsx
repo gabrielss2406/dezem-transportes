@@ -246,6 +246,7 @@ export const Select = forwardRef<SelectRef, SelectProps>(
     useImperativeHandle(ref, () => ({
       focus: () => buttonRef.current?.focus(),
       open: () => {
+        scrollFieldIntoView(buttonRef.current)
         setIsOpen(true)
         document.dispatchEvent(
           new CustomEvent('close-other-selects', { detail: { id: uniqueId.current } }),
@@ -607,6 +608,34 @@ export function KpiCard({ label, value, sub, accent }: KpiCardProps) {
   )
 }
 
+// Rola o ancestral com scroll real pra manter o campo focado visível, antecipando o
+// scroll assim que o campo passa de `thresholdRatio` da altura visível — em vez de só
+// reagir quando ele já saiu de vista.
+function scrollFieldIntoView(el: HTMLElement | null, thresholdRatio = 0.8) {
+  if (!el) {
+    return
+  }
+  let container: HTMLElement | null = el.parentElement
+  while (container) {
+    const style = window.getComputedStyle(container)
+    if (/(auto|scroll)/.test(style.overflowY) && container.scrollHeight > container.clientHeight) {
+      break
+    }
+    container = container.parentElement
+  }
+  if (!container) {
+    return
+  }
+  const containerRect = container.getBoundingClientRect()
+  const elRect = el.getBoundingClientRect()
+  const relativeTop = elRect.top - containerRect.top
+  const relativeBottom = elRect.bottom - containerRect.top
+  const threshold = containerRect.height * thresholdRatio
+  if (relativeBottom > threshold || relativeTop < 0) {
+    el.scrollIntoView({ block: 'center', behavior: 'smooth' })
+  }
+}
+
 // ── Modal ────────────────────────────────────────────────────────────────────
 interface ModalProps {
   title: string
@@ -616,6 +645,8 @@ interface ModalProps {
   size?: 'md' | 'xl'
 }
 export function Modal({ title, onClose, onEscape, children, size = 'md' }: ModalProps) {
+  const scrollRef = useRef<HTMLDivElement>(null)
+
   useEffect(() => {
     const handleEsc = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -630,9 +661,25 @@ export function Modal({ title, onClose, onEscape, children, size = 'md' }: Modal
     return () => window.removeEventListener('keydown', handleEsc)
   }, [onClose, onEscape])
 
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el) {
+      return
+    }
+    const handleFocusIn = (e: FocusEvent) => {
+      const target = e.target as HTMLElement | null
+      if (target && el.contains(target)) {
+        scrollFieldIntoView(target)
+      }
+    }
+    el.addEventListener('focusin', handleFocusIn)
+    return () => el.removeEventListener('focusin', handleFocusIn)
+  }, [])
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
       <div
+        ref={scrollRef}
         className={`bg-surface-container-low border border-outline-variant/20 rounded-xl shadow-2xl w-full ${size === 'xl' ? 'max-w-3xl' : 'max-w-lg'} max-h-[90vh] overflow-y-auto`}
       >
         <div className="flex items-center justify-between px-6 py-4 border-b border-outline-variant/10">

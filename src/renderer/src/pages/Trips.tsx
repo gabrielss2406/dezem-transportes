@@ -392,6 +392,12 @@ export function TripsPage() {
     trips.reduce((s, t) => s + t.weight_ton + (t.overweight_ton || 0), 0).toFixed(4),
   )
 
+  // Tabela mostra mais recente primeiro; PDF/exports usam `trips` na ordem crescente
+  // que vem do backend (trips.handlers.ts, ORDER BY t.date ASC) sem mexer aqui.
+  const displayTrips = [...trips].sort((a, b) =>
+    a.date === b.date ? b.id - a.id : a.date < b.date ? 1 : -1,
+  )
+
   const perTruck = Object.values(
     trips.reduce<Record<number, { license_plate: string; count: number }>>((acc, t) => {
       if (!acc[t.truck_id]) {
@@ -834,14 +840,14 @@ export function TripsPage() {
             </tr>
           </thead>
           <tbody className="divide-y divide-outline-variant/10">
-            {trips.length === 0 && (
+            {displayTrips.length === 0 && (
               <tr>
                 <td colSpan={10} className="px-6 py-12 text-center text-on-surface-variant text-sm">
                   Nenhum lançamento encontrado com os filtros selecionados
                 </td>
               </tr>
             )}
-            {trips.map((row, i) => {
+            {displayTrips.map((row, i) => {
               return (
                 <tr
                   key={row.id}
@@ -1146,104 +1152,108 @@ export function TripsPage() {
                 )}
               />
 
-              <div className="col-span-3">
-                <Controller
-                  name="ticket_number"
-                  control={control}
-                  render={({ field }) => (
-                    <Input
-                      ref={ticketInputRef}
-                      label="Nº do Bilhete"
-                      placeholder="Ex: 000123"
-                      value={field.value}
-                      onChange={field.onChange}
-                      error={errors.ticket_number?.message}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault()
-                          taxSelectRef.current?.open()
-                        }
-                      }}
-                    />
-                  )}
-                />
-              </div>
+              <div className="col-span-3 flex gap-5">
+                <div className="w-40 shrink-0">
+                  <Controller
+                    name="ticket_number"
+                    control={control}
+                    render={({ field }) => (
+                      <Input
+                        ref={ticketInputRef}
+                        label="Nº do Bilhete"
+                        placeholder="Ex: 000123"
+                        value={field.value}
+                        onChange={field.onChange}
+                        error={errors.ticket_number?.message}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault()
+                            taxSelectRef.current?.open()
+                          }
+                        }}
+                      />
+                    )}
+                  />
+                </div>
 
-              <div className="col-span-3">
-                <Input
-                  label="Observação"
-                  optional
-                  {...register('observation')}
-                  error={errors.observation?.message}
-                />
+                <div className="flex-1">
+                  <Input
+                    label="Observação"
+                    optional
+                    {...register('observation')}
+                    error={errors.observation?.message}
+                  />
+                </div>
               </div>
 
               {/* Tax section */}
-              <Controller
-                name="has_percentage_tax"
-                control={control}
-                render={({ field }) => (
-                  <Select
-                    ref={taxSelectRef}
-                    label="Imposto"
-                    icon="receipt"
-                    value={field.value ? 'true' : 'false'}
-                    onChange={(v) => field.onChange(v === 'true')}
-                    onEnterSelect={() => commissionSelectRef.current?.open()}
-                    options={[
-                      {
-                        value: 'false',
-                        label: 'Sem imposto',
-                        displayLabel: 'Sem imposto',
-                        searchableLabel: 'sem imposto',
-                      },
-                      {
-                        value: 'true',
-                        label: `Com imposto (${appSettings.taxRate}%)`,
-                        displayLabel: `Com imposto (${appSettings.taxRate}%)`,
-                        searchableLabel: `com imposto ${appSettings.taxRate}`,
-                      },
-                    ]}
-                  />
-                )}
-              />
-
-              {/* Commission section */}
-              <div>
+              <div className="col-span-3 grid grid-cols-2 gap-5">
                 <Controller
-                  name="has_commission"
+                  name="has_percentage_tax"
                   control={control}
                   render={({ field }) => (
                     <Select
-                      ref={commissionSelectRef}
-                      label="Comissão"
-                      icon="percent"
+                      ref={taxSelectRef}
+                      label="Imposto"
+                      icon="receipt"
                       value={field.value ? 'true' : 'false'}
                       onChange={(v) => field.onChange(v === 'true')}
-                      onEnterSelect={() => handleSubmit(onEnterSubmit as any)()}
+                      onEnterSelect={() => commissionSelectRef.current?.open()}
                       options={[
                         {
                           value: 'false',
-                          label: 'Sem comissão',
-                          displayLabel: 'Sem comissão',
-                          searchableLabel: 'sem comissao',
+                          label: 'Sem imposto',
+                          displayLabel: 'Sem imposto',
+                          searchableLabel: 'sem imposto',
                         },
                         {
                           value: 'true',
-                          label: `Com comissão (${effectiveCommissionRate}%)`,
-                          displayLabel: `Com comissão (${effectiveCommissionRate}%)`,
-                          searchableLabel: `com comissao ${effectiveCommissionRate}`,
+                          label: `Com imposto (${appSettings.taxRate}%)`,
+                          displayLabel: `Com imposto (${appSettings.taxRate}%)`,
+                          searchableLabel: `com imposto ${appSettings.taxRate}`,
                         },
                       ]}
                     />
                   )}
                 />
-                {hasCustomCommissionRate && (
-                  <p className="text-xs text-secondary mt-1 flex items-center gap-1">
-                    <span className="material-symbols-outlined text-xs">star</span>
-                    Comissão personalizada deste motorista
-                  </p>
-                )}
+
+                {/* Commission section */}
+                <div>
+                  <Controller
+                    name="has_commission"
+                    control={control}
+                    render={({ field }) => (
+                      <Select
+                        ref={commissionSelectRef}
+                        label="Comissão"
+                        icon="percent"
+                        value={field.value ? 'true' : 'false'}
+                        onChange={(v) => field.onChange(v === 'true')}
+                        onEnterSelect={() => handleSubmit(onEnterSubmit as any)()}
+                        options={[
+                          {
+                            value: 'false',
+                            label: 'Sem comissão',
+                            displayLabel: 'Sem comissão',
+                            searchableLabel: 'sem comissao',
+                          },
+                          {
+                            value: 'true',
+                            label: `Com comissão (${effectiveCommissionRate}%)`,
+                            displayLabel: `Com comissão (${effectiveCommissionRate}%)`,
+                            searchableLabel: `com comissao ${effectiveCommissionRate}`,
+                          },
+                        ]}
+                      />
+                    )}
+                  />
+                  {hasCustomCommissionRate && (
+                    <p className="text-xs text-secondary mt-1 flex items-center gap-1">
+                      <span className="material-symbols-outlined text-xs">star</span>
+                      Comissão personalizada deste motorista
+                    </p>
+                  )}
+                </div>
               </div>
 
               {/* Overweight toggle */}

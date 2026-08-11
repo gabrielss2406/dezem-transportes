@@ -259,7 +259,7 @@ export function ReceivablesPage() {
         onSecondaryAction={handleExportPdf}
       />
 
-      <div className="grid grid-cols-2 gap-4 mb-8">
+      <div className="grid grid-cols-2 gap-3 mb-4">
         {[
           {
             label: 'Total em Aberto',
@@ -270,9 +270,9 @@ export function ReceivablesPage() {
         ].map(({ label, value, icon }) => (
           <div
             key={label}
-            className="bg-surface-container-low p-6 rounded-xl flex items-center gap-4 border border-outline-variant/5 shadow-sm"
+            className="bg-surface-container-low p-3 rounded-xl flex items-center gap-3 border border-outline-variant/5 shadow-sm"
           >
-            <div className="w-12 h-12 bg-surface-container rounded-lg flex items-center justify-center shrink-0">
+            <div className="w-10 h-10 bg-surface-container rounded-lg flex items-center justify-center shrink-0">
               <span className="material-symbols-outlined text-primary">{icon}</span>
             </div>
             <div>
@@ -285,7 +285,7 @@ export function ReceivablesPage() {
         ))}
       </div>
 
-      <div className="bg-surface-container-low p-4 rounded-xl border border-outline-variant/10 flex flex-wrap items-end gap-4 mb-6">
+      <div className="bg-surface-container-low p-3 rounded-xl border border-outline-variant/10 flex flex-wrap items-end gap-3 mb-4">
         <div className="flex-1 min-w-[200px]">
           <Select
             label="Cliente"
@@ -347,7 +347,7 @@ export function ReceivablesPage() {
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-surface-container-low">
-              <th className="px-6 py-2.5 w-10">
+              <th className="px-6 py-1.5 w-10">
                 {selectableRows.length > 0 && (
                   <input
                     type="checkbox"
@@ -360,14 +360,14 @@ export function ReceivablesPage() {
               {['Data', 'Bilhete', 'Cliente', 'Valor', 'Status', ''].map((h) => (
                 <th
                   key={h}
-                  className="px-6 py-2.5 text-[10px] font-black uppercase tracking-widest text-on-surface-variant"
+                  className="px-6 py-1.5 text-[10px] font-black uppercase tracking-widest text-on-surface-variant"
                 >
                   {h}
                 </th>
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-outline-variant/10">
+          <tbody className="divide-y divide-outline-variant/40">
             {receivables.length === 0 && (
               <tr>
                 <td colSpan={7} className="px-6 py-12 text-center text-on-surface-variant text-sm">
@@ -377,7 +377,7 @@ export function ReceivablesPage() {
             )}
             {receivables.map((row) => (
               <tr key={row.id} className="hover:bg-surface-bright/5 transition-colors group">
-                <td className="px-6 py-2.5">
+                <td className="px-6 py-1.5">
                   {row.status === 'open' && (
                     <input
                       type="checkbox"
@@ -387,17 +387,17 @@ export function ReceivablesPage() {
                     />
                   )}
                 </td>
-                <td className="px-6 py-2.5 text-sm text-on-surface-variant">
+                <td className="px-6 py-1.5 text-sm text-on-surface-variant">
                   {formatDate(row.trip_date || row.due_date || '')}
                 </td>
-                <td className="px-6 py-2.5 text-sm font-mono text-on-surface-variant">
+                <td className="px-6 py-1.5 text-sm font-mono text-on-surface-variant">
                   {row.trip_ticket_number ?? row.description ?? '—'}
                 </td>
-                <td className="px-6 py-2.5 text-sm text-on-surface">{row.customer_name ?? '—'}</td>
-                <td className="px-6 py-2.5 font-black font-headline text-on-surface text-sm">
+                <td className="px-6 py-1.5 text-sm text-on-surface">{row.customer_name ?? '—'}</td>
+                <td className="px-6 py-1.5 font-black font-headline text-on-surface text-sm">
                   {formatBRL(row.amount)}
                 </td>
-                <td className="px-6 py-2.5">
+                <td className="px-6 py-1.5">
                   <span
                     className={`text-[10px] font-black uppercase px-2.5 py-1 rounded ${
                       row.status === 'paid'
@@ -408,7 +408,7 @@ export function ReceivablesPage() {
                     {row.status === 'paid' ? 'Pago' : 'Aberto'}
                   </span>
                 </td>
-                <td className="px-6 py-2.5">
+                <td className="px-6 py-1.5">
                   <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                     {row.status === 'open' && (
                       <button

@@ -391,7 +391,9 @@ export function CostsPage() {
   }
 
   const filteredCosts = filterCategory ? costs.filter((c) => c.category === filterCategory) : costs
-  const totalCosts = filteredCosts.reduce((s, c) => s + c.value, 0)
+  const totalCosts = filteredCosts
+    .filter((c) => c.category !== 'fuel')
+    .reduce((s, c) => s + c.value, 0)
   const totalFuel = fuelRecords.reduce((s, f) => s + f.value, 0)
   const totalCommission = commissionData.reduce((s, c) => s + c.total_commission, 0)
 
@@ -499,7 +501,7 @@ export function CostsPage() {
                 label="Categoria"
                 value={filterCategory}
                 onChange={(v) => setFilterCategory(String(v))}
-                options={costCategories}
+                options={costCategories.filter((c) => c.value !== 'fuel')}
                 optional
               />
             </div>
