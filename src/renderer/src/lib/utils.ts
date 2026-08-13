@@ -17,22 +17,51 @@ export function formatDate(dateStr: string): string {
   return `${d}/${m}/${y}`
 }
 
-export function currentMonthRange(): { start: string; end: string } {
-  const now = new Date()
-  const y = now.getFullYear()
-  const m = String(now.getMonth() + 1).padStart(2, '0')
-  const lastDay = new Date(y, now.getMonth() + 1, 0).getDate()
-  return {
-    start: `${y}-${m}-01`,
-    end: `${y}-${m}-${lastDay}`,
-  }
-}
-
 export function currentMonthKey(): string {
   const now = new Date()
   const y = now.getFullYear()
   const m = String(now.getMonth() + 1).padStart(2, '0')
   return `${y}-${m}`
+}
+
+/** Full-month date range (first day through last day, inclusive) for a 'YYYY-MM' key. */
+export function monthRangeFromKey(monthKey: string): { start: string; end: string } {
+  const [y, m] = monthKey.split('-').map(Number)
+  const lastDay = new Date(y, m, 0).getDate()
+  return {
+    start: `${monthKey}-01`,
+    end: `${monthKey}-${String(lastDay).padStart(2, '0')}`,
+  }
+}
+
+export function currentMonthRange(): { start: string; end: string } {
+  return monthRangeFromKey(currentMonthKey())
+}
+
+export function shiftMonthKey(monthKey: string, delta: number): string {
+  const [y, m] = monthKey.split('-').map(Number)
+  const d = new Date(y, m - 1 + delta, 1)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+}
+
+const MONTH_NAMES_PT = [
+  'Janeiro',
+  'Fevereiro',
+  'Março',
+  'Abril',
+  'Maio',
+  'Junho',
+  'Julho',
+  'Agosto',
+  'Setembro',
+  'Outubro',
+  'Novembro',
+  'Dezembro',
+]
+
+export function formatMonthLabel(monthKey: string): string {
+  const [y, m] = monthKey.split('-').map(Number)
+  return `${MONTH_NAMES_PT[m - 1]} ${y}`
 }
 
 export function today(): string {

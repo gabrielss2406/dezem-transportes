@@ -11,13 +11,21 @@ import {
   DatePicker,
   Input,
   Modal,
+  MonthNavigator,
   Select,
   type SelectRef,
   Toast,
   useToast,
 } from '../components/ui'
 import type { CommissionByDriver, Cost, Driver, FuelRecord, Supplier, Truck } from '../lib/types'
-import { currentMonthKey, currentMonthRange, formatBRL, formatDate, today } from '../lib/utils'
+import {
+  currentMonthKey,
+  currentMonthRange,
+  formatBRL,
+  formatDate,
+  monthRangeFromKey,
+  today,
+} from '../lib/utils'
 
 interface CostFormData {
   date: string
@@ -88,7 +96,7 @@ export function CostsPage() {
   const [filterCategory, setFilterCategory] = useState('')
   const [filterSupplierId, setFilterSupplierId] = useState('')
   const [filterStatus, setFilterStatus] = useState('')
-  const [costDateFilters, setCostDateFilters] = useState({ startDate: '', endDate: '' })
+  const [costMonth, setCostMonth] = useState(currentMonthKey())
   const [costModal, setCostModal] = useState(false)
   const [editingCost, setEditingCost] = useState<Cost | null>(null)
   const [pendingCost, setPendingCost] = useState<any>(null)
@@ -99,7 +107,8 @@ export function CostsPage() {
 
   // ── Fuel state ──
   const [fuelRecords, setFuelRecords] = useState<FuelRecord[]>([])
-  const [fuelFilters, setFuelFilters] = useState({ truck_id: '', startDate: '', endDate: '' })
+  const [fuelTruckFilter, setFuelTruckFilter] = useState('')
+  const [fuelMonth, setFuelMonth] = useState(currentMonthKey())
   const [fuelModal, setFuelModal] = useState(false)
   const [pendingFuel, setPendingFuel] = useState<any>(null)
   const [deleteFuelTarget, setDeleteFuelTarget] = useState<FuelRecord | null>(null)
@@ -185,27 +194,25 @@ export function CostsPage() {
   }, [])
 
   const loadCosts = useCallback(async () => {
+    const { start, end } = monthRangeFromKey(costMonth)
     const c = await window.api.costs.list({
-      startDate: costDateFilters.startDate || undefined,
-      endDate: costDateFilters.endDate || undefined,
+      startDate: start,
+      endDate: end,
       supplier_id: filterSupplierId || undefined,
       status: filterStatus || undefined,
     })
     setCosts(c)
-  }, [costDateFilters, filterSupplierId, filterStatus])
+  }, [costMonth, filterSupplierId, filterStatus])
 
   const loadFuel = useCallback(async () => {
-    const f = await window.api.fuel.list(
-      fuelFilters.truck_id || fuelFilters.startDate || fuelFilters.endDate
-        ? {
-            truck_id: fuelFilters.truck_id || undefined,
-            startDate: fuelFilters.startDate || undefined,
-            endDate: fuelFilters.endDate || undefined,
-          }
-        : {},
-    )
+    const { start, end } = monthRangeFromKey(fuelMonth)
+    const f = await window.api.fuel.list({
+      truck_id: fuelTruckFilter || undefined,
+      startDate: start,
+      endDate: end,
+    })
     setFuelRecords(f)
-  }, [fuelFilters])
+  }, [fuelMonth, fuelTruckFilter])
 
   useEffect(() => {
     load()
@@ -451,11 +458,14 @@ export function CostsPage() {
       {activeTab === 'costs' && (
         <div className="space-y-6">
           <div className="flex items-center justify-between">
-            <div className="bg-surface-container-low px-5 py-3 rounded-xl">
-              <p className="text-xs text-on-surface-variant mb-0.5">Total do Período</p>
-              <p className="text-2xl font-black font-headline text-primary">
-                {formatBRL(totalCosts)}
-              </p>
+            <div className="flex items-center gap-4">
+              <div className="bg-surface-container-low px-5 py-3 rounded-xl">
+                <p className="text-xs text-on-surface-variant mb-0.5">Total do Período</p>
+                <p className="text-2xl font-black font-headline text-primary">
+                  {formatBRL(totalCosts)}
+                </p>
+              </div>
+              <MonthNavigator monthKey={costMonth} onChange={setCostMonth} />
             </div>
             <div className="flex gap-3">
               <button
@@ -480,22 +490,8 @@ export function CostsPage() {
             </div>
           </div>
 
-          {/* Date + category + supplier filters */}
+          {/* Category + supplier + status filters */}
           <div className="bg-surface-container-low p-4 rounded-xl border border-outline-variant/10 flex flex-wrap items-end gap-4">
-            <div className="flex-1 min-w-[140px]">
-              <DatePicker
-                label="De"
-                value={costDateFilters.startDate}
-                onChange={(e) => setCostDateFilters((f) => ({ ...f, startDate: e.target.value }))}
-              />
-            </div>
-            <div className="flex-1 min-w-[140px]">
-              <DatePicker
-                label="Até"
-                value={costDateFilters.endDate}
-                onChange={(e) => setCostDateFilters((f) => ({ ...f, endDate: e.target.value }))}
-              />
-            </div>
             <div className="flex-1 min-w-[180px]">
               <Select
                 label="Categoria"
@@ -654,11 +650,14 @@ export function CostsPage() {
       {activeTab === 'fuel' && (
         <div className="space-y-6">
           <div className="flex items-center justify-between">
-            <div className="bg-surface-container-low px-5 py-3 rounded-xl">
-              <p className="text-xs text-on-surface-variant mb-0.5">Total em Combustível</p>
-              <p className="text-2xl font-black font-headline text-primary">
-                {formatBRL(totalFuel)}
-              </p>
+            <div className="flex items-center gap-4">
+              <div className="bg-surface-container-low px-5 py-3 rounded-xl">
+                <p className="text-xs text-on-surface-variant mb-0.5">Total em Combustível</p>
+                <p className="text-2xl font-black font-headline text-primary">
+                  {formatBRL(totalFuel)}
+                </p>
+              </div>
+              <MonthNavigator monthKey={fuelMonth} onChange={setFuelMonth} />
             </div>
             <button
               type="button"
@@ -678,8 +677,8 @@ export function CostsPage() {
             <div className="flex-1 min-w-[160px]">
               <Select
                 label="Caminhão"
-                value={fuelFilters.truck_id}
-                onChange={(v) => setFuelFilters((f) => ({ ...f, truck_id: String(v) }))}
+                value={fuelTruckFilter}
+                onChange={(v) => setFuelTruckFilter(String(v))}
                 options={trucks.map((t) => ({
                   value: t.id,
                   label: (
@@ -694,20 +693,6 @@ export function CostsPage() {
                   searchableLabel: `${t.license_plate} ${t.customId || ''}`,
                 }))}
                 optional
-              />
-            </div>
-            <div className="flex-1 min-w-[140px]">
-              <DatePicker
-                label="De"
-                value={fuelFilters.startDate}
-                onChange={(e) => setFuelFilters((f) => ({ ...f, startDate: e.target.value }))}
-              />
-            </div>
-            <div className="flex-1 min-w-[140px]">
-              <DatePicker
-                label="Até"
-                value={fuelFilters.endDate}
-                onChange={(e) => setFuelFilters((f) => ({ ...f, endDate: e.target.value }))}
               />
             </div>
           </div>
