@@ -1,6 +1,7 @@
 import React, { forwardRef, useState, useRef, useEffect, useImperativeHandle } from 'react'
 import { createPortal } from 'react-dom'
 import { IMaskInput } from 'react-imask'
+import { formatMonthLabel, shiftMonthKey } from '../lib/utils'
 
 // ── Button ───────────────────────────────────────────────────────────────────
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
@@ -553,6 +554,37 @@ export function Badge({ label, color = 'gray' }: BadgeProps) {
     >
       {label}
     </span>
+  )
+}
+
+// ── MonthNavigator ───────────────────────────────────────────────────────────
+interface MonthNavigatorProps {
+  monthKey: string
+  onChange: (monthKey: string) => void
+}
+export function MonthNavigator({ monthKey, onChange }: MonthNavigatorProps) {
+  return (
+    <div className="flex items-center gap-1 bg-surface-container-low border border-outline-variant/20 rounded-xl px-1.5 py-1.5">
+      <button
+        type="button"
+        onClick={() => onChange(shiftMonthKey(monthKey, -1))}
+        className="p-1.5 rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-colors"
+        aria-label="Mês anterior"
+      >
+        <span className="material-symbols-outlined text-xl">chevron_left</span>
+      </button>
+      <span className="min-w-[140px] text-center text-sm font-bold text-on-surface capitalize select-none">
+        {formatMonthLabel(monthKey)}
+      </span>
+      <button
+        type="button"
+        onClick={() => onChange(shiftMonthKey(monthKey, 1))}
+        className="p-1.5 rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-colors"
+        aria-label="Próximo mês"
+      >
+        <span className="material-symbols-outlined text-xl">chevron_right</span>
+      </button>
+    </div>
   )
 }
 

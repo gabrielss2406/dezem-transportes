@@ -10,13 +10,21 @@ import {
   DatePicker,
   Input,
   Modal,
+  MonthNavigator,
   Select,
   Toast,
   useToast,
 } from '../components/ui'
 import { generatePdf } from '../lib/pdfGenerator'
 import type { Customer, Receivable } from '../lib/types'
-import { formatBRL, formatDate, today } from '../lib/utils'
+import {
+  currentMonthKey,
+  formatBRL,
+  formatDate,
+  formatMonthLabel,
+  monthRangeFromKey,
+  today,
+} from '../lib/utils'
 
 interface ReceivableFormData {
   customer_id?: number
@@ -37,14 +45,11 @@ export function ReceivablesPage() {
   const [filters, setFilters] = useState<{
     customer_id: string
     status: string
-    startDate: string
-    endDate: string
   }>({
     customer_id: '',
     status: 'open',
-    startDate: '',
-    endDate: '',
   })
+  const [receivablesMonth, setReceivablesMonth] = useState(currentMonthKey())
   const [receivables, setReceivables] = useState<Receivable[]>([])
   const [openTotals, setOpenTotals] = useState({ amount: 0, count: 0 })
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
@@ -70,15 +75,16 @@ export function ReceivablesPage() {
   }, [])
 
   const loadReceivables = useCallback(async () => {
+    const { start, end } = monthRangeFromKey(receivablesMonth)
     const r = await window.api.receivables.list({
       customer_id: filters.customer_id || undefined,
       status: filters.status || undefined,
-      startDate: filters.startDate || undefined,
-      endDate: filters.endDate || undefined,
+      startDate: start,
+      endDate: end,
     })
     setReceivables(r)
     setSelectedIds(new Set())
-  }, [filters])
+  }, [filters, receivablesMonth])
 
   const loadOpenTotals = useCallback(async () => {
     const open = await window.api.receivables.list({ status: 'open' })
@@ -148,12 +154,9 @@ export function ReceivablesPage() {
     const subtitleParts: string[] = []
     const fileNameParts: string[] = []
 
-    if (filters.startDate || filters.endDate) {
-      const start = filters.startDate ? formatDate(filters.startDate) : 'Início'
-      const end = filters.endDate ? formatDate(filters.endDate) : 'Fim'
-      subtitleParts.push(`Período: ${start} a ${end}`)
-      fileNameParts.push(`${start}_a_${end}`)
-    }
+    const monthLabel = formatMonthLabel(receivablesMonth)
+    subtitleParts.push(`Mês: ${monthLabel}`)
+    fileNameParts.push(receivablesMonth)
     if (filters.customer_id) {
       const customer = customers.find((c) => String(c.id) === String(filters.customer_id))
       if (customer) {
@@ -259,30 +262,33 @@ export function ReceivablesPage() {
         onSecondaryAction={handleExportPdf}
       />
 
-      <div className="grid grid-cols-2 gap-3 mb-4">
-        {[
-          {
-            label: 'Total em Aberto',
-            value: formatBRL(openTotals.amount),
-            icon: 'account_balance_wallet',
-          },
-          { label: 'Qtde em Aberto', value: String(openTotals.count), icon: 'receipt_long' },
-        ].map(({ label, value, icon }) => (
-          <div
-            key={label}
-            className="bg-surface-container-low p-3 rounded-xl flex items-center gap-3 border border-outline-variant/5 shadow-sm"
-          >
-            <div className="w-10 h-10 bg-surface-container rounded-lg flex items-center justify-center shrink-0">
-              <span className="material-symbols-outlined text-primary">{icon}</span>
+      <div className="flex items-start justify-between gap-4 flex-wrap mb-4">
+        <div className="grid grid-cols-2 gap-3 flex-1 min-w-[280px]">
+          {[
+            {
+              label: 'Total em Aberto',
+              value: formatBRL(openTotals.amount),
+              icon: 'account_balance_wallet',
+            },
+            { label: 'Qtde em Aberto', value: String(openTotals.count), icon: 'receipt_long' },
+          ].map(({ label, value, icon }) => (
+            <div
+              key={label}
+              className="bg-surface-container-low p-3 rounded-xl flex items-center gap-3 border border-outline-variant/5 shadow-sm"
+            >
+              <div className="w-10 h-10 bg-surface-container rounded-lg flex items-center justify-center shrink-0">
+                <span className="material-symbols-outlined text-primary">{icon}</span>
+              </div>
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant">
+                  {label}
+                </p>
+                <p className="text-xl font-black text-on-surface font-headline">{value}</p>
+              </div>
             </div>
-            <div>
-              <p className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant">
-                {label}
-              </p>
-              <p className="text-xl font-black text-on-surface font-headline">{value}</p>
-            </div>
-          </div>
-        ))}
+          ))}
+        </div>
+        <MonthNavigator monthKey={receivablesMonth} onChange={setReceivablesMonth} />
       </div>
 
       <div className="bg-surface-container-low p-3 rounded-xl border border-outline-variant/10 flex flex-wrap items-end gap-3 mb-4">
@@ -310,20 +316,6 @@ export function ReceivablesPage() {
               { value: 'paid', label: 'Pago' },
               { value: '', label: 'Todos' },
             ]}
-          />
-        </div>
-        <div className="flex-1 min-w-[160px]">
-          <DatePicker
-            label="Data Inicial"
-            value={filters.startDate}
-            onChange={(e) => setFilters((f) => ({ ...f, startDate: e.target.value }))}
-          />
-        </div>
-        <div className="flex-1 min-w-[160px]">
-          <DatePicker
-            label="Data Final"
-            value={filters.endDate}
-            onChange={(e) => setFilters((f) => ({ ...f, endDate: e.target.value }))}
           />
         </div>
       </div>
