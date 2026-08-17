@@ -21,4 +21,9 @@ export interface PdfExportData {
   data: ArrayBuffer
 }
 
+export interface ImageExportData {
+  fileName: string
+  data: ArrayBuffer
+}
+
 export type TripExportFieldsConfig = string[] | null

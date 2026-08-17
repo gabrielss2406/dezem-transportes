@@ -17,6 +17,7 @@ import {
   Toast,
   useToast,
 } from '../components/ui'
+import { generatePdf } from '../lib/pdfGenerator'
 import type { CommissionByDriver, Cost, Driver, FuelRecord, Supplier, Truck } from '../lib/types'
 import {
   currentMonthKey,
@@ -97,6 +98,9 @@ export function CostsPage() {
   const [filterSupplierId, setFilterSupplierId] = useState('')
   const [filterStatus, setFilterStatus] = useState('')
   const [costMonth, setCostMonth] = useState(currentMonthKey())
+  const [costFilterMode, setCostFilterMode] = useState<'month' | 'range'>('month')
+  const [costRangeStart, setCostRangeStart] = useState(today())
+  const [costRangeEnd, setCostRangeEnd] = useState(today())
   const [costModal, setCostModal] = useState(false)
   const [editingCost, setEditingCost] = useState<Cost | null>(null)
   const [pendingCost, setPendingCost] = useState<any>(null)
@@ -194,7 +198,10 @@ export function CostsPage() {
   }, [])
 
   const loadCosts = useCallback(async () => {
-    const { start, end } = monthRangeFromKey(costMonth)
+    const { start, end } =
+      costFilterMode === 'month'
+        ? monthRangeFromKey(costMonth)
+        : { start: costRangeStart, end: costRangeEnd }
     const c = await window.api.costs.list({
       startDate: start,
       endDate: end,
@@ -202,7 +209,7 @@ export function CostsPage() {
       status: filterStatus || undefined,
     })
     setCosts(c)
-  }, [costMonth, filterSupplierId, filterStatus])
+  }, [costMonth, filterSupplierId, filterStatus, costFilterMode, costRangeStart, costRangeEnd])
 
   const loadFuel = useCallback(async () => {
     const { start, end } = monthRangeFromKey(fuelMonth)
@@ -335,6 +342,75 @@ export function CostsPage() {
     loadCosts()
   }
 
+  const handleExportCostsPdf = async () => {
+    const subtitleParts: string[] = []
+    const fileNameParts: string[] = []
+
+    if (costFilterMode === 'month') {
+      subtitleParts.push(`Mês: ${costMonth}`)
+      fileNameParts.push(costMonth)
+    } else {
+      subtitleParts.push(`Período: ${formatDate(costRangeStart)} a ${formatDate(costRangeEnd)}`)
+      fileNameParts.push(`${costRangeStart}_a_${costRangeEnd}`)
+    }
+    if (filterSupplierId) {
+      const supplier = suppliers.find((s) => String(s.id) === String(filterSupplierId))
+      if (supplier) {
+        subtitleParts.push(`Fornecedor: ${supplier.name}`)
+        fileNameParts.push(supplier.name)
+      }
+    } else {
+      subtitleParts.push('Fornecedor: Todos')
+    }
+    if (filterStatus) {
+      subtitleParts.push(`Status: ${filterStatus === 'paid' ? 'Pago' : 'Em aberto'}`)
+    }
+
+    const safeFileName = fileNameParts
+      .join('_')
+      .normalize('NFD')
+      .replace(/\p{Diacritic}/gu, '')
+      .replace(/\s+/g, '_')
+      .replace(/[^\w-]/g, '')
+
+    const fileName = safeFileName ? `contas_a_pagar_${safeFileName}` : 'contas_a_pagar'
+
+    const headers = ['Data', 'Descrição', 'Categoria', 'Fornecedor', 'Valor', 'Status']
+    const data = filteredCosts.map((row) => {
+      const cat = costCategories.find((c) => c.value === row.category)
+      return [
+        formatDate(row.date),
+        row.description || '—',
+        cat?.label ?? row.category,
+        row.supplier_name ?? '—',
+        formatBRL(row.value),
+        row.status === 'paid' ? 'Pago' : 'Em aberto',
+      ]
+    })
+    const total = filteredCosts.reduce((s, c) => s + c.value, 0)
+    const foot = [['TOTAL', '', '', '', formatBRL(total), '']]
+
+    const pdfData = generatePdf({
+      title: 'Contas a Pagar',
+      subtitle: subtitleParts.join(' | '),
+      headers,
+      data,
+      foot,
+    })
+
+    try {
+      const result = await window.api.exportPdf({ fileName, data: pdfData })
+      if (result.success) {
+        show(`PDF salvo e aberto com sucesso em: ${result.path}`, 'success')
+      } else {
+        show(`Erro ao exportar PDF: ${result.error}`, 'error')
+      }
+    } catch (error) {
+      show('Ocorreu um erro inesperado ao exportar o PDF.', 'error')
+      console.error(error)
+    }
+  }
+
   const handleCostEscape = () => {
     if (isCostDirty) {
       setShowCostDiscardConfirm(true)
@@ -412,6 +488,8 @@ export function CostsPage() {
         pretitle="Gestão Financeira"
         title="Custos da Frota"
         subtitle="Gerencie despesas operacionais e histórico de abastecimentos."
+        secondaryActionLabel="Exportar PDF"
+        onSecondaryAction={handleExportCostsPdf}
       />
 
       {/* Tabs */}
@@ -465,7 +543,45 @@ export function CostsPage() {
                   {formatBRL(totalCosts)}
                 </p>
               </div>
-              <MonthNavigator monthKey={costMonth} onChange={setCostMonth} />
+              <div className="flex gap-1 bg-surface-container-high rounded-lg p-1 border border-outline-variant/10">
+                <button
+                  type="button"
+                  onClick={() => setCostFilterMode('month')}
+                  className={`px-4 py-2 rounded-md text-sm font-bold transition-all ${
+                    costFilterMode === 'month'
+                      ? 'bg-primary text-on-primary shadow-sm'
+                      : 'text-on-surface-variant hover:text-on-surface'
+                  }`}
+                >
+                  Mês
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCostFilterMode('range')}
+                  className={`px-4 py-2 rounded-md text-sm font-bold transition-all ${
+                    costFilterMode === 'range'
+                      ? 'bg-primary text-on-primary shadow-sm'
+                      : 'text-on-surface-variant hover:text-on-surface'
+                  }`}
+                >
+                  Período
+                </button>
+              </div>
+              {costFilterMode === 'month' ? (
+                <MonthNavigator monthKey={costMonth} onChange={setCostMonth} />
+              ) : (
+                <div className="flex items-center gap-2">
+                  <DatePicker
+                    value={costRangeStart}
+                    onChange={(e) => setCostRangeStart(e.target.value)}
+                  />
+                  <span className="text-on-surface-variant text-sm">a</span>
+                  <DatePicker
+                    value={costRangeEnd}
+                    onChange={(e) => setCostRangeEnd(e.target.value)}
+                  />
+                </div>
+              )}
             </div>
             <div className="flex gap-3">
               <button

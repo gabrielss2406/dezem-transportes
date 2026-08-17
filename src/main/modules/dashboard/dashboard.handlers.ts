@@ -332,7 +332,101 @@ export function registerDashboardHandlers(): void {
       )
       .all() as any[]
 
-    const monthlyRevenue: Array<{ month: string; revenue: number }> = []
+    // Monthly cost/expense breakdown (last 6 months) — same components as the
+    // period-total cost/expense calc above, grouped by month instead of summed.
+    const directCostsMonthly = db()
+      .prepare(
+        `
+      SELECT strftime('%Y-%m', c.date) as month, COALESCE(SUM(c.value), 0) as total
+      FROM costs c
+      LEFT JOIN trucks t ON c.truck_id = t.id
+      LEFT JOIN drivers d ON c.driver_id = d.id
+      WHERE c.date >= date('now', '-6 months')
+        AND c.category != 'fuel' AND c.kind = 'operational'
+        AND (c.truck_id IS NULL OR ${INTERNAL_TRUCK})
+        AND (c.driver_id IS NULL OR ${INTERNAL_DRIVER})
+      GROUP BY month
+    `,
+      )
+      .all() as any[]
+
+    const fuelCostsMonthly = db()
+      .prepare(
+        `
+      SELECT strftime('%Y-%m', tr.date) as month, COALESCE(SUM(fs.value), 0) as total
+      FROM trip_fuel_stops fs
+      JOIN trips tr ON fs.trip_id = tr.id
+      JOIN trucks t ON tr.truck_id = t.id
+      JOIN drivers d ON tr.driver_id = d.id
+      WHERE tr.date >= date('now', '-6 months') AND ${INTERNAL_TRUCK} AND ${INTERNAL_DRIVER}
+      GROUP BY month
+    `,
+      )
+      .all() as any[]
+
+    const commissionCostMonthly = db()
+      .prepare(
+        `
+      SELECT strftime('%Y-%m', tr.date) as month, COALESCE(SUM(tr.commission_value), 0) as total
+      FROM trips tr
+      JOIN trucks t ON tr.truck_id = t.id
+      JOIN drivers d ON tr.driver_id = d.id
+      WHERE tr.date >= date('now', '-6 months') AND tr.has_commission = 1 AND ${INTERNAL_TRUCK} AND ${INTERNAL_DRIVER}
+      GROUP BY month
+    `,
+      )
+      .all() as any[]
+
+    const fuelRecordsCostMonthly = db()
+      .prepare(
+        `
+      SELECT strftime('%Y-%m', fr.date) as month, COALESCE(SUM(fr.value), 0) as total
+      FROM fuel_records fr
+      JOIN trucks t ON fr.truck_id = t.id
+      WHERE fr.date >= date('now', '-6 months') AND ${INTERNAL_TRUCK}
+      GROUP BY month
+    `,
+      )
+      .all() as any[]
+
+    const taxMonthly = db()
+      .prepare(
+        `
+      SELECT strftime('%Y-%m', tr.date) as month, COALESCE(SUM(tr.tax_value), 0) as total
+      FROM trips tr
+      JOIN trucks t ON tr.truck_id = t.id
+      JOIN drivers d ON tr.driver_id = d.id
+      WHERE tr.date >= date('now', '-6 months') AND tr.has_percentage_tax = 1 AND ${INTERNAL_TRUCK} AND ${INTERNAL_DRIVER}
+      GROUP BY month
+    `,
+      )
+      .all() as any[]
+
+    const expenseCostMonthly = db()
+      .prepare(
+        `
+      SELECT strftime('%Y-%m', c.date) as month, COALESCE(SUM(c.value), 0) as total
+      FROM costs c
+      LEFT JOIN trucks t ON c.truck_id = t.id
+      LEFT JOIN drivers d ON c.driver_id = d.id
+      WHERE c.date >= date('now', '-6 months') AND c.kind = 'expense'
+        AND (c.truck_id IS NULL OR ${INTERNAL_TRUCK})
+        AND (c.driver_id IS NULL OR ${INTERNAL_DRIVER})
+      GROUP BY month
+    `,
+      )
+      .all() as any[]
+
+    const monthTotal = (rows: any[], monthStr: string) =>
+      Number(rows.find((r) => r.month === monthStr)?.total) || 0
+
+    const monthlyRevenue: Array<{
+      month: string
+      revenue: number
+      cost: number
+      expense: number
+      net: number
+    }> = []
     const now = new Date()
     for (let i = 5; i >= 0; i--) {
       const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
@@ -342,9 +436,22 @@ export function registerDashboardHandlers(): void {
 
       const found = monthlyRevenueRaw.find((r) => r.month === monthStr)
       const avulsaFound = avulsaMonthlyRevenueRaw.find((r) => r.month === monthStr)
+      const monthRevenue = (Number(found?.revenue) || 0) + (Number(avulsaFound?.revenue) || 0)
+
+      const monthCost =
+        monthTotal(directCostsMonthly, monthStr) +
+        monthTotal(fuelCostsMonthly, monthStr) +
+        monthTotal(commissionCostMonthly, monthStr) +
+        monthTotal(fuelRecordsCostMonthly, monthStr) +
+        monthTotal(taxMonthly, monthStr)
+      const monthExpense = monthTotal(expenseCostMonthly, monthStr)
+
       monthlyRevenue.push({
         month: monthStr,
-        revenue: (Number(found?.revenue) || 0) + (Number(avulsaFound?.revenue) || 0),
+        revenue: monthRevenue,
+        cost: monthCost,
+        expense: monthExpense,
+        net: monthRevenue - monthCost - monthExpense,
       })
     }
 
@@ -570,6 +677,30 @@ export function registerDashboardHandlers(): void {
       )
       .all(startDate, endDate) as any[]
 
+    // Saldo Bancário / Contas a Receber / Contas a Pagar — sempre históricos (todo o
+    // banco), não recortados pelo período do dashboard: são posições atuais, não do range.
+    const receivablesOpenTotal = (
+      db()
+        .prepare(`SELECT COALESCE(SUM(amount), 0) as total FROM receivables WHERE status = 'open'`)
+        .get() as any
+    ).total
+    const costsOpenTotal = (
+      db()
+        .prepare(`SELECT COALESCE(SUM(value), 0) as total FROM costs WHERE status = 'open'`)
+        .get() as any
+    ).total
+    const receivablesPaidTotal = (
+      db()
+        .prepare(`SELECT COALESCE(SUM(amount), 0) as total FROM receivables WHERE status = 'paid'`)
+        .get() as any
+    ).total
+    const costsPaidTotal = (
+      db()
+        .prepare(`SELECT COALESCE(SUM(value), 0) as total FROM costs WHERE status = 'paid'`)
+        .get() as any
+    ).total
+    const bankBalance = Number(receivablesPaidTotal) - Number(costsPaidTotal)
+
     return {
       revenue,
       netRevenue: revenue - totalTax,
@@ -589,6 +720,9 @@ export function registerDashboardHandlers(): void {
       perCategory,
       perCustomer,
       perProduct,
+      bankBalance,
+      receivablesOpenTotal: Number(receivablesOpenTotal) || 0,
+      costsOpenTotal: Number(costsOpenTotal) || 0,
     }
   })
 

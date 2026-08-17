@@ -40,6 +40,9 @@ module.exports = {
         'inverse-surface': 'rgb(var(--inverse-surface))',
         'inverse-on-surface': 'rgb(var(--inverse-on-surface))',
         'inverse-primary': 'rgb(var(--inverse-primary))',
+        'chart-blue': 'rgb(var(--chart-blue))',
+        'chart-yellow': 'rgb(var(--chart-yellow))',
+        'chart-green': 'rgb(var(--chart-green))',
       },
       borderRadius: {
         DEFAULT: '0.125rem',

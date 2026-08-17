@@ -1,9 +1,19 @@
-import { useEffect, useState } from 'react'
+import { toPng } from 'html-to-image'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { PageHeader } from '../components/PageHeader'
-import { Button, DatePicker } from '../components/ui'
+import { Button, DatePicker, Toast, useToast } from '../components/ui'
 import type { DashboardSummary } from '../lib/types'
 import { currentMonthRange, formatBRL } from '../lib/utils'
+
+const CHART_SERIES = [
+  { key: 'revenue', label: 'Fat. Bruto', color: 'bg-chart-blue', dot: 'bg-chart-blue' },
+  { key: 'cost', label: 'Custo', color: 'bg-error', dot: 'bg-error' },
+  { key: 'expense', label: 'Despesa', color: 'bg-chart-yellow', dot: 'bg-chart-yellow' },
+  { key: 'net', label: 'Líquido', color: 'bg-chart-green', dot: 'bg-chart-green' },
+] as const
+
+type ChartSeriesKey = (typeof CHART_SERIES)[number]['key']
 
 function KpiBlock({
   label,
@@ -78,6 +88,44 @@ export function DashboardPage() {
   const [range, setRange] = useState(currentMonthRange())
   const [showCustom, setShowCustom] = useState(false)
   const [showAllTrucks, setShowAllTrucks] = useState(false)
+  const [visibleSeries, setVisibleSeries] = useState<Record<ChartSeriesKey, boolean>>({
+    revenue: true,
+    cost: true,
+    expense: true,
+    net: true,
+  })
+  const chartRef = useRef<HTMLDivElement>(null)
+  const { toast, show } = useToast()
+
+  const toggleSeries = (key: ChartSeriesKey) => {
+    setVisibleSeries((prev) => ({ ...prev, [key]: !prev[key] }))
+  }
+
+  const handleExportChartImage = async () => {
+    if (!chartRef.current) {
+      return
+    }
+    try {
+      const dataUrl = await toPng(chartRef.current, {
+        backgroundColor: getComputedStyle(chartRef.current).backgroundColor,
+        pixelRatio: 2,
+      })
+      const res = await fetch(dataUrl)
+      const buffer = await res.arrayBuffer()
+      const result = await window.api.exportImage({
+        fileName: `evolucao_faturamento_${range.start}_a_${range.end}`,
+        data: buffer,
+      })
+      if (result.success) {
+        show(`Imagem salva e aberta em: ${result.path}`, 'success')
+      } else {
+        show(`Erro ao exportar imagem: ${result.error}`, 'error')
+      }
+    } catch (error) {
+      show('Ocorreu um erro inesperado ao exportar a imagem.', 'error')
+      console.error(error)
+    }
+  }
 
   useEffect(() => {
     setLoading(true)
@@ -143,6 +191,7 @@ export function DashboardPage() {
 
   return (
     <div className="px-4 py-8 lg:px-6 lg:py-12 max-w-[1600px] mx-auto">
+      {toast && <Toast message={toast.message} type={toast.type} />}
       <PageHeader title="Visão Geral Operacional" subtitle={monthLabel}>
         <div className="flex gap-3 items-center">
           <button
@@ -222,7 +271,7 @@ export function DashboardPage() {
         {summary && (
           <div className="space-y-12">
             {/* KPI Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               <div className="rounded-xl p-6 bg-surface-container-low border border-outline-variant/5 shadow-sm">
                 <span className="text-[10px] font-black uppercase tracking-widest mb-4 text-on-surface-variant block">
                   Receita
@@ -282,11 +331,32 @@ export function DashboardPage() {
                 trend="Combustível / KM da Frota"
                 info={`${summary.totalKm.toFixed(0)} km percorridos`}
               />
+
+              <KpiBlock
+                label="Saldo Bancário"
+                value={formatBRL(summary.bankBalance).replace('R$ ', '')}
+                info="Recebido − pago (histórico)"
+              />
+
+              <KpiBlock
+                label="Contas a Receber"
+                value={formatBRL(summary.receivablesOpenTotal).replace('R$ ', '')}
+                info="Em aberto (não filtrado por período)"
+              />
+
+              <KpiBlock
+                label="Contas a Pagar"
+                value={formatBRL(summary.costsOpenTotal).replace('R$ ', '')}
+                info="Em aberto (não filtrado por período)"
+              />
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
               {/* Faturamento Mensal */}
-              <div className="lg:col-span-2 bg-surface-container rounded-2xl p-8 border border-outline-variant/10">
+              <div
+                ref={chartRef}
+                className="lg:col-span-2 bg-surface-container rounded-2xl p-8 border border-outline-variant/10"
+              >
                 <div className="flex items-center gap-2 mb-6">
                   <div className="flex items-center gap-3 flex-1">
                     <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
@@ -296,43 +366,125 @@ export function DashboardPage() {
                     </div>
                     <div>
                       <h2 className="text-xl font-black font-headline tracking-tight text-on-surface">
-                        Evolução do Faturamento (Bruto)
+                        Evolução do Faturamento
                       </h2>
                       <p className="text-[10px] text-on-surface-variant mt-0.5">
                         Últimos 6 meses (fixo, não muda com o filtro)
                       </p>
                     </div>
                   </div>
+                  <button
+                    type="button"
+                    onClick={handleExportChartImage}
+                    title="Exportar gráfico como imagem"
+                    className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-on-surface-variant hover:text-primary hover:bg-primary/10 rounded-lg transition-colors"
+                  >
+                    <span className="material-symbols-outlined text-base">download</span>
+                    Exportar imagem
+                  </button>
                 </div>
+
+                {/* Legend / series toggle */}
+                <div className="flex flex-wrap gap-2 mb-4">
+                  {CHART_SERIES.map((s) => (
+                    <button
+                      key={s.key}
+                      type="button"
+                      onClick={() => toggleSeries(s.key)}
+                      className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border transition-all ${
+                        visibleSeries[s.key]
+                          ? 'border-outline-variant/20 text-on-surface bg-surface-container-low'
+                          : 'border-outline-variant/10 text-on-surface-variant/40 bg-transparent'
+                      }`}
+                    >
+                      <span
+                        className={`w-2 h-2 rounded-full ${visibleSeries[s.key] ? s.dot : 'bg-outline-variant/40'}`}
+                      />
+                      {s.label}
+                    </button>
+                  ))}
+                </div>
+
                 <div className="h-64 flex items-stretch gap-4 mt-8 px-2">
                   {(() => {
-                    const maxRevenue = Math.max(...summary.monthlyRevenue.map((x) => x.revenue), 1)
-                    return summary.monthlyRevenue.map((m) => {
-                      const height = (m.revenue / maxRevenue) * 100
-                      return (
-                        <div
-                          key={m.month}
-                          className="flex-1 flex flex-col items-center gap-3 group"
-                        >
-                          <div className="relative w-full flex-1 flex flex-col justify-end items-center">
-                            <div
-                              className="w-full max-w-[40px] bg-primary rounded-t-md transition-all duration-500 group-hover:bg-primary-container group-hover:scale-x-110 origin-bottom"
-                              style={{ height: `${Math.max(height, m.revenue > 0 ? 2 : 0)}%` }}
-                            />
-                            <div className="absolute -top-10 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-all bg-surface-container-highest px-3 py-1.5 rounded-lg text-[10px] font-black text-primary shadow-xl border border-primary/20 whitespace-nowrap z-10">
-                              <div>Bruto: {formatBRL(m.revenue)}</div>
-                              <div className="text-warning text-[9px] font-normal">
-                                (Líquido: {formatBRL(m.revenue - summary.tax / 6)})
+                    const activeSeries = CHART_SERIES.filter((s) => visibleSeries[s.key])
+                    const maxValue = Math.max(
+                      ...summary.monthlyRevenue.flatMap((m) =>
+                        activeSeries.map((s) => Math.abs(m[s.key])),
+                      ),
+                      1,
+                    )
+                    return summary.monthlyRevenue.map((m) => (
+                      <div key={m.month} className="flex-1 flex flex-col items-center gap-3 group">
+                        <div className="relative w-full flex-1 flex items-end justify-center gap-1">
+                          {activeSeries.map((s) => {
+                            const value = m[s.key]
+                            const height = (Math.abs(value) / maxValue) * 100
+                            return (
+                              <div
+                                key={s.key}
+                                className={`flex-1 max-w-[18px] rounded-t-md transition-all duration-500 ${s.color}`}
+                                style={{ height: `${Math.max(height, value !== 0 ? 2 : 0)}%` }}
+                                title={`${s.label}: ${formatBRL(value)}`}
+                              />
+                            )
+                          })}
+                          <div className="pointer-events-none absolute -top-16 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-all bg-surface-container-highest px-3 py-1.5 rounded-lg text-[10px] font-black shadow-xl border border-outline-variant/20 whitespace-nowrap z-10 space-y-0.5">
+                            {activeSeries.map((s) => (
+                              <div key={s.key} className="text-on-surface">
+                                {s.label}: {formatBRL(m[s.key])}
                               </div>
-                            </div>
+                            ))}
                           </div>
-                          <span className="text-[10px] font-black text-on-surface-variant uppercase tracking-tighter opacity-70">
-                            {m.month.split('-')[1]}/{m.month.split('-')[0].slice(2)}
-                          </span>
                         </div>
-                      )
-                    })
+                        <span className="text-[10px] font-black text-on-surface-variant uppercase tracking-tighter opacity-70">
+                          {m.month.split('-')[1]}/{m.month.split('-')[0].slice(2)}
+                        </span>
+                      </div>
+                    ))
                   })()}
+                </div>
+
+                {/* Tabela de valores — sempre visível, garante que o export em imagem
+                    saia com os números (o tooltip de hover não aparece em screenshot) */}
+                <div className="mt-6 overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="border-b border-outline-variant/20">
+                        <th className="py-1.5 pr-3 text-[9px] font-black uppercase tracking-widest text-on-surface-variant">
+                          Mês
+                        </th>
+                        {CHART_SERIES.filter((s) => visibleSeries[s.key]).map((s) => (
+                          <th
+                            key={s.key}
+                            className="py-1.5 px-3 text-[9px] font-black uppercase tracking-widest text-on-surface-variant"
+                          >
+                            <span className="inline-flex items-center gap-1">
+                              <span className={`w-1.5 h-1.5 rounded-full ${s.dot}`} />
+                              {s.label}
+                            </span>
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-outline-variant/10">
+                      {summary.monthlyRevenue.map((m) => (
+                        <tr key={m.month}>
+                          <td className="py-1.5 pr-3 text-[10px] font-bold text-on-surface-variant uppercase">
+                            {m.month.split('-')[1]}/{m.month.split('-')[0].slice(2)}
+                          </td>
+                          {CHART_SERIES.filter((s) => visibleSeries[s.key]).map((s) => (
+                            <td
+                              key={s.key}
+                              className="py-1.5 px-3 text-[10px] font-bold text-on-surface"
+                            >
+                              {formatBRL(m[s.key])}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               </div>
 

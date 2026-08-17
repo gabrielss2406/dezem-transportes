@@ -35,6 +35,7 @@ export function registerTripHandlers(): void {
       SELECT t.*,
         tr.license_plate as truck_license_plate, tr.model as truck_model,
         d.name           as driver_name,
+        d.is_outsourced  as driver_is_outsourced,
         p.name           as product_name,
         c.name           as customer_name,
         (SELECT COUNT(*) FROM trip_fuel_stops WHERE trip_id = t.id) as fuel_stops_count

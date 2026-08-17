@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import type { PdfExportData } from '../shared/types'
+import type { ImageExportData, PdfExportData } from '../shared/types'
 
 // Exposes secure API to the renderer via contextBridge
 contextBridge.exposeInMainWorld('api', {
@@ -174,6 +174,9 @@ contextBridge.exposeInMainWorld('api', {
 
   // PDF
   exportPdf: (data: PdfExportData) => ipcRenderer.invoke('export-pdf', data),
+
+  // Image
+  exportImage: (data: ImageExportData) => ipcRenderer.invoke('export-image', data),
 
   // Cross-window data change notifications (fired after any create/update/delete mutation)
   onDataChanged: (callback: (entity: string) => void) => {

@@ -113,6 +113,7 @@ export function TripsPage() {
   const [showTruckBreakdown, setShowTruckBreakdown] = useState(false)
   const [showDriverBreakdown, setShowDriverBreakdown] = useState(false)
   const [deductionView, setDeductionView] = useState<'tax' | 'commission'>('tax')
+  const [outsourcedFilter, setOutsourcedFilter] = useState<'all' | 'internal' | 'outsourced'>('all')
   const [noPriceRegistered, setNoPriceRegistered] = useState(false)
   const [manualUnitPrice, setManualUnitPrice] = useState<number | null>(null)
   const [filters, setFilters] = useState({
@@ -392,9 +393,18 @@ export function TripsPage() {
     trips.reduce((s, t) => s + t.weight_ton + (t.overweight_ton || 0), 0).toFixed(4),
   )
 
+  const outsourcedTripsCount = trips.filter((t) => t.driver_is_outsourced).length
+
+  const outsourcedFilteredTrips =
+    outsourcedFilter === 'all'
+      ? trips
+      : trips.filter((t) =>
+          outsourcedFilter === 'outsourced' ? !!t.driver_is_outsourced : !t.driver_is_outsourced,
+        )
+
   // Tabela mostra mais recente primeiro; PDF/exports usam `trips` na ordem crescente
   // que vem do backend (trips.handlers.ts, ORDER BY t.date ASC) sem mexer aqui.
-  const displayTrips = [...trips].sort((a, b) =>
+  const displayTrips = [...outsourcedFilteredTrips].sort((a, b) =>
     a.date === b.date ? b.id - a.id : a.date < b.date ? 1 : -1,
   )
 
@@ -744,10 +754,40 @@ export function TripsPage() {
 
       {/* Breakdown section */}
       <div className={showTruckBreakdown || showDriverBreakdown ? 'mb-10' : 'mb-4'}>
-        <div className="flex items-center gap-6 mb-4">
+        <div className="flex items-center gap-6 mb-4 flex-wrap">
           <h3 className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant">
-            Lançamentos: {trips.length}
+            Lançamentos: {displayTrips.length}
           </h3>
+
+          {outsourcedTripsCount > 0 && (
+            <div className="flex items-center gap-2">
+              <div className="flex gap-1 bg-surface-container-high rounded-lg p-1 border border-outline-variant/10">
+                {(
+                  [
+                    { value: 'all', label: 'Todos' },
+                    { value: 'internal', label: 'Próprios' },
+                    { value: 'outsourced', label: 'Terceirizados' },
+                  ] as const
+                ).map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => setOutsourcedFilter(opt.value)}
+                    className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${
+                      outsourcedFilter === opt.value
+                        ? 'bg-primary text-on-primary shadow-sm'
+                        : 'text-on-surface-variant hover:text-on-surface'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+              <span className="text-xs text-on-surface-variant">
+                {outsourcedTripsCount} viagem{outsourcedTripsCount !== 1 ? 's' : ''} de terceiro
+              </span>
+            </div>
+          )}
 
           {/* Per-truck breakdown button */}
           {perTruck.length > 1 && (
@@ -851,7 +891,7 @@ export function TripsPage() {
               return (
                 <tr
                   key={row.id}
-                  className={`hover:bg-surface-bright/5 transition-colors group ${i % 2 === 1 ? 'bg-surface-container-lowest/30' : ''}`}
+                  className={`hover:bg-surface-bright/5 transition-colors group ${i % 2 === 1 ? 'bg-surface-container-lowest/30' : ''} ${row.driver_is_outsourced ? 'border-l-4 border-tertiary' : ''}`}
                 >
                   <td className="px-6 py-4 text-sm text-on-surface-variant">
                     {formatDate(row.date)}
@@ -862,7 +902,14 @@ export function TripsPage() {
                   <td className="px-6 py-4 text-sm font-mono font-bold text-primary">
                     {row.truck_license_plate}
                   </td>
-                  <td className="px-6 py-4 text-sm text-on-surface">{row.driver_name}</td>
+                  <td className="px-6 py-4 text-sm text-on-surface">
+                    {row.driver_name}
+                    {row.driver_is_outsourced ? (
+                      <div className="mt-1">
+                        <Badge label="TERCEIRO" color="blue" />
+                      </div>
+                    ) : null}
+                  </td>
                   <td className="px-6 py-4 text-sm text-on-surface">{row.product_name}</td>
                   <td className="px-6 py-4 text-sm text-on-surface-variant">
                     {row.weight_ton} ton
@@ -997,6 +1044,11 @@ export function TripsPage() {
                         <div className="flex justify-between">
                           <span>
                             {d.name}
+                            {d.is_outsourced ? (
+                              <span className="text-tertiary text-xs ml-1 font-bold">
+                                (terceirizado)
+                              </span>
+                            ) : null}
                             {d.commission_rate_override != null && (
                               <span className="text-secondary text-xs ml-1">
                                 (comissão {d.commission_rate_override}%)
@@ -1014,6 +1066,11 @@ export function TripsPage() {
                   />
                 )}
               />
+              {selectedDriver?.is_outsourced ? (
+                <div className="col-span-3 -mt-2">
+                  <Badge label="TERCEIRO" color="blue" />
+                </div>
+              ) : null}
 
               <Controller
                 name="product_id"
