@@ -34,7 +34,7 @@ export function registerReceivablesHandlers(): void {
       query += ' AND COALESCE(t.date, r.due_date) <= ?'
       params.push(filters.endDate)
     }
-    query += ' ORDER BY COALESCE(t.date, r.due_date) DESC'
+    query += ' ORDER BY COALESCE(t.date, r.due_date) ASC'
     return db()
       .prepare(query)
       .all(...params)

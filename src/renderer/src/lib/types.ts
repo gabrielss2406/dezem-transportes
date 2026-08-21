@@ -117,6 +117,7 @@ export interface Trip {
   truck_license_plate?: string
   truck_model?: string
   driver_name?: string
+  driver_is_outsourced?: number
   product_name?: string
   customer_name?: string
 }
@@ -213,7 +214,13 @@ export interface DashboardSummary {
     startOdometer: number | null
     endOdometer: number | null
   }>
-  monthlyRevenue: Array<{ month: string; revenue: number }>
+  monthlyRevenue: Array<{
+    month: string
+    revenue: number
+    cost: number
+    expense: number
+    net: number
+  }>
   maintenanceSummary: {
     overdueCount: number
     dueSoonCount: number
@@ -243,6 +250,9 @@ export interface DashboardSummary {
     tonnage: number
     trips: number
   }>
+  bankBalance: number
+  receivablesOpenTotal: number
+  costsOpenTotal: number
 }
 
 export interface CommissionByDriver {
@@ -432,6 +442,11 @@ declare global {
         saveTripExportFields(fields: string[]): Promise<{ ok: boolean }>
       }
       exportPdf(data: import('../../../shared/types').PdfExportData): Promise<{
+        success: boolean
+        path?: string
+        error?: string
+      }>
+      exportImage(data: import('../../../shared/types').ImageExportData): Promise<{
         success: boolean
         path?: string
         error?: string

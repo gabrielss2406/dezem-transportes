@@ -3,7 +3,7 @@ import { join } from 'path'
 import path from 'path'
 import { BrowserWindow, app, dialog, ipcMain, shell } from 'electron'
 
-import type { PdfExportData } from '../shared/types'
+import type { ImageExportData, PdfExportData } from '../shared/types'
 import { setupDatabase } from './database'
 import { registerAuthHandlers } from './modules/auth/auth.handlers'
 import { startBackupScheduler } from './modules/backup/backup-scheduler'
@@ -66,10 +66,22 @@ app.whenReady().then(async () => {
   registerTruckHandlers()
   registerBackupHandlers()
 
+  // Renderer-supplied file names are never trusted directly: strip path separators and
+  // anything that isn't a safe filename character, then confirm the resolved path still
+  // lands inside the Documents folder (defense against '..'-style traversal).
+  const safeExportPath = (documentsPath: string, fileName: string, extension: string) => {
+    const safeName = path.basename(fileName).replace(/[^\w.-]/g, '_') || 'export'
+    const filePath = path.join(documentsPath, `${safeName}.${extension}`)
+    if (!filePath.startsWith(path.resolve(documentsPath) + path.sep)) {
+      throw new Error('Nome de arquivo inválido.')
+    }
+    return filePath
+  }
+
   ipcMain.handle('export-pdf', async (_event, pdfData: PdfExportData) => {
     try {
       const documentsPath = app.getPath('documents')
-      const filePath = path.join(documentsPath, `${pdfData.fileName}.pdf`)
+      const filePath = safeExportPath(documentsPath, pdfData.fileName, 'pdf')
 
       const buffer = Buffer.from(pdfData.data)
 
@@ -79,6 +91,23 @@ app.whenReady().then(async () => {
       return { success: true, path: filePath }
     } catch (error) {
       console.error('Falha ao salvar ou abrir o PDF:', error)
+      return { success: false, error: (error as Error).message }
+    }
+  })
+
+  ipcMain.handle('export-image', async (_event, imageData: ImageExportData) => {
+    try {
+      const documentsPath = app.getPath('documents')
+      const filePath = safeExportPath(documentsPath, imageData.fileName, 'png')
+
+      const buffer = Buffer.from(imageData.data)
+
+      fs.writeFileSync(filePath, buffer)
+      await shell.openPath(filePath)
+
+      return { success: true, path: filePath }
+    } catch (error) {
+      console.error('Falha ao salvar ou abrir a imagem:', error)
       return { success: false, error: (error as Error).message }
     }
   })

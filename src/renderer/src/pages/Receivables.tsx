@@ -50,6 +50,9 @@ export function ReceivablesPage() {
     status: 'open',
   })
   const [receivablesMonth, setReceivablesMonth] = useState(currentMonthKey())
+  const [filterMode, setFilterMode] = useState<'month' | 'range'>('month')
+  const [rangeStart, setRangeStart] = useState(today())
+  const [rangeEnd, setRangeEnd] = useState(today())
   const [receivables, setReceivables] = useState<Receivable[]>([])
   const [openTotals, setOpenTotals] = useState({ amount: 0, count: 0 })
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
@@ -75,7 +78,10 @@ export function ReceivablesPage() {
   }, [])
 
   const loadReceivables = useCallback(async () => {
-    const { start, end } = monthRangeFromKey(receivablesMonth)
+    const { start, end } =
+      filterMode === 'month'
+        ? monthRangeFromKey(receivablesMonth)
+        : { start: rangeStart, end: rangeEnd }
     const r = await window.api.receivables.list({
       customer_id: filters.customer_id || undefined,
       status: filters.status || undefined,
@@ -84,7 +90,7 @@ export function ReceivablesPage() {
     })
     setReceivables(r)
     setSelectedIds(new Set())
-  }, [filters, receivablesMonth])
+  }, [filters, receivablesMonth, filterMode, rangeStart, rangeEnd])
 
   const loadOpenTotals = useCallback(async () => {
     const open = await window.api.receivables.list({ status: 'open' })
@@ -154,9 +160,14 @@ export function ReceivablesPage() {
     const subtitleParts: string[] = []
     const fileNameParts: string[] = []
 
-    const monthLabel = formatMonthLabel(receivablesMonth)
-    subtitleParts.push(`Mês: ${monthLabel}`)
-    fileNameParts.push(receivablesMonth)
+    if (filterMode === 'month') {
+      const monthLabel = formatMonthLabel(receivablesMonth)
+      subtitleParts.push(`Mês: ${monthLabel}`)
+      fileNameParts.push(receivablesMonth)
+    } else {
+      subtitleParts.push(`Período: ${formatDate(rangeStart)} a ${formatDate(rangeEnd)}`)
+      fileNameParts.push(`${rangeStart}_a_${rangeEnd}`)
+    }
     if (filters.customer_id) {
       const customer = customers.find((c) => String(c.id) === String(filters.customer_id))
       if (customer) {
@@ -288,7 +299,41 @@ export function ReceivablesPage() {
             </div>
           ))}
         </div>
-        <MonthNavigator monthKey={receivablesMonth} onChange={setReceivablesMonth} />
+        <div className="flex items-center gap-3 flex-wrap">
+          <div className="flex gap-1 bg-surface-container-high rounded-lg p-1 border border-outline-variant/10">
+            <button
+              type="button"
+              onClick={() => setFilterMode('month')}
+              className={`px-4 py-2 rounded-md text-sm font-bold transition-all ${
+                filterMode === 'month'
+                  ? 'bg-primary text-on-primary shadow-sm'
+                  : 'text-on-surface-variant hover:text-on-surface'
+              }`}
+            >
+              Mês
+            </button>
+            <button
+              type="button"
+              onClick={() => setFilterMode('range')}
+              className={`px-4 py-2 rounded-md text-sm font-bold transition-all ${
+                filterMode === 'range'
+                  ? 'bg-primary text-on-primary shadow-sm'
+                  : 'text-on-surface-variant hover:text-on-surface'
+              }`}
+            >
+              Período
+            </button>
+          </div>
+          {filterMode === 'month' ? (
+            <MonthNavigator monthKey={receivablesMonth} onChange={setReceivablesMonth} />
+          ) : (
+            <div className="flex items-center gap-2">
+              <DatePicker value={rangeStart} onChange={(e) => setRangeStart(e.target.value)} />
+              <span className="text-on-surface-variant text-sm">a</span>
+              <DatePicker value={rangeEnd} onChange={(e) => setRangeEnd(e.target.value)} />
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="bg-surface-container-low p-3 rounded-xl border border-outline-variant/10 flex flex-wrap items-end gap-3 mb-4">
