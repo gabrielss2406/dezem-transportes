@@ -217,6 +217,7 @@ export function DashboardPage() {
   })
 
   const fleetCpk = summary ? (summary.totalKm > 0 ? summary.fuelCost / summary.totalKm : 0) : 0
+  const fleetFuelLiters = summary?.fuelLiters ?? 0
   const displayedTrucks = showAllTrucks
     ? summary?.perTruck || []
     : (summary?.perTruck || []).slice(0, 5)
@@ -358,10 +359,10 @@ export function DashboardPage() {
               </div>
 
               <KpiBlock
-                label="CPK (Combustível)"
+                label="CPK (Custo por Quilômetro)"
                 value={fleetCpk.toFixed(2)}
-                trend="Combustível / KM da Frota"
-                info={`${summary.totalKm.toFixed(0)} km percorridos`}
+                trend="KM da Frota / Gastos Totais"
+                info={`${summary.totalKm.toFixed(0)} km`}
               />
 
               <KpiBlock
