@@ -191,6 +191,7 @@ export function registerDashboardHandlers(): void {
       .prepare(
         `
       SELECT
+        t.id,
         t.license_plate,
         t.model,
         COALESCE(SUM(tr.price_charged), 0) as revenue,
@@ -210,42 +211,12 @@ export function registerDashboardHandlers(): void {
           LIMIT 1
         ) as end_odometer,
         (
-          SELECT COALESCE(SUM(fs.value), 0)
-          FROM trip_fuel_stops fs
-          JOIN trips tr2 ON fs.trip_id = tr2.id
-          WHERE tr2.truck_id = t.id AND tr2.date BETWEEN ? AND ?
-        ) as fuel_stops_cost,
-        (
-          SELECT COALESCE(SUM(fr.value), 0)
-          FROM fuel_records fr
-          WHERE fr.truck_id = t.id AND fr.date BETWEEN ? AND ?
-        ) as fuel_records_cost,
-        (
-          SELECT COALESCE(SUM(c.value), 0)
-          FROM costs c
-          WHERE c.truck_id = t.id AND c.date BETWEEN ? AND ?
-        ) + (
-          SELECT COALESCE(SUM(fs.value), 0)
-          FROM trip_fuel_stops fs
-          JOIN trips tr2 ON fs.trip_id = tr2.id
-          WHERE tr2.truck_id = t.id AND tr2.date BETWEEN ? AND ?
-        ) + (
-          SELECT COALESCE(SUM(tr3.commission_value), 0)
-          FROM trips tr3
-          JOIN drivers d3 ON tr3.driver_id = d3.id
-          WHERE tr3.truck_id = t.id AND tr3.has_commission = 1 AND tr3.date BETWEEN ? AND ?
-            AND (d3.is_outsourced = 0 OR d3.is_outsourced IS NULL)
-        ) + (
-          SELECT COALESCE(SUM(fr.value), 0)
-          FROM fuel_records fr
-          WHERE fr.truck_id = t.id AND fr.date BETWEEN ? AND ?
-        ) + (
-          SELECT COALESCE(SUM(tr4.tax_value), 0)
-          FROM trips tr4
-          JOIN drivers d4 ON tr4.driver_id = d4.id
-          WHERE tr4.truck_id = t.id AND tr4.has_percentage_tax = 1 AND tr4.date BETWEEN ? AND ?
-            AND (d4.is_outsourced = 0 OR d4.is_outsourced IS NULL)
-        ) as cost
+          SELECT fr_prev.odometer_at_service
+          FROM fuel_records fr_prev
+          WHERE fr_prev.truck_id = t.id AND fr_prev.date < ?
+          ORDER BY fr_prev.date DESC, fr_prev.id DESC
+          LIMIT 1
+        ) as prev_odometer
       FROM trucks t
       LEFT JOIN trips tr ON tr.truck_id = t.id AND tr.date BETWEEN ? AND ?
       WHERE ${INTERNAL_TRUCK}
@@ -253,44 +224,132 @@ export function registerDashboardHandlers(): void {
       ORDER BY revenue DESC
     `,
       )
-      .all(
-        startDate,
-        endDate,
-        startDate,
-        endDate,
-        startDate,
-        endDate,
-        startDate,
-        endDate,
-        startDate,
-        endDate,
-        startDate,
-        endDate,
-        startDate,
-        endDate,
-        startDate,
-        endDate,
-        startDate,
-        endDate,
-        startDate,
-        endDate,
-      ) as any[]
+      .all(startDate, endDate, startDate, endDate, startDate, startDate, endDate) as any[]
+
+    // Fuel costs per truck (matching global query pattern)
+    const fuelStopsCostPerTruck = db()
+      .prepare(
+        `
+      SELECT tr.truck_id, COALESCE(SUM(fs.value), 0) as total
+      FROM trip_fuel_stops fs
+      JOIN trips tr ON fs.trip_id = tr.id
+      JOIN drivers d ON tr.driver_id = d.id
+      JOIN trucks t ON tr.truck_id = t.id
+      WHERE tr.date BETWEEN ? AND ? AND ${INTERNAL_TRUCK} AND ${INTERNAL_DRIVER}
+      GROUP BY tr.truck_id
+    `,
+      )
+      .all(startDate, endDate) as any[]
+
+    const fuelRecordsCostPerTruck = db()
+      .prepare(
+        `
+      SELECT fr.truck_id, COALESCE(SUM(fr.value), 0) as total
+      FROM fuel_records fr
+      JOIN trucks t ON fr.truck_id = t.id
+      WHERE fr.date BETWEEN ? AND ? AND ${INTERNAL_TRUCK}
+      GROUP BY fr.truck_id
+    `,
+      )
+      .all(startDate, endDate) as any[]
+
+    const fuelStopsCostMap = new Map(fuelStopsCostPerTruck.map((r) => [r.truck_id, r.total]))
+    const fuelRecordsCostMap = new Map(fuelRecordsCostPerTruck.map((r) => [r.truck_id, r.total]))
+
+    // Total cost per truck (matching global query pattern)
+    const directCostsPerTruck = db()
+      .prepare(
+        `
+      SELECT c.truck_id, COALESCE(SUM(c.value), 0) as total
+      FROM costs c
+      LEFT JOIN trucks t ON c.truck_id = t.id
+      LEFT JOIN drivers d ON c.driver_id = d.id
+      WHERE c.date BETWEEN ? AND ?
+        AND c.category != 'fuel' AND c.kind = 'operational'
+        AND (c.truck_id IS NULL OR ${INTERNAL_TRUCK})
+        AND (c.driver_id IS NULL OR ${INTERNAL_DRIVER})
+      GROUP BY c.truck_id
+    `,
+      )
+      .all(startDate, endDate) as any[]
+
+    const commissionCostPerTruck = db()
+      .prepare(
+        `
+      SELECT tr.truck_id, COALESCE(SUM(tr.commission_value), 0) as total
+      FROM trips tr
+      JOIN drivers d ON tr.driver_id = d.id
+      JOIN trucks t ON tr.truck_id = t.id
+      WHERE tr.date BETWEEN ? AND ? AND tr.has_commission = 1 AND ${INTERNAL_TRUCK} AND ${INTERNAL_DRIVER}
+      GROUP BY tr.truck_id
+    `,
+      )
+      .all(startDate, endDate) as any[]
+
+    const taxPerTruck = db()
+      .prepare(
+        `
+      SELECT tr.truck_id, COALESCE(SUM(tr.tax_value), 0) as total
+      FROM trips tr
+      JOIN drivers d ON tr.driver_id = d.id
+      JOIN trucks t ON tr.truck_id = t.id
+      WHERE tr.date BETWEEN ? AND ? AND tr.has_percentage_tax = 1 AND ${INTERNAL_TRUCK} AND ${INTERNAL_DRIVER}
+      GROUP BY tr.truck_id
+    `,
+      )
+      .all(startDate, endDate) as any[]
+
+    const directCostsMap = new Map(directCostsPerTruck.map((r) => [r.truck_id, r.total]))
+    const commissionCostMap = new Map(commissionCostPerTruck.map((r) => [r.truck_id, r.total]))
+    const taxMap = new Map(taxPerTruck.map((r) => [r.truck_id, r.total]))
 
     const trucksWithMetrics = perTruck.map((t) => {
-      const hasOdometerRange = t.start_odometer != null && t.end_odometer != null
-      const rawDistance = hasOdometerRange ? Number(t.end_odometer) - Number(t.start_odometer) : 0
+      const startOdo = t.start_odometer != null ? Number(t.start_odometer) : null
+      const endOdo = t.end_odometer != null ? Number(t.end_odometer) : null
+      const prevOdo = t.prev_odometer != null ? Number(t.prev_odometer) : null
+
+      let km = 0
+      if (endOdo != null && startOdo != null && endOdo > startOdo) {
+        // Multiple readings in period: use first to last
+        km = endOdo - startOdo
+      } else if (
+        endOdo != null &&
+        startOdo != null &&
+        endOdo === startOdo &&
+        prevOdo != null &&
+        endOdo > prevOdo
+      ) {
+        // Single reading in period: use previous period's last reading as baseline
+        km = endOdo - prevOdo
+      } else if (endOdo != null && prevOdo != null && endOdo > prevOdo) {
+        // No reading in period but has previous: shouldn't happen with current query, but guard
+        km = endOdo - prevOdo
+      }
       // Negative distance shouldn't happen (fuel records enforce chronological monotonicity),
       // but guard it anyway rather than surfacing a nonsensical negative CPK.
-      const km = rawDistance > 0 ? rawDistance : 0
-      const fuelCost = Number(t.fuel_stops_cost) + Number(t.fuel_records_cost)
+      if (km < 0) {
+        km = 0
+      }
+      const fuelStopsCost = fuelStopsCostMap.get(t.id) || 0
+      const fuelRecordsCost = fuelRecordsCostMap.get(t.id) || 0
+      const fuelCost = Number(fuelStopsCost) + Number(fuelRecordsCost)
       return {
         license_plate: t.license_plate,
         model: t.model,
         revenue: t.revenue,
         trip_count: t.trip_count,
-        cost: t.cost,
+        cost:
+          (directCostsMap.get(t.id) || 0) +
+          fuelCost +
+          (commissionCostMap.get(t.id) || 0) +
+          (taxMap.get(t.id) || 0),
         fuelCost,
-        profit: t.revenue - t.cost,
+        profit:
+          t.revenue -
+          ((directCostsMap.get(t.id) || 0) +
+            fuelCost +
+            (commissionCostMap.get(t.id) || 0) +
+            (taxMap.get(t.id) || 0)),
         km,
         // null (not 0) when distance can't be determined — 0 would misleadingly read as
         // "free to operate" instead of "not enough odometer data in this period".
@@ -302,7 +361,66 @@ export function registerDashboardHandlers(): void {
     })
 
     const totalKm = trucksWithMetrics.reduce((s, t) => s + t.km, 0)
-    const totalFuelCost = trucksWithMetrics.reduce((s, t) => s + t.fuelCost, 0)
+
+    const totalFuelLitersStops = (
+      db()
+        .prepare(
+          `
+        SELECT COALESCE(SUM(fs.liters), 0) as total
+        FROM trip_fuel_stops fs
+        JOIN trips tr ON fs.trip_id = tr.id
+        JOIN trucks t ON tr.truck_id = t.id
+        JOIN drivers d ON tr.driver_id = d.id
+        WHERE tr.date BETWEEN ? AND ? AND ${INTERNAL_TRUCK} AND ${INTERNAL_DRIVER}
+      `,
+        )
+        .get(startDate, endDate) as any
+    ).total
+
+    const totalFuelLitersRecords = (
+      db()
+        .prepare(
+          `
+        SELECT COALESCE(SUM(fr.liters), 0) as total
+        FROM fuel_records fr
+        JOIN trucks t ON fr.truck_id = t.id
+        WHERE fr.date BETWEEN ? AND ? AND ${INTERNAL_TRUCK}
+      `,
+        )
+        .get(startDate, endDate) as any
+    ).total
+
+    const totalFuelLiters = Number(totalFuelLitersStops) + Number(totalFuelLitersRecords)
+
+    const totalFuelCostStops = (
+      db()
+        .prepare(
+          `
+        SELECT COALESCE(SUM(fs.value), 0) as total
+        FROM trip_fuel_stops fs
+        JOIN trips tr ON fs.trip_id = tr.id
+        JOIN trucks t ON tr.truck_id = t.id
+        JOIN drivers d ON tr.driver_id = d.id
+        WHERE tr.date BETWEEN ? AND ? AND ${INTERNAL_TRUCK} AND ${INTERNAL_DRIVER}
+      `,
+        )
+        .get(startDate, endDate) as any
+    ).total
+
+    const totalFuelCostRecords = (
+      db()
+        .prepare(
+          `
+        SELECT COALESCE(SUM(fr.value), 0) as total
+        FROM fuel_records fr
+        JOIN trucks t ON fr.truck_id = t.id
+        WHERE fr.date BETWEEN ? AND ? AND ${INTERNAL_TRUCK}
+      `,
+        )
+        .get(startDate, endDate) as any
+    ).total
+
+    const totalFuelCost = Number(totalFuelCostStops) + Number(totalFuelCostRecords)
 
     // 4. Monthly Revenue (Last 6 months) — internal trucks only
     const monthlyRevenueRaw = db()
@@ -714,6 +832,7 @@ export function registerDashboardHandlers(): void {
       totalTrips,
       totalKm,
       fuelCost: totalFuelCost,
+      fuelLiters: totalFuelLiters,
       perTruck: trucksWithMetrics,
       monthlyRevenue,
       maintenanceSummary,

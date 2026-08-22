@@ -201,6 +201,7 @@ export interface DashboardSummary {
   totalTrips: number
   totalKm: number
   fuelCost: number
+  fuelLiters: number
   perTruck: Array<{
     license_plate: string
     model: string

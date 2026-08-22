@@ -10,8 +10,10 @@ const CHART_SERIES = [
   { key: 'revenue', label: 'Fat. Bruto', color: 'bg-chart-blue', dot: 'bg-chart-blue' },
   { key: 'cost', label: 'Custo', color: 'bg-error', dot: 'bg-error' },
   { key: 'expense', label: 'Despesa', color: 'bg-chart-yellow', dot: 'bg-chart-yellow' },
-  { key: 'net', label: 'Líquido', color: 'bg-chart-green', dot: 'bg-chart-green' },
+  { key: 'net', label: 'L. Líquido', color: 'bg-chart-green', dot: 'bg-chart-green' },
 ] as const
+
+type PctBase = 'revenue' | 'total'
 
 type ChartSeriesKey = (typeof CHART_SERIES)[number]['key']
 
@@ -94,8 +96,38 @@ export function DashboardPage() {
     expense: true,
     net: true,
   })
+  const [pctBase, setPctBase] = useState<PctBase>('total')
   const chartRef = useRef<HTMLDivElement>(null)
   const { toast, show } = useToast()
+
+  const calcPct = (
+    value: number,
+    month: (typeof summary)['monthlyRevenue'][0],
+    base: PctBase,
+  ): number => {
+    if (!month) {
+      return 0
+    }
+    if (base === 'revenue') {
+      const denom = month.revenue
+      return denom > 0 ? (value / denom) * 100 : 0
+    }
+    const denom =
+      Math.abs(month.revenue) + Math.abs(month.cost) + Math.abs(month.expense) + Math.abs(month.net)
+    return denom > 0 ? (Math.abs(value) / denom) * 100 : 0
+  }
+
+  const formatPct = (
+    value: number,
+    month: (typeof summary)['monthlyRevenue'][0],
+    base: PctBase,
+  ): string => {
+    const pct = calcPct(value, month, base)
+    if (base === 'revenue') {
+      return `${pct >= 0 ? '+' : ''}${pct.toFixed(1)}%`
+    }
+    return `${pct.toFixed(1)}%`
+  }
 
   const toggleSeries = (key: ChartSeriesKey) => {
     setVisibleSeries((prev) => ({ ...prev, [key]: !prev[key] }))
@@ -185,6 +217,7 @@ export function DashboardPage() {
   })
 
   const fleetCpk = summary ? (summary.totalKm > 0 ? summary.fuelCost / summary.totalKm : 0) : 0
+  const fleetFuelLiters = summary?.fuelLiters ?? 0
   const displayedTrucks = showAllTrucks
     ? summary?.perTruck || []
     : (summary?.perTruck || []).slice(0, 5)
@@ -326,10 +359,10 @@ export function DashboardPage() {
               </div>
 
               <KpiBlock
-                label="CPK (Combustível)"
+                label="CPK (Custo por Quilômetro)"
                 value={fleetCpk.toFixed(2)}
-                trend="Combustível / KM da Frota"
-                info={`${summary.totalKm.toFixed(0)} km percorridos`}
+                trend="KM da Frota / Gastos Totais"
+                info={`${summary.totalKm.toFixed(0)} km`}
               />
 
               <KpiBlock
@@ -385,7 +418,7 @@ export function DashboardPage() {
                 </div>
 
                 {/* Legend / series toggle */}
-                <div className="flex flex-wrap gap-2 mb-4">
+                <div className="flex flex-wrap items-center gap-2 mb-4">
                   {CHART_SERIES.map((s) => (
                     <button
                       key={s.key}
@@ -403,38 +436,55 @@ export function DashboardPage() {
                       {s.label}
                     </button>
                   ))}
+                  <div className="ml-auto flex items-center gap-1.5">
+                    <span className="text-[10px] font-medium text-on-surface-variant">Base:</span>
+                    <select
+                      value={pctBase}
+                      onChange={(e) => setPctBase(e.target.value as PctBase)}
+                      className="text-[10px] px-2 py-1 rounded border bg-surface-container text-on-surface outline-none"
+                    >
+                      <option value="revenue">% da Receita</option>
+                      <option value="total">% Composição (absolutos)</option>
+                    </select>
+                  </div>
                 </div>
 
                 <div className="h-64 flex items-stretch gap-4 mt-8 px-2">
                   {(() => {
                     const activeSeries = CHART_SERIES.filter((s) => visibleSeries[s.key])
+                    const monthsWithData = summary.monthlyRevenue.filter((m) =>
+                      activeSeries.some((s) => Math.abs(m[s.key]) > 0),
+                    )
                     const maxValue = Math.max(
-                      ...summary.monthlyRevenue.flatMap((m) =>
-                        activeSeries.map((s) => Math.abs(m[s.key])),
-                      ),
+                      ...monthsWithData.flatMap((m) => activeSeries.map((s) => Math.abs(m[s.key]))),
                       1,
                     )
-                    return summary.monthlyRevenue.map((m) => (
+                    return monthsWithData.map((m) => (
                       <div key={m.month} className="flex-1 flex flex-col items-center gap-3 group">
                         <div className="relative w-full flex-1 flex items-end justify-center gap-1">
                           {activeSeries.map((s) => {
                             const value = m[s.key]
                             const height = (Math.abs(value) / maxValue) * 100
+                            const pctStr = formatPct(value, m, pctBase)
                             return (
                               <div
                                 key={s.key}
                                 className={`flex-1 max-w-[18px] rounded-t-md transition-all duration-500 ${s.color}`}
                                 style={{ height: `${Math.max(height, value !== 0 ? 2 : 0)}%` }}
-                                title={`${s.label}: ${formatBRL(value)}`}
+                                title={`${s.label}: ${formatBRL(value)} (${pctStr})`}
                               />
                             )
                           })}
                           <div className="pointer-events-none absolute -top-16 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-all bg-surface-container-highest px-3 py-1.5 rounded-lg text-[10px] font-black shadow-xl border border-outline-variant/20 whitespace-nowrap z-10 space-y-0.5">
-                            {activeSeries.map((s) => (
-                              <div key={s.key} className="text-on-surface">
-                                {s.label}: {formatBRL(m[s.key])}
-                              </div>
-                            ))}
+                            {activeSeries.map((s) => {
+                              const value = m[s.key]
+                              const pctStr = formatPct(value, m, pctBase)
+                              return (
+                                <div key={s.key} className="text-on-surface">
+                                  {s.label}: {formatBRL(value)} ({pctStr})
+                                </div>
+                              )
+                            })}
                           </div>
                         </div>
                         <span className="text-[10px] font-black text-on-surface-variant uppercase tracking-tighter opacity-70">
@@ -468,21 +518,30 @@ export function DashboardPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-outline-variant/10">
-                      {summary.monthlyRevenue.map((m) => (
-                        <tr key={m.month}>
-                          <td className="py-1.5 pr-3 text-[10px] font-bold text-on-surface-variant uppercase">
-                            {m.month.split('-')[1]}/{m.month.split('-')[0].slice(2)}
-                          </td>
-                          {CHART_SERIES.filter((s) => visibleSeries[s.key]).map((s) => (
-                            <td
-                              key={s.key}
-                              className="py-1.5 px-3 text-[10px] font-bold text-on-surface"
-                            >
-                              {formatBRL(m[s.key])}
+                      {summary.monthlyRevenue
+                        .filter((m) =>
+                          CHART_SERIES.filter((s) => visibleSeries[s.key]).some(
+                            (s) => Math.abs(m[s.key]) > 0,
+                          ),
+                        )
+                        .map((m) => (
+                          <tr key={m.month}>
+                            <td className="py-1.5 pr-3 text-[10px] font-bold text-on-surface-variant uppercase">
+                              {m.month.split('-')[1]}/{m.month.split('-')[0].slice(2)}
                             </td>
-                          ))}
-                        </tr>
-                      ))}
+                            {CHART_SERIES.filter((s) => visibleSeries[s.key]).map((s) => (
+                              <td
+                                key={s.key}
+                                className="py-1.5 px-3 text-[10px] font-bold text-on-surface"
+                              >
+                                {formatBRL(m[s.key])}{' '}
+                                <span className="font-medium text-on-surface-variant">
+                                  ({formatPct(m[s.key], m, pctBase)})
+                                </span>
+                              </td>
+                            ))}
+                          </tr>
+                        ))}
                     </tbody>
                   </table>
                 </div>
