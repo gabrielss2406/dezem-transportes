@@ -259,6 +259,17 @@ export interface DashboardSummary {
   costsOpenTotal: number
 }
 
+export interface CreditorReportLine {
+  id: number
+  source: 'cost' | 'fuel_record' | 'trip_fuel_stop'
+  date: string
+  category: string
+  value: number
+  description: string
+  supplier_id: number
+  supplier_name: string
+}
+
 export interface CommissionByDriver {
   id: number
   name: string
@@ -403,6 +414,7 @@ declare global {
           updated?: number
         }>
         issueMonthlySalaries(monthYear: string): Promise<{ ok: boolean; issued: number }>
+        byCreditor(filters?: any): Promise<CreditorReportLine[]>
       }
       dashboard: {
         summary(startDate: string, endDate: string): Promise<DashboardSummary>
