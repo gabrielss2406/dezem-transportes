@@ -538,7 +538,7 @@ export const Select = forwardRef<SelectRef, SelectProps>(
 // ── Badge ────────────────────────────────────────────────────────────────────
 interface BadgeProps {
   label: string
-  color?: 'green' | 'amber' | 'red' | 'blue' | 'gray'
+  color?: 'green' | 'amber' | 'red' | 'blue' | 'gray' | 'primary'
 }
 export function Badge({ label, color = 'gray' }: BadgeProps) {
   const colors = {
@@ -547,6 +547,7 @@ export function Badge({ label, color = 'gray' }: BadgeProps) {
     red: 'bg-error-container/30 text-error',
     blue: 'bg-tertiary-container/20 text-tertiary',
     gray: 'bg-surface-container-highest text-on-surface-variant',
+    primary: 'bg-primary/10 text-primary',
   }
   return (
     <span

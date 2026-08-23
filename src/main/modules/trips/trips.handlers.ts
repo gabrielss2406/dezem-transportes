@@ -38,12 +38,14 @@ export function registerTripHandlers(): void {
         d.is_outsourced  as driver_is_outsourced,
         p.name           as product_name,
         c.name           as customer_name,
+        tpc.name         as third_party_contractor_name,
         (SELECT COUNT(*) FROM trip_fuel_stops WHERE trip_id = t.id) as fuel_stops_count
       FROM trips t
       JOIN trucks tr ON t.truck_id = tr.id
       JOIN drivers d ON t.driver_id = d.id
       JOIN products p ON t.product_id = p.id
       LEFT JOIN customers c ON t.customer_id = c.id
+      LEFT JOIN contractors tpc ON t.third_party_contractor_id = tpc.id
       WHERE 1=1
     `
     const params: any[] = []
@@ -106,12 +108,23 @@ export function registerTripHandlers(): void {
     const commissionValue = hasCommission
       ? (tripData.price_charged * getEffectiveCommissionRate(tripData.driver_id)) / 100
       : 0
+    const isThirdParty = !!(tripData as any).is_third_party
+    const thirdPartyContractorId = (tripData as any).third_party_contractor_id || null
+    if (isThirdParty && !thirdPartyContractorId) {
+      return {
+        ok: false,
+        errors: {
+          third_party_contractor_id:
+            'Selecione o terceiro para lançamentos marcados como Terceiro.',
+        },
+      }
+    }
     const r = db().transaction(() => {
       const res = db()
         .prepare(
           `
-        INSERT INTO trips (date, truck_id, driver_id, product_id, customer_id, supplier_id, weight_ton, overweight_ton, overweight_observation, price_charged, km_driven, observation, ticket_number, has_percentage_tax, tax_value, has_commission, commission_value)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+        INSERT INTO trips (date, truck_id, driver_id, product_id, customer_id, supplier_id, weight_ton, overweight_ton, overweight_observation, price_charged, km_driven, observation, ticket_number, has_percentage_tax, tax_value, has_commission, commission_value, is_third_party, third_party_contractor_id)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
       `,
         )
         .run(
@@ -132,6 +145,8 @@ export function registerTripHandlers(): void {
           taxValue,
           hasCommission ? 1 : 0,
           commissionValue,
+          isThirdParty ? 1 : 0,
+          thirdPartyContractorId,
         )
 
       const tripId = res.lastInsertRowid
@@ -141,6 +156,14 @@ export function registerTripHandlers(): void {
           `INSERT INTO receivables (trip_id, customer_id, amount, status) VALUES (?, ?, ?, 'open')`,
         )
         .run(tripId, tripData.customer_id || null, tripData.price_charged)
+
+      if (isThirdParty) {
+        db()
+          .prepare(
+            `INSERT INTO third_party_settlements (trip_id, contractor_id, amount, status) VALUES (?, ?, ?, 'pending')`,
+          )
+          .run(tripId, thirdPartyContractorId, tripData.price_charged)
+      }
 
       if (fuel_stops && fuel_stops.length > 0) {
         const insertStop = db().prepare(
@@ -170,11 +193,22 @@ export function registerTripHandlers(): void {
     const commissionValue = hasCommission
       ? (tripData.price_charged * getEffectiveCommissionRate(tripData.driver_id)) / 100
       : 0
+    const isThirdParty = !!(tripData as any).is_third_party
+    const thirdPartyContractorId = (tripData as any).third_party_contractor_id || null
+    if (isThirdParty && !thirdPartyContractorId) {
+      return {
+        ok: false,
+        errors: {
+          third_party_contractor_id:
+            'Selecione o terceiro para lançamentos marcados como Terceiro.',
+        },
+      }
+    }
     db().transaction(() => {
       db()
         .prepare(
           `UPDATE trips SET date=?, truck_id=?, driver_id=?, product_id=?, customer_id=?,
-            supplier_id=?, weight_ton=?, overweight_ton=?, overweight_observation=?, price_charged=?, km_driven=?, observation=?, ticket_number=?, has_percentage_tax=?, tax_value=?, has_commission=?, commission_value=?
+            supplier_id=?, weight_ton=?, overweight_ton=?, overweight_observation=?, price_charged=?, km_driven=?, observation=?, ticket_number=?, has_percentage_tax=?, tax_value=?, has_commission=?, commission_value=?, is_third_party=?, third_party_contractor_id=?
           WHERE id=?`,
         )
         .run(
@@ -195,6 +229,8 @@ export function registerTripHandlers(): void {
           taxValue,
           hasCommission ? 1 : 0,
           commissionValue,
+          isThirdParty ? 1 : 0,
+          thirdPartyContractorId,
           id,
         )
 
@@ -205,6 +241,33 @@ export function registerTripHandlers(): void {
           `UPDATE receivables SET customer_id = ?, amount = ? WHERE trip_id = ? AND status = 'open'`,
         )
         .run(tripData.customer_id || null, tripData.price_charged, id)
+
+      // Third-party settlement mirrors the receivable's "sync only while still open"
+      // rule: once settled, a later edit of the trip must not silently change what was
+      // already paid out. Unlike the receivable (always 1:1 with the trip), the
+      // settlement row only exists conditionally, so this is an upsert-or-freeze rather
+      // than a plain UPDATE.
+      const existingSettlement = db()
+        .prepare('SELECT status FROM third_party_settlements WHERE trip_id = ?')
+        .get(id) as { status: string } | undefined
+      if (isThirdParty) {
+        if (!existingSettlement) {
+          db()
+            .prepare(
+              `INSERT INTO third_party_settlements (trip_id, contractor_id, amount, status) VALUES (?, ?, ?, 'pending')`,
+            )
+            .run(id, thirdPartyContractorId, tripData.price_charged)
+        } else if (existingSettlement.status === 'pending') {
+          db()
+            .prepare(
+              'UPDATE third_party_settlements SET contractor_id = ?, amount = ? WHERE trip_id = ?',
+            )
+            .run(thirdPartyContractorId, tripData.price_charged, id)
+        }
+        // status === 'settled': already paid out, left untouched regardless of the form.
+      } else if (existingSettlement?.status === 'pending') {
+        db().prepare('DELETE FROM third_party_settlements WHERE trip_id = ?').run(id)
+      }
 
       // The trip entry form no longer manages fuel stops (handled by the Cost Records
       // module), so it never sends `fuel_stops`. Only touch existing stops when a
@@ -233,6 +296,17 @@ export function registerTripHandlers(): void {
         ok: false,
         errors: {
           form: 'Não é possível excluir: o recebível desta viagem já foi baixado (pago).',
+        },
+      }
+    }
+    const settlement = db()
+      .prepare('SELECT status FROM third_party_settlements WHERE trip_id = ?')
+      .get(id) as { status: string } | undefined
+    if (settlement?.status === 'settled') {
+      return {
+        ok: false,
+        errors: {
+          form: 'Não é possível excluir: o repasse ao terceiro desta viagem já foi baixado (pago).',
         },
       }
     }

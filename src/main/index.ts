@@ -22,6 +22,7 @@ import { registerReceivablesHandlers } from './modules/receivables/receivables.h
 import { registerSettingsHandlers } from './modules/settings/settings.handlers'
 import { registerSupplierTypesHandlers } from './modules/supplier-types/supplier-types.handlers'
 import { registerSupplierHandlers } from './modules/suppliers/suppliers.handlers'
+import { registerThirdPartySettlementsHandlers } from './modules/third-party-settlements/third-party-settlements.handlers'
 import { registerTripHandlers } from './modules/trips/trips.handlers'
 import { registerTruckHandlers } from './modules/trucks/trucks.handlers'
 import { createWindow } from './window'
@@ -62,6 +63,7 @@ app.whenReady().then(async () => {
   registerSupplierTypesHandlers()
   registerFuelHandlers()
   registerMaintenanceHandlers()
+  registerThirdPartySettlementsHandlers()
   registerTripHandlers()
   registerTruckHandlers()
   registerBackupHandlers()

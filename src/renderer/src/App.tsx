@@ -10,6 +10,7 @@ import { OverviewPage } from './pages/Overview'
 import { PriceManagementPage } from './pages/PriceManagement'
 import { ReceivablesPage } from './pages/Receivables'
 import { SettingsPage } from './pages/Settings'
+import { ThirdPartySettlementsPage } from './pages/ThirdPartySettlements'
 import { TripsPage } from './pages/Trips'
 import { ContractorsPage } from './pages/records/Contractors'
 import { CustomersPage } from './pages/records/Customers'
@@ -75,6 +76,7 @@ function AppRoutes() {
                 <Route path="/prices" element={<PriceManagementPage />} />
                 <Route path="/costs" element={<CostsPage />} />{' '}
                 <Route path="/receivables" element={<ReceivablesPage />} />
+                <Route path="/third-party-settlements" element={<ThirdPartySettlementsPage />} />
                 <Route path="/trucks" element={<TrucksPage />} />
                 <Route path="/drivers" element={<DriversPage />} />
                 <Route path="/customers" element={<CustomersPage />} />

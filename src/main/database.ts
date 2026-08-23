@@ -132,6 +132,20 @@ export function setupDatabase(): void {
       created_at   TEXT DEFAULT (datetime('now'))
     );
 
+    -- Third-Party Settlements (Repasses a Terceiros) — 1:1 mirror of trips marked as
+    -- third-party (is_third_party = 1), tracks whether the company has paid the
+    -- third-party provider for that trip's revenue (separate from — and downstream of —
+    -- the receivable above, which tracks whether the customer has paid the company).
+    CREATE TABLE IF NOT EXISTS third_party_settlements (
+      id            INTEGER PRIMARY KEY AUTOINCREMENT,
+      trip_id       INTEGER NOT NULL UNIQUE REFERENCES trips(id) ON DELETE CASCADE,
+      contractor_id INTEGER NOT NULL REFERENCES contractors(id),
+      amount        REAL NOT NULL DEFAULT 0,
+      status        TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','settled')),
+      settled_date  TEXT DEFAULT NULL,
+      created_at    TEXT DEFAULT (datetime('now'))
+    );
+
     -- Cost Categories (for settings)
     CREATE TABLE IF NOT EXISTS cost_categories (
       id            INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -230,6 +244,8 @@ export function setupDatabase(): void {
     CREATE INDEX IF NOT EXISTS idx_fuel_records_date  ON fuel_records(date);
     CREATE INDEX IF NOT EXISTS idx_receivables_customer ON receivables(customer_id);
     CREATE INDEX IF NOT EXISTS idx_receivables_status ON receivables(status);
+    CREATE INDEX IF NOT EXISTS idx_third_party_settlements_status ON third_party_settlements(status);
+    CREATE INDEX IF NOT EXISTS idx_third_party_settlements_contractor ON third_party_settlements(contractor_id);
   `)
 
   // Backfill: create an 'open' receivable for any pre-existing trip that doesn't have one yet.
@@ -302,6 +318,19 @@ export function setupDatabase(): void {
   }
   if (!tripInfo.some((col) => col.name === 'commission_value')) {
     db.exec('ALTER TABLE trips ADD COLUMN commission_value REAL NOT NULL DEFAULT 0')
+  }
+
+  // Migration: Add third-party fields to trips if missing. is_third_party marks a trip
+  // whose revenue does not belong to the company (it's collected on behalf of, and owed
+  // to, third_party_contractor_id) — independent of driver/truck is_outsourced, which is
+  // an entity-level flag rather than a per-entry one.
+  if (!tripInfo.some((col) => col.name === 'is_third_party')) {
+    db.exec('ALTER TABLE trips ADD COLUMN is_third_party INTEGER NOT NULL DEFAULT 0')
+  }
+  if (!tripInfo.some((col) => col.name === 'third_party_contractor_id')) {
+    db.exec(
+      'ALTER TABLE trips ADD COLUMN third_party_contractor_id INTEGER REFERENCES contractors(id)',
+    )
   }
 
   // Migration: Add unit_value to products if missing

@@ -193,6 +193,11 @@ export const tripSchema = z.object({
   observation: z.string().max(500).optional(),
   has_percentage_tax: z.boolean().optional(),
   has_commission: z.boolean().optional(),
+  is_third_party: z.boolean().optional(),
+  third_party_contractor_id: z.preprocess(
+    (val) => (val === '' || val === null || val === undefined ? null : Number(val)),
+    z.number().int().positive().nullable().optional(),
+  ),
   fuel_stops: z.array(fuelStopSchema).optional(),
 })
 
@@ -237,6 +242,11 @@ export const receivablesMarkPaidSchema = z.object({
 export const costsMarkPaidSchema = z.object({
   ids: z.array(idSchema).min(1, 'Selecione ao menos um item'),
   paid_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data inválida'),
+})
+
+export const thirdPartySettlementsMarkSettledSchema = z.object({
+  ids: z.array(idSchema).min(1, 'Selecione ao menos um item'),
+  settled_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data inválida'),
 })
 
 export const receivableSchema = z.object({

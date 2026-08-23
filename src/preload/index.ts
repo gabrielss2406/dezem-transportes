@@ -144,6 +144,13 @@ contextBridge.exposeInMainWorld('api', {
     summaryByCustomer: () => ipcRenderer.invoke('receivables:summaryByCustomer'),
   },
 
+  // Third-Party Settlements
+  thirdPartySettlements: {
+    list: (filters?: any) => ipcRenderer.invoke('third-party-settlements:list', filters),
+    markSettled: (data: { ids: number[]; settled_date: string }) =>
+      ipcRenderer.invoke('third-party-settlements:markSettled', data),
+  },
+
   // Backup
   backup: {
     getConfig: () => ipcRenderer.invoke('backup:getConfig'),

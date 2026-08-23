@@ -14,6 +14,7 @@ const navItems = [
   { path: '/maintenance', label: 'Manutenção', icon: 'build' },
   { path: '/costs', label: 'Custos', icon: 'payments' },
   { path: '/receivables', label: 'Contas a Receber', icon: 'account_balance_wallet' },
+  { path: '/third-party-settlements', label: 'Repasses a Terceiros', icon: 'sync_alt' },
   { path: '/settings', label: 'Configurações', icon: 'settings' },
 ]
 

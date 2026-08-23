@@ -9,11 +9,15 @@ export function registerReceivablesHandlers(): void {
   ipcMain.handle('receivables:list', (_e, filters: any = {}) => {
     let query = `
       SELECT r.*,
-        t.ticket_number as trip_ticket_number,
-        t.date          as trip_date,
-        c.name          as customer_name
+        t.ticket_number             as trip_ticket_number,
+        t.date                      as trip_date,
+        t.is_third_party            as is_third_party,
+        t.third_party_contractor_id as third_party_contractor_id,
+        tpc.name                    as third_party_contractor_name,
+        c.name                      as customer_name
       FROM receivables r
       LEFT JOIN trips t ON r.trip_id = t.id
+      LEFT JOIN contractors tpc ON t.third_party_contractor_id = tpc.id
       LEFT JOIN customers c ON r.customer_id = c.id
       WHERE 1=1
     `
