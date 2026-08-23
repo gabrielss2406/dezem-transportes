@@ -117,6 +117,7 @@ contextBridge.exposeInMainWorld('api', {
     markPaid: (data: any) => ipcRenderer.invoke('costs:markPaid', data),
     issueMonthlySalaries: (monthYear: string) =>
       ipcRenderer.invoke('costs:issueMonthlySalaries', monthYear),
+    byCreditor: (filters?: any) => ipcRenderer.invoke('costs:byCreditor', filters),
   },
 
   // Fuel Records
