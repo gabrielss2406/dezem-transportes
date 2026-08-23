@@ -18,7 +18,15 @@ import {
   useToast,
 } from '../components/ui'
 import { generatePdf } from '../lib/pdfGenerator'
-import type { CommissionByDriver, Cost, Driver, FuelRecord, Supplier, Truck } from '../lib/types'
+import type {
+  CommissionByDriver,
+  Cost,
+  CreditorReportLine,
+  Driver,
+  FuelRecord,
+  Supplier,
+  Truck,
+} from '../lib/types'
 import {
   currentMonthKey,
   currentMonthRange,
@@ -82,7 +90,7 @@ const categoryBadge: Record<string, string> = {
 }
 
 export function CostsPage() {
-  const [activeTab, setActiveTab] = useState<'costs' | 'fuel' | 'commissions'>('costs')
+  const [activeTab, setActiveTab] = useState<'costs' | 'fuel' | 'commissions' | 'creditor'>('costs')
 
   // ── Commissions state ──
   const [commissionData, setCommissionData] = useState<CommissionByDriver[]>([])
@@ -90,6 +98,14 @@ export function CostsPage() {
     ...currentMonthRange(),
     driver_id: '',
   })
+
+  // ── Creditor report state ──
+  const [creditorReport, setCreditorReport] = useState<CreditorReportLine[]>([])
+  const [creditorSupplierFilter, setCreditorSupplierFilter] = useState('')
+  const [creditorMonth, setCreditorMonth] = useState(currentMonthKey())
+  const [creditorFilterMode, setCreditorFilterMode] = useState<'month' | 'range'>('month')
+  const [creditorRangeStart, setCreditorRangeStart] = useState(today())
+  const [creditorRangeEnd, setCreditorRangeEnd] = useState(today())
 
   // ── Costs state ──
   const [costs, setCosts] = useState<Cost[]>([])
@@ -245,6 +261,29 @@ export function CostsPage() {
   useEffect(() => {
     loadCommissions()
   }, [loadCommissions])
+
+  const loadCreditorReport = useCallback(async () => {
+    const { start, end } =
+      creditorFilterMode === 'month'
+        ? monthRangeFromKey(creditorMonth)
+        : { start: creditorRangeStart, end: creditorRangeEnd }
+    const r = await window.api.costs.byCreditor({
+      startDate: start,
+      endDate: end,
+      supplier_id: creditorSupplierFilter || undefined,
+    })
+    setCreditorReport(r)
+  }, [
+    creditorFilterMode,
+    creditorMonth,
+    creditorRangeStart,
+    creditorRangeEnd,
+    creditorSupplierFilter,
+  ])
+
+  useEffect(() => {
+    loadCreditorReport()
+  }, [loadCreditorReport])
 
   // ── Cost modal lifecycle ──
   useEffect(() => {
@@ -411,6 +450,79 @@ export function CostsPage() {
     }
   }
 
+  const handleExportCreditorPdf = async () => {
+    const subtitleParts: string[] = []
+    const fileNameParts: string[] = []
+
+    if (creditorFilterMode === 'month') {
+      subtitleParts.push(`Mês: ${creditorMonth}`)
+      fileNameParts.push(creditorMonth)
+    } else {
+      subtitleParts.push(
+        `Período: ${formatDate(creditorRangeStart)} a ${formatDate(creditorRangeEnd)}`,
+      )
+      fileNameParts.push(`${creditorRangeStart}_a_${creditorRangeEnd}`)
+    }
+    if (creditorSupplierFilter) {
+      const supplier = suppliers.find((s) => String(s.id) === String(creditorSupplierFilter))
+      if (supplier) {
+        subtitleParts.push(`Credor: ${supplier.name}`)
+        fileNameParts.push(supplier.name)
+      }
+    } else {
+      subtitleParts.push('Credor: Todos')
+    }
+
+    const safeFileName = fileNameParts
+      .join('_')
+      .normalize('NFD')
+      .replace(/\p{Diacritic}/gu, '')
+      .replace(/\s+/g, '_')
+      .replace(/[^\w-]/g, '')
+
+    const fileName = safeFileName
+      ? `contas_a_pagar_por_credor_${safeFileName}`
+      : 'contas_a_pagar_por_credor'
+
+    const headers = ['Data', 'Fornecedor', 'Plano de Contas', 'Descrição', 'Valor']
+    const data: (string | number)[][] = []
+    for (const group of creditorGroups) {
+      const lines = creditorReport.filter((l) => l.supplier_id === group.supplier_id)
+      for (const line of lines) {
+        const cat = costCategories.find((c) => c.value === line.category)
+        data.push([
+          formatDate(line.date),
+          line.supplier_name,
+          cat?.label ?? line.category,
+          line.description,
+          formatBRL(line.value),
+        ])
+      }
+      data.push(['', '', '', `SUBTOTAL — ${group.supplier_name}`, formatBRL(group.total)])
+    }
+    const foot = [['', '', '', 'TOTAL GERAL', formatBRL(creditorGrandTotal)]]
+
+    const pdfData = generatePdf({
+      title: 'Contas a Pagar por Credor',
+      subtitle: subtitleParts.join(' | '),
+      headers,
+      data,
+      foot,
+    })
+
+    try {
+      const result = await window.api.exportPdf({ fileName, data: pdfData })
+      if (result.success) {
+        show(`PDF salvo e aberto com sucesso em: ${result.path}`, 'success')
+      } else {
+        show(`Erro ao exportar PDF: ${result.error}`, 'error')
+      }
+    } catch (error) {
+      show('Ocorreu um erro inesperado ao exportar o PDF.', 'error')
+      console.error(error)
+    }
+  }
+
   const handleCostEscape = () => {
     if (isCostDirty) {
       setShowCostDiscardConfirm(true)
@@ -480,6 +592,27 @@ export function CostsPage() {
   const totalFuel = fuelRecords.reduce((s, f) => s + f.value, 0)
   const totalCommission = commissionData.reduce((s, c) => s + c.total_commission, 0)
 
+  const creditorGroups = Array.from(
+    creditorReport
+      .reduce((map, line) => {
+        const current = map.get(line.supplier_id) || {
+          supplier_id: line.supplier_id,
+          supplier_name: line.supplier_name,
+          count: 0,
+          total: 0,
+        }
+        current.count++
+        current.total += line.value
+        map.set(line.supplier_id, current)
+        return map
+      }, new Map<
+        number,
+        { supplier_id: number; supplier_name: string; count: number; total: number }
+      >())
+      .values(),
+  ).sort((a, b) => b.total - a.total)
+  const creditorGrandTotal = creditorReport.reduce((s, l) => s + l.value, 0)
+
   return (
     <div className="px-6 py-12 max-w-7xl mx-auto">
       {toast && <Toast message={toast.message} type={toast.type} />}
@@ -489,7 +622,9 @@ export function CostsPage() {
         title="Custos da Frota"
         subtitle="Gerencie despesas operacionais e histórico de abastecimentos."
         secondaryActionLabel="Exportar PDF"
-        onSecondaryAction={handleExportCostsPdf}
+        onSecondaryAction={
+          activeTab === 'creditor' ? handleExportCreditorPdf : handleExportCostsPdf
+        }
       />
 
       {/* Tabs */}
@@ -529,6 +664,18 @@ export function CostsPage() {
         >
           <span className="material-symbols-outlined text-lg">payments</span>
           Comissões
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('creditor')}
+          className={`flex items-center gap-2 px-5 py-3 text-sm font-bold transition-all border-b-2 -mb-px ${
+            activeTab === 'creditor'
+              ? 'border-primary text-primary'
+              : 'border-transparent text-on-surface-variant hover:text-on-surface'
+          }`}
+        >
+          <span className="material-symbols-outlined text-lg">handshake</span>
+          Por Credor
         </button>
       </div>
 
@@ -610,7 +757,7 @@ export function CostsPage() {
           <div className="bg-surface-container-low p-4 rounded-xl border border-outline-variant/10 flex flex-wrap items-end gap-4">
             <div className="flex-1 min-w-[180px]">
               <Select
-                label="Categoria"
+                label="Plano de Contas"
                 value={filterCategory}
                 onChange={(v) => setFilterCategory(String(v))}
                 options={costCategories.filter((c) => c.value !== 'fuel')}
@@ -656,7 +803,7 @@ export function CostsPage() {
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-surface-container-low">
-                  {['Data', 'Descrição', 'Veículo', 'Categoria', 'Valor', ''].map((h) => (
+                  {['Data', 'Descrição', 'Veículo', 'Plano de Contas', 'Valor', ''].map((h) => (
                     <th
                       key={h}
                       className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-on-surface-variant"
@@ -971,6 +1118,187 @@ export function CostsPage() {
         </div>
       )}
 
+      {/* ── CREDITOR REPORT TAB ── */}
+      {activeTab === 'creditor' && (
+        <div className="space-y-6">
+          <div className="flex items-center justify-between flex-wrap gap-4">
+            <div className="flex items-center gap-4">
+              <div className="bg-surface-container-low px-5 py-3 rounded-xl">
+                <p className="text-xs text-on-surface-variant mb-0.5">Total do Período</p>
+                <p className="text-2xl font-black font-headline text-primary">
+                  {formatBRL(creditorGrandTotal)}
+                </p>
+              </div>
+              <div className="flex gap-1 bg-surface-container-high rounded-lg p-1 border border-outline-variant/10">
+                <button
+                  type="button"
+                  onClick={() => setCreditorFilterMode('month')}
+                  className={`px-4 py-2 rounded-md text-sm font-bold transition-all ${
+                    creditorFilterMode === 'month'
+                      ? 'bg-primary text-on-primary shadow-sm'
+                      : 'text-on-surface-variant hover:text-on-surface'
+                  }`}
+                >
+                  Mês
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCreditorFilterMode('range')}
+                  className={`px-4 py-2 rounded-md text-sm font-bold transition-all ${
+                    creditorFilterMode === 'range'
+                      ? 'bg-primary text-on-primary shadow-sm'
+                      : 'text-on-surface-variant hover:text-on-surface'
+                  }`}
+                >
+                  Período
+                </button>
+              </div>
+              {creditorFilterMode === 'month' ? (
+                <MonthNavigator monthKey={creditorMonth} onChange={setCreditorMonth} />
+              ) : (
+                <div className="flex items-center gap-2">
+                  <DatePicker
+                    value={creditorRangeStart}
+                    onChange={(e) => setCreditorRangeStart(e.target.value)}
+                  />
+                  <span className="text-on-surface-variant text-sm">a</span>
+                  <DatePicker
+                    value={creditorRangeEnd}
+                    onChange={(e) => setCreditorRangeEnd(e.target.value)}
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Creditor filter */}
+          <div className="bg-surface-container-low p-4 rounded-xl border border-outline-variant/10 flex flex-wrap items-end gap-4">
+            <div className="flex-1 min-w-[220px]">
+              <Select
+                label="Credor (Fornecedor)"
+                value={creditorSupplierFilter}
+                onChange={(v) => setCreditorSupplierFilter(String(v))}
+                options={suppliers.map((s) => ({
+                  value: s.id,
+                  label: (
+                    <div className="flex justify-between">
+                      <span>{s.name}</span>
+                      {s.customId && (
+                        <span className="text-on-surface-variant/50">#{s.customId}</span>
+                      )}
+                    </div>
+                  ),
+                  displayLabel: s.name,
+                  searchableLabel: `${s.name} ${s.customId || ''}`,
+                }))}
+                optional
+              />
+            </div>
+          </div>
+
+          {/* Per-creditor summary */}
+          <div className="bg-surface-container rounded-2xl overflow-hidden border border-outline-variant/10">
+            <table className="w-full text-left">
+              <thead>
+                <tr className="bg-surface-container-high">
+                  {['Credor', 'Lançamentos', 'Total'].map((h) => (
+                    <th
+                      key={h}
+                      className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-on-surface-variant"
+                    >
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-outline-variant/10">
+                {creditorGroups.length === 0 && (
+                  <tr>
+                    <td
+                      colSpan={3}
+                      className="px-6 py-12 text-center text-on-surface-variant text-sm"
+                    >
+                      Nenhum custo com credor no período
+                    </td>
+                  </tr>
+                )}
+                {creditorGroups.map((group) => (
+                  <tr
+                    key={group.supplier_id}
+                    className="hover:bg-surface-bright/5 transition-colors"
+                  >
+                    <td className="px-6 py-4 font-bold text-on-surface text-sm">
+                      {group.supplier_name}
+                    </td>
+                    <td className="px-6 py-4 text-sm text-on-surface-variant">{group.count}</td>
+                    <td className="px-6 py-4 font-black font-headline text-on-surface text-sm">
+                      {formatBRL(group.total)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Line-item detail, for reconciliation against a creditor's invoice */}
+          <div className="bg-surface-container rounded-xl overflow-hidden border border-outline-variant/10">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-surface-container-low">
+                  {['Data', 'Fornecedor', 'Plano de Contas', 'Descrição', 'Valor'].map((h) => (
+                    <th
+                      key={h}
+                      className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-on-surface-variant"
+                    >
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-outline-variant/10">
+                {creditorReport.length === 0 && (
+                  <tr>
+                    <td
+                      colSpan={5}
+                      className="px-6 py-12 text-center text-on-surface-variant text-sm"
+                    >
+                      Nenhum lançamento encontrado
+                    </td>
+                  </tr>
+                )}
+                {creditorReport.map((row) => {
+                  const cat = costCategories.find((c) => c.value === row.category)
+                  return (
+                    <tr
+                      key={`${row.source}-${row.id}`}
+                      className="hover:bg-surface-bright/5 transition-colors"
+                    >
+                      <td className="px-6 py-4 text-sm text-on-surface-variant">
+                        {formatDate(row.date)}
+                      </td>
+                      <td className="px-6 py-4 text-sm text-on-surface">{row.supplier_name}</td>
+                      <td className="px-6 py-4">
+                        <span
+                          className={`text-[10px] font-black uppercase px-2.5 py-1 rounded ${categoryBadge[row.category] ?? 'bg-surface-container-highest text-on-surface-variant'}`}
+                        >
+                          {cat?.label ?? row.category}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-sm text-on-surface-variant">
+                        {row.description}
+                      </td>
+                      <td className="px-6 py-4 font-black font-headline text-on-surface text-sm">
+                        {formatBRL(row.value)}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
       {/* ── COST MODAL ── */}
       {costModal && (
         <Modal
@@ -986,7 +1314,7 @@ export function CostsPage() {
                 render={({ field }) => (
                   <Select
                     ref={categorySelectRef}
-                    label="Categoria"
+                    label="Plano de Contas"
                     value={field.value}
                     onChange={field.onChange}
                     onEnterSelect={() => dateRef.current?.focus()}

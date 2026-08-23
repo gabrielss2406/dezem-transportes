@@ -399,7 +399,7 @@ export function SettingsPage({ theme, onToggleTheme }: SettingsPageProps) {
               api={window.api['supplier-types']}
             />
             <DynamicTypeManager
-              title="Categorias de Custo"
+              title="Plano de Contas"
               icon="category"
               api={window.api['cost-categories']}
             />
