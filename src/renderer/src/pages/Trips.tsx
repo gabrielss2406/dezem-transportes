@@ -19,7 +19,7 @@ import {
 } from '../components/ui'
 import { generatePdf } from '../lib/pdfGenerator'
 import { TRIP_EXPORT_FIELDS, getDefaultTripExportFieldKeys } from '../lib/tripExportFields'
-import type { Customer, Driver, Product, Trip, Truck } from '../lib/types'
+import type { Contractor, Customer, Driver, Product, Trip, Truck } from '../lib/types'
 import { formatBRL, formatDate, today } from '../lib/utils'
 
 interface TripFormData {
@@ -40,6 +40,8 @@ interface TripFormData {
   ticket_number: string
   has_percentage_tax?: boolean
   has_commission?: boolean
+  is_third_party?: boolean
+  third_party_contractor_id?: number | null
 }
 
 const EMPTY: TripFormData = {
@@ -58,6 +60,8 @@ const EMPTY: TripFormData = {
   observation: '',
   has_percentage_tax: true,
   has_commission: true,
+  is_third_party: false,
+  third_party_contractor_id: null,
 }
 
 // Modal de confirmação próprio — sem confirm() nativo do Electron
@@ -99,6 +103,7 @@ export function TripsPage() {
   const [drivers, setDrivers] = useState<Driver[]>([])
   const [products, setProducts] = useState<Product[]>([])
   const [customers, setCustomers] = useState<Customer[]>([])
+  const [contractors, setContractors] = useState<Contractor[]>([])
   const [modal, setModal] = useState(false)
   const [editing, setEditing] = useState<Trip | null>(null)
   const [hasOverweight, setHasOverweight] = useState(false)
@@ -114,6 +119,7 @@ export function TripsPage() {
   const [showDriverBreakdown, setShowDriverBreakdown] = useState(false)
   const [deductionView, setDeductionView] = useState<'tax' | 'commission'>('tax')
   const [outsourcedFilter, setOutsourcedFilter] = useState<'all' | 'internal' | 'outsourced'>('all')
+  const [thirdPartyFilter, setThirdPartyFilter] = useState<'all' | 'regular' | 'third_party'>('all')
   const [noPriceRegistered, setNoPriceRegistered] = useState(false)
   const [manualUnitPrice, setManualUnitPrice] = useState<number | null>(null)
   const [filters, setFilters] = useState({
@@ -171,6 +177,7 @@ export function TripsPage() {
   const selectedDriverId = watch('driver_id')
   const currentWeight = watch('weight_ton')
   const currentOverweight = watch('overweight_ton')
+  const isThirdParty = watch('is_third_party')
 
   const selectedDriver = drivers.find((d) => d.id === Number(selectedDriverId))
   const hasCustomCommissionRate = selectedDriver?.commission_rate_override != null
@@ -247,12 +254,13 @@ export function TripsPage() {
   }, [manualUnitPrice, noPriceRegistered, currentWeight, currentOverweight, setValue])
 
   const load = useCallback(async () => {
-    const [t, tr, d, p, c, settings, exportFields] = await Promise.all([
+    const [t, tr, d, p, c, ctr, settings, exportFields] = await Promise.all([
       window.api.trips.list(filters),
       window.api.trucks.list(),
       window.api.drivers.list(),
       window.api.products.list(),
       window.api.customers.list(),
+      window.api.contractors.list(),
       window.api.settings.getApp(),
       window.api.settings.getTripExportFields(),
     ])
@@ -261,6 +269,7 @@ export function TripsPage() {
     setDrivers(d)
     setProducts(p)
     setCustomers(c)
+    setContractors(ctr)
     setAppSettings(settings)
     setExportFieldsConfig(exportFields)
   }, [filters])
@@ -366,6 +375,8 @@ export function TripsPage() {
       observation: row.observation ?? '',
       has_percentage_tax: !!row.has_percentage_tax,
       has_commission: !!row.has_commission,
+      is_third_party: !!row.is_third_party,
+      third_party_contractor_id: row.third_party_contractor_id ?? null,
     })
     setHasOverweight(!!(row.overweight_ton && row.overweight_ton > 0))
     setEditing(row)
@@ -394,6 +405,7 @@ export function TripsPage() {
   )
 
   const outsourcedTripsCount = trips.filter((t) => t.driver_is_outsourced).length
+  const thirdPartyTripsCount = trips.filter((t) => t.is_third_party).length
 
   const outsourcedFilteredTrips =
     outsourcedFilter === 'all'
@@ -402,9 +414,16 @@ export function TripsPage() {
           outsourcedFilter === 'outsourced' ? !!t.driver_is_outsourced : !t.driver_is_outsourced,
         )
 
+  const thirdPartyFilteredTrips =
+    thirdPartyFilter === 'all'
+      ? outsourcedFilteredTrips
+      : outsourcedFilteredTrips.filter((t) =>
+          thirdPartyFilter === 'third_party' ? !!t.is_third_party : !t.is_third_party,
+        )
+
   // Tabela mostra mais recente primeiro; PDF/exports usam `trips` na ordem crescente
   // que vem do backend (trips.handlers.ts, ORDER BY t.date ASC) sem mexer aqui.
-  const displayTrips = [...outsourcedFilteredTrips].sort((a, b) =>
+  const displayTrips = [...thirdPartyFilteredTrips].sort((a, b) =>
     a.date === b.date ? b.id - a.id : a.date < b.date ? 1 : -1,
   )
 
@@ -789,6 +808,36 @@ export function TripsPage() {
             </div>
           )}
 
+          {thirdPartyTripsCount > 0 && (
+            <div className="flex items-center gap-2">
+              <div className="flex gap-1 bg-surface-container-high rounded-lg p-1 border border-outline-variant/10">
+                {(
+                  [
+                    { value: 'all', label: 'Todos' },
+                    { value: 'regular', label: 'Regulares' },
+                    { value: 'third_party', label: 'Repasses' },
+                  ] as const
+                ).map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => setThirdPartyFilter(opt.value)}
+                    className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${
+                      thirdPartyFilter === opt.value
+                        ? 'bg-primary text-on-primary shadow-sm'
+                        : 'text-on-surface-variant hover:text-on-surface'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+              <span className="text-xs text-on-surface-variant">
+                {thirdPartyTripsCount} lançamento{thirdPartyTripsCount !== 1 ? 's' : ''} de repasse
+              </span>
+            </div>
+          )}
+
           {/* Per-truck breakdown button */}
           {perTruck.length > 1 && (
             <button
@@ -941,6 +990,14 @@ export function TripsPage() {
                   </td>
                   <td className="px-6 py-4 text-sm text-on-surface-variant">
                     {row.customer_name ?? '—'}
+                    {row.is_third_party ? (
+                      <div className="mt-1">
+                        <Badge
+                          label={`REPASSE${row.third_party_contractor_name ? ` • ${row.third_party_contractor_name}` : ''}`}
+                          color="primary"
+                        />
+                      </div>
+                    ) : null}
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -1312,6 +1369,62 @@ export function TripsPage() {
                   )}
                 </div>
               </div>
+
+              {/* Third-party toggle */}
+              <div className="col-span-3 pt-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const next = !isThirdParty
+                    setValue('is_third_party', next, { shouldDirty: true })
+                    if (!next) {
+                      setValue('third_party_contractor_id', null)
+                    }
+                  }}
+                  className="flex items-center gap-3 group"
+                >
+                  <div
+                    className={`relative w-10 h-5 rounded-full transition-colors ${isThirdParty ? 'bg-primary' : 'bg-surface-container-high'}`}
+                  >
+                    <div
+                      className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${isThirdParty ? 'translate-x-5' : ''}`}
+                    />
+                  </div>
+                  <span className="text-sm font-semibold text-on-surface group-hover:text-primary transition-colors">
+                    Repasse a Terceiro
+                  </span>
+                  {isThirdParty && <Badge label="REPASSE" color="primary" />}
+                </button>
+              </div>
+
+              {/* Third-party section */}
+              {isThirdParty && (
+                <div className="col-span-3 border border-primary/30 bg-primary/5 rounded-xl p-4 space-y-4 animate-in fade-in slide-in-from-top-1 duration-200">
+                  <h4 className="text-[10px] font-black uppercase tracking-widest text-primary flex items-center gap-2">
+                    <span className="material-symbols-outlined text-sm">sync_alt</span>
+                    Este lançamento é um repasse — o valor não entra no fluxo de caixa da empresa
+                  </h4>
+                  <Controller
+                    name="third_party_contractor_id"
+                    control={control}
+                    render={({ field }) => (
+                      <Select
+                        label="Terceiro"
+                        icon="handshake"
+                        value={field.value}
+                        onChange={field.onChange}
+                        error={errors.third_party_contractor_id?.message}
+                        options={contractors.map((c) => ({
+                          value: c.id,
+                          label: c.name,
+                          displayLabel: c.name,
+                          searchableLabel: c.name,
+                        }))}
+                      />
+                    )}
+                  />
+                </div>
+              )}
 
               {/* Overweight toggle */}
               <div className="col-span-3 pt-1">

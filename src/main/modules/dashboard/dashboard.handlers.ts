@@ -9,6 +9,10 @@ export function registerDashboardHandlers(): void {
     // All financial queries filter out trips/costs linked to outsourced trucks or drivers.
     const INTERNAL_TRUCK = '(t.is_outsourced = 0 OR t.is_outsourced IS NULL)'
     const INTERNAL_DRIVER = '(d.is_outsourced = 0 OR d.is_outsourced IS NULL)'
+    // Third-party entries (revenue collected on behalf of, and owed to, an external
+    // provider) are excluded from every trip-linked revenue/cost query below, the same
+    // way outsourced trucks/drivers are — this money isn't the company's.
+    const NOT_THIRD_PARTY = '(tr.is_third_party = 0 OR tr.is_third_party IS NULL)'
 
     // 1. Total Revenue — trips with internal trucks only
     const tripRevenue = (
@@ -19,7 +23,7 @@ export function registerDashboardHandlers(): void {
         FROM trips tr
         JOIN trucks t ON tr.truck_id = t.id
         JOIN drivers d ON tr.driver_id = d.id
-        WHERE tr.date BETWEEN ? AND ? AND ${INTERNAL_TRUCK} AND ${INTERNAL_DRIVER}
+        WHERE tr.date BETWEEN ? AND ? AND ${INTERNAL_TRUCK} AND ${INTERNAL_DRIVER} AND ${NOT_THIRD_PARTY}
       `,
         )
         .get(startDate, endDate) as any
@@ -51,7 +55,7 @@ export function registerDashboardHandlers(): void {
       JOIN trips tr ON fs.trip_id = tr.id
       JOIN trucks t ON tr.truck_id = t.id
       JOIN drivers d ON tr.driver_id = d.id
-      WHERE tr.date BETWEEN ? AND ? AND ${INTERNAL_TRUCK} AND ${INTERNAL_DRIVER}
+      WHERE tr.date BETWEEN ? AND ? AND ${INTERNAL_TRUCK} AND ${INTERNAL_DRIVER} AND ${NOT_THIRD_PARTY}
       GROUP BY fs.trip_id
     `,
       )
@@ -89,7 +93,7 @@ export function registerDashboardHandlers(): void {
         JOIN trips tr ON fs.trip_id = tr.id
         JOIN trucks t ON tr.truck_id = t.id
         JOIN drivers d ON tr.driver_id = d.id
-        WHERE tr.date BETWEEN ? AND ? AND ${INTERNAL_TRUCK} AND ${INTERNAL_DRIVER}
+        WHERE tr.date BETWEEN ? AND ? AND ${INTERNAL_TRUCK} AND ${INTERNAL_DRIVER} AND ${NOT_THIRD_PARTY}
       `,
         )
         .get(startDate, endDate) as any
@@ -103,7 +107,7 @@ export function registerDashboardHandlers(): void {
         FROM trips tr
         JOIN trucks t ON tr.truck_id = t.id
         JOIN drivers d ON tr.driver_id = d.id
-        WHERE tr.date BETWEEN ? AND ? AND tr.has_commission = 1 AND ${INTERNAL_TRUCK} AND ${INTERNAL_DRIVER}
+        WHERE tr.date BETWEEN ? AND ? AND tr.has_commission = 1 AND ${INTERNAL_TRUCK} AND ${INTERNAL_DRIVER} AND ${NOT_THIRD_PARTY}
       `,
         )
         .get(startDate, endDate) as any
@@ -130,7 +134,7 @@ export function registerDashboardHandlers(): void {
         FROM trips tr
         JOIN trucks t ON tr.truck_id = t.id
         JOIN drivers d ON tr.driver_id = d.id
-        WHERE tr.date BETWEEN ? AND ? AND tr.has_percentage_tax = 1 AND ${INTERNAL_TRUCK} AND ${INTERNAL_DRIVER}
+        WHERE tr.date BETWEEN ? AND ? AND tr.has_percentage_tax = 1 AND ${INTERNAL_TRUCK} AND ${INTERNAL_DRIVER} AND ${NOT_THIRD_PARTY}
       `,
         )
         .get(startDate, endDate) as any
@@ -176,7 +180,7 @@ export function registerDashboardHandlers(): void {
         FROM trips tr
         JOIN trucks t ON tr.truck_id = t.id
         JOIN drivers d ON tr.driver_id = d.id
-        WHERE tr.date BETWEEN ? AND ? AND ${INTERNAL_TRUCK} AND ${INTERNAL_DRIVER}
+        WHERE tr.date BETWEEN ? AND ? AND ${INTERNAL_TRUCK} AND ${INTERNAL_DRIVER} AND ${NOT_THIRD_PARTY}
       `,
         )
         .get(startDate, endDate) as any
@@ -218,7 +222,7 @@ export function registerDashboardHandlers(): void {
           LIMIT 1
         ) as prev_odometer
       FROM trucks t
-      LEFT JOIN trips tr ON tr.truck_id = t.id AND tr.date BETWEEN ? AND ?
+      LEFT JOIN trips tr ON tr.truck_id = t.id AND tr.date BETWEEN ? AND ? AND ${NOT_THIRD_PARTY}
       WHERE ${INTERNAL_TRUCK}
       GROUP BY t.id
       ORDER BY revenue DESC
@@ -235,7 +239,7 @@ export function registerDashboardHandlers(): void {
       JOIN trips tr ON fs.trip_id = tr.id
       JOIN drivers d ON tr.driver_id = d.id
       JOIN trucks t ON tr.truck_id = t.id
-      WHERE tr.date BETWEEN ? AND ? AND ${INTERNAL_TRUCK} AND ${INTERNAL_DRIVER}
+      WHERE tr.date BETWEEN ? AND ? AND ${INTERNAL_TRUCK} AND ${INTERNAL_DRIVER} AND ${NOT_THIRD_PARTY}
       GROUP BY tr.truck_id
     `,
       )
@@ -280,7 +284,7 @@ export function registerDashboardHandlers(): void {
       FROM trips tr
       JOIN drivers d ON tr.driver_id = d.id
       JOIN trucks t ON tr.truck_id = t.id
-      WHERE tr.date BETWEEN ? AND ? AND tr.has_commission = 1 AND ${INTERNAL_TRUCK} AND ${INTERNAL_DRIVER}
+      WHERE tr.date BETWEEN ? AND ? AND tr.has_commission = 1 AND ${INTERNAL_TRUCK} AND ${INTERNAL_DRIVER} AND ${NOT_THIRD_PARTY}
       GROUP BY tr.truck_id
     `,
       )
@@ -293,7 +297,7 @@ export function registerDashboardHandlers(): void {
       FROM trips tr
       JOIN drivers d ON tr.driver_id = d.id
       JOIN trucks t ON tr.truck_id = t.id
-      WHERE tr.date BETWEEN ? AND ? AND tr.has_percentage_tax = 1 AND ${INTERNAL_TRUCK} AND ${INTERNAL_DRIVER}
+      WHERE tr.date BETWEEN ? AND ? AND tr.has_percentage_tax = 1 AND ${INTERNAL_TRUCK} AND ${INTERNAL_DRIVER} AND ${NOT_THIRD_PARTY}
       GROUP BY tr.truck_id
     `,
       )
@@ -371,7 +375,7 @@ export function registerDashboardHandlers(): void {
         JOIN trips tr ON fs.trip_id = tr.id
         JOIN trucks t ON tr.truck_id = t.id
         JOIN drivers d ON tr.driver_id = d.id
-        WHERE tr.date BETWEEN ? AND ? AND ${INTERNAL_TRUCK} AND ${INTERNAL_DRIVER}
+        WHERE tr.date BETWEEN ? AND ? AND ${INTERNAL_TRUCK} AND ${INTERNAL_DRIVER} AND ${NOT_THIRD_PARTY}
       `,
         )
         .get(startDate, endDate) as any
@@ -401,7 +405,7 @@ export function registerDashboardHandlers(): void {
         JOIN trips tr ON fs.trip_id = tr.id
         JOIN trucks t ON tr.truck_id = t.id
         JOIN drivers d ON tr.driver_id = d.id
-        WHERE tr.date BETWEEN ? AND ? AND ${INTERNAL_TRUCK} AND ${INTERNAL_DRIVER}
+        WHERE tr.date BETWEEN ? AND ? AND ${INTERNAL_TRUCK} AND ${INTERNAL_DRIVER} AND ${NOT_THIRD_PARTY}
       `,
         )
         .get(startDate, endDate) as any
@@ -432,7 +436,7 @@ export function registerDashboardHandlers(): void {
       FROM trips tr
       JOIN trucks t ON tr.truck_id = t.id
       JOIN drivers d ON tr.driver_id = d.id
-      WHERE tr.date >= date('now', '-6 months') AND ${INTERNAL_TRUCK} AND ${INTERNAL_DRIVER}
+      WHERE tr.date >= date('now', '-6 months') AND ${INTERNAL_TRUCK} AND ${INTERNAL_DRIVER} AND ${NOT_THIRD_PARTY}
       GROUP BY month
       ORDER BY month ASC
     `,
@@ -476,7 +480,7 @@ export function registerDashboardHandlers(): void {
       JOIN trips tr ON fs.trip_id = tr.id
       JOIN trucks t ON tr.truck_id = t.id
       JOIN drivers d ON tr.driver_id = d.id
-      WHERE tr.date >= date('now', '-6 months') AND ${INTERNAL_TRUCK} AND ${INTERNAL_DRIVER}
+      WHERE tr.date >= date('now', '-6 months') AND ${INTERNAL_TRUCK} AND ${INTERNAL_DRIVER} AND ${NOT_THIRD_PARTY}
       GROUP BY month
     `,
       )
@@ -489,7 +493,7 @@ export function registerDashboardHandlers(): void {
       FROM trips tr
       JOIN trucks t ON tr.truck_id = t.id
       JOIN drivers d ON tr.driver_id = d.id
-      WHERE tr.date >= date('now', '-6 months') AND tr.has_commission = 1 AND ${INTERNAL_TRUCK} AND ${INTERNAL_DRIVER}
+      WHERE tr.date >= date('now', '-6 months') AND tr.has_commission = 1 AND ${INTERNAL_TRUCK} AND ${INTERNAL_DRIVER} AND ${NOT_THIRD_PARTY}
       GROUP BY month
     `,
       )
@@ -514,7 +518,7 @@ export function registerDashboardHandlers(): void {
       FROM trips tr
       JOIN trucks t ON tr.truck_id = t.id
       JOIN drivers d ON tr.driver_id = d.id
-      WHERE tr.date >= date('now', '-6 months') AND tr.has_percentage_tax = 1 AND ${INTERNAL_TRUCK} AND ${INTERNAL_DRIVER}
+      WHERE tr.date >= date('now', '-6 months') AND tr.has_percentage_tax = 1 AND ${INTERNAL_TRUCK} AND ${INTERNAL_DRIVER} AND ${NOT_THIRD_PARTY}
       GROUP BY month
     `,
       )
@@ -668,7 +672,7 @@ export function registerDashboardHandlers(): void {
       JOIN trips tr ON fs.trip_id = tr.id
       JOIN trucks t ON tr.truck_id = t.id
       JOIN drivers d ON tr.driver_id = d.id
-      WHERE tr.date BETWEEN ? AND ? AND ${INTERNAL_TRUCK} AND ${INTERNAL_DRIVER}
+      WHERE tr.date BETWEEN ? AND ? AND ${INTERNAL_TRUCK} AND ${INTERNAL_DRIVER} AND ${NOT_THIRD_PARTY}
       GROUP BY s.type
     `,
       )
@@ -734,7 +738,7 @@ export function registerDashboardHandlers(): void {
       JOIN trucks t ON tr.truck_id = t.id
       JOIN drivers d ON tr.driver_id = d.id
       LEFT JOIN customers c ON tr.customer_id = c.id
-      WHERE tr.date BETWEEN ? AND ? AND ${INTERNAL_TRUCK} AND ${INTERNAL_DRIVER}
+      WHERE tr.date BETWEEN ? AND ? AND ${INTERNAL_TRUCK} AND ${INTERNAL_DRIVER} AND ${NOT_THIRD_PARTY}
       GROUP BY tr.customer_id
     `,
       )
@@ -797,9 +801,16 @@ export function registerDashboardHandlers(): void {
 
     // Saldo Bancário / Contas a Receber / Contas a Pagar — sempre históricos (todo o
     // banco), não recortados pelo período do dashboard: são posições atuais, não do range.
+    // Third-party trips' receivables are excluded here too — that cash isn't the
+    // company's, even though it may pass through the company's own bank account.
     const receivablesOpenTotal = (
       db()
-        .prepare(`SELECT COALESCE(SUM(amount), 0) as total FROM receivables WHERE status = 'open'`)
+        .prepare(
+          `SELECT COALESCE(SUM(r.amount), 0) as total
+           FROM receivables r
+           LEFT JOIN trips t ON r.trip_id = t.id
+           WHERE r.status = 'open' AND (t.is_third_party = 0 OR t.is_third_party IS NULL)`,
+        )
         .get() as any
     ).total
     const costsOpenTotal = (
@@ -809,7 +820,12 @@ export function registerDashboardHandlers(): void {
     ).total
     const receivablesPaidTotal = (
       db()
-        .prepare(`SELECT COALESCE(SUM(amount), 0) as total FROM receivables WHERE status = 'paid'`)
+        .prepare(
+          `SELECT COALESCE(SUM(r.amount), 0) as total
+           FROM receivables r
+           LEFT JOIN trips t ON r.trip_id = t.id
+           WHERE r.status = 'paid' AND (t.is_third_party = 0 OR t.is_third_party IS NULL)`,
+        )
         .get() as any
     ).total
     const costsPaidTotal = (

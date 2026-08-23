@@ -111,6 +111,8 @@ export interface Trip {
   tax_value?: number
   has_commission?: boolean
   commission_value?: number
+  is_third_party?: boolean
+  third_party_contractor_id?: number | null
   fuel_stops?: FuelStop[]
   fuel_stops_count?: number
   // joins
@@ -120,6 +122,7 @@ export interface Trip {
   driver_is_outsourced?: number
   product_name?: string
   customer_name?: string
+  third_party_contractor_name?: string
 }
 
 export interface MaintenanceType {
@@ -277,6 +280,9 @@ export interface Receivable {
   trip_ticket_number?: string
   trip_date?: string
   customer_name?: string
+  is_third_party?: boolean
+  third_party_contractor_id?: number | null
+  third_party_contractor_name?: string
 }
 
 export interface ReceivableCustomerSummary {
@@ -284,6 +290,21 @@ export interface ReceivableCustomerSummary {
   customer_name: string | null
   open_amount: number
   open_count: number
+}
+
+export interface ThirdPartySettlement {
+  id: number
+  trip_id: number
+  contractor_id: number
+  amount: number
+  status: 'pending' | 'settled'
+  settled_date?: string | null
+  created_at?: string
+  // joins
+  trip_ticket_number?: string
+  trip_date?: string
+  customer_name?: string
+  contractor_name?: string
 }
 
 // Augment Window
@@ -407,6 +428,13 @@ declare global {
           errors?: Record<string, string>
         }>
         summaryByCustomer(): Promise<ReceivableCustomerSummary[]>
+      }
+      thirdPartySettlements: {
+        list(filters?: any): Promise<ThirdPartySettlement[]>
+        markSettled(data: { ids: number[]; settled_date: string }): Promise<{
+          ok: boolean
+          updated?: number
+        }>
       }
       backup: {
         getConfig(): Promise<import('../../../shared/types').BackupConfig | null>

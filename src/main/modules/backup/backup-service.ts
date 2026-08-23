@@ -181,7 +181,14 @@ async function analyzeBackupFile(backupPath: string): Promise<BackupAnalysis> {
 
       // Verificar se faltam colunas esperadas
       const expectedCols = {
-        trips: ['overweight_ton', 'ticket_number', 'has_percentage_tax', 'has_commission'],
+        trips: [
+          'overweight_ton',
+          'ticket_number',
+          'has_percentage_tax',
+          'has_commission',
+          'is_third_party',
+          'third_party_contractor_id',
+        ],
         costs: [],
         drivers: ['is_outsourced', 'contractor_id'],
         trucks: ['is_outsourced', 'contractor_id', 'customId'],

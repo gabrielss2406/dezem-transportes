@@ -4,6 +4,7 @@ import { Controller, useForm } from 'react-hook-form'
 import { receivableSchema } from '../../../shared/schemas'
 import { PageHeader } from '../components/PageHeader'
 import {
+  Badge,
   Button,
   ConfirmModal,
   CurrencyInput,
@@ -94,9 +95,12 @@ export function ReceivablesPage() {
 
   const loadOpenTotals = useCallback(async () => {
     const open = await window.api.receivables.list({ status: 'open' })
+    // Third-party receivables are still payable/trackable here, but this KPI represents
+    // the company's own cash position, so their amount is left out of it.
+    const ownOpen = open.filter((r) => !r.is_third_party)
     setOpenTotals({
-      amount: open.reduce((s, r) => s + r.amount, 0),
-      count: open.length,
+      amount: ownOpen.reduce((s, r) => s + r.amount, 0),
+      count: ownOpen.length,
     })
   }, [])
 
@@ -430,7 +434,17 @@ export function ReceivablesPage() {
                 <td className="px-6 py-1.5 text-sm font-mono text-on-surface-variant">
                   {row.trip_ticket_number ?? row.description ?? '—'}
                 </td>
-                <td className="px-6 py-1.5 text-sm text-on-surface">{row.customer_name ?? '—'}</td>
+                <td className="px-6 py-1.5 text-sm text-on-surface">
+                  {row.customer_name ?? '—'}
+                  {row.is_third_party ? (
+                    <div className="mt-1">
+                      <Badge
+                        label={`REPASSE${row.third_party_contractor_name ? ` • ${row.third_party_contractor_name}` : ''}`}
+                        color="primary"
+                      />
+                    </div>
+                  ) : null}
+                </td>
                 <td className="px-6 py-1.5 font-black font-headline text-on-surface text-sm">
                   {formatBRL(row.amount)}
                 </td>

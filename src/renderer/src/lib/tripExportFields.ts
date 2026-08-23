@@ -88,6 +88,12 @@ export const TRIP_EXPORT_FIELDS: TripExportField[] = [
     getValue: (trip) => trip.customer_name ?? '—',
     defaultSelected: () => true,
   },
+  {
+    key: 'third_party',
+    label: 'Terceiro',
+    getValue: (trip) => (trip.is_third_party ? (trip.third_party_contractor_name ?? 'Sim') : 'Não'),
+    defaultSelected: (filters) => !filters.customer_id,
+  },
 ]
 
 export function getDefaultTripExportFieldKeys(filters: TripExportFilters): string[] {
