@@ -1,5 +1,6 @@
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
+import { DEZEM_LOGO_ASPECT_RATIO, DEZEM_LOGO_PNG_BASE64 } from '../assets/dezemLogoBase64'
 
 interface PdfOptions {
   title: string
@@ -23,6 +24,7 @@ export function generatePdf({
 }: PdfOptions): ArrayBuffer {
   // Alterada a assinatura
   const doc = new jsPDF({ orientation, unit: 'mm', format: 'a4' })
+  const pageWidth = doc.internal.pageSize.getWidth()
 
   // Cores da Identidade Visual (Dezem Transportes)
   const primaryColor: [number, number, number] = [132, 84, 0] // --primary
@@ -30,6 +32,11 @@ export function generatePdf({
   const mutedColor: [number, number, number] = [116, 119, 117] // --outline
   const surfaceLow: [number, number, number] = [243, 243, 242] // --surface-container-low
   const separatorColor: [number, number, number] = [190, 190, 186] // --outline-variant (mais escuro)
+
+  // Logo (Dezem Transportes) — canto superior direito de todo relatório
+  const logoWidth = 28
+  const logoHeight = logoWidth * DEZEM_LOGO_ASPECT_RATIO
+  doc.addImage(DEZEM_LOGO_PNG_BASE64, 'PNG', pageWidth - 14 - logoWidth, 8, logoWidth, logoHeight)
 
   // Título
   doc.setFontSize(20)

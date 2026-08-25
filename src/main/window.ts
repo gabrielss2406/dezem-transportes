@@ -3,6 +3,12 @@ import { BrowserWindow, app, shell } from 'electron'
 
 let mainWindow: BrowserWindow | null = null
 
+function getIconPath(): string {
+  return app.isPackaged
+    ? join(process.resourcesPath, 'icon.png')
+    : join(__dirname, '../../resources/icon.png')
+}
+
 function loadContent(win: BrowserWindow): void {
   if (!app.isPackaged && process.env.ELECTRON_RENDERER_URL) {
     win.loadURL(process.env.ELECTRON_RENDERER_URL)
@@ -24,6 +30,7 @@ export function createWindow(): BrowserWindow {
     show: false,
     autoHideMenuBar: true,
     title: 'Dezem — Gestão de Frota',
+    icon: getIconPath(),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       sandbox: false,
