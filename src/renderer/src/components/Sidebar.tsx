@@ -1,4 +1,5 @@
 import { NavLink, useNavigate } from 'react-router-dom'
+import dezemLogo from '../assets/dezem-logo.png'
 
 const navItems = [
   { path: '/overview', label: 'Menu', icon: 'menu' },
@@ -30,10 +31,8 @@ export function Sidebar({ onLogout }: SidebarProps) {
       {/* Brand */}
       <div className="px-6 py-8 mb-2">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-primary rounded flex items-center justify-center shrink-0">
-            <span className="material-symbols-outlined text-on-primary text-xl">
-              local_shipping
-            </span>
+          <div className="w-14 h-10 bg-white rounded flex items-center justify-center shrink-0 p-1">
+            <img src={dezemLogo} alt="Dezem Transportes" className="w-full h-full object-contain" />
           </div>
           <div>
             <h1 className="text-xl font-bold tracking-tight text-on-surface leading-tight">

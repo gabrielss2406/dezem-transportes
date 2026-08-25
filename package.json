@@ -73,7 +73,7 @@
       "output": "release"
     },
     "win": {
-      "icon": "resources/icon.ico",
+      "icon": "resources/icon.png",
       "target": [
         {
           "target": "nsis",
@@ -94,6 +94,10 @@
       {
         "from": ".env.production",
         "to": ".env"
+      },
+      {
+        "from": "resources/icon.png",
+        "to": "icon.png"
       }
     ],
     "files": [
