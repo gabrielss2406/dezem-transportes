@@ -73,6 +73,9 @@ export function registerCostHandlers(): void {
     `)
 
     if (data.installments <= 1) {
+      const now = new Date()
+      const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+      const isDue = data.date <= todayStr
       const r = insert.run(
         data.date,
         data.category,
@@ -85,8 +88,8 @@ export function registerCostHandlers(): void {
         null,
         null,
         data.kind,
-        'paid',
-        data.date,
+        isDue ? 'paid' : 'open',
+        isDue ? data.date : null,
       )
       return { id: r.lastInsertRowid }
     }

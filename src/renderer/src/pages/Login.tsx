@@ -2,7 +2,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { loginSchema } from '../../../shared/schemas'
-import dezemLogo from '../assets/dezem-logo.png'
+import dezemLogoBgRemoved from '../assets/dezem-logo-bg-removed.png'
 
 interface LoginProps {
   onLogin: (name: string) => void
@@ -47,8 +47,12 @@ export function LoginPage({ onLogin }: LoginProps) {
         <div className="w-full">
           {/* Branding */}
           <div className="text-center mb-12">
-            <div className="inline-flex items-center justify-center bg-white p-3 rounded-xl mb-6 shadow-sm">
-              <img src={dezemLogo} alt="Dezem Transportes" className="h-16 w-auto object-contain" />
+            <div className="inline-flex items-center justify-center p-3 mb-6">
+              <img
+                src={dezemLogoBgRemoved}
+                alt="Dezem Transportes"
+                className="h-28 w-auto object-contain"
+              />
             </div>
             <h1 className="text-3xl font-black text-on-background tracking-tight mb-2">
               Dezem Transportes

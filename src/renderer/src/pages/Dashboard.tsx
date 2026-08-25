@@ -211,7 +211,9 @@ export function DashboardPage() {
     setRange((r) => ({ ...r, [field]: value }))
   }
 
-  const monthLabel = new Date(range.start).toLocaleDateString('pt-BR', {
+  const monthLabel = new Date(
+    new Date(range.start).setDate(new Date(range.start).getDate() + 1),
+  ).toLocaleDateString('pt-BR', {
     month: 'long',
     year: 'numeric',
   })
