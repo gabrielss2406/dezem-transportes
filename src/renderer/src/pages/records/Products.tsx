@@ -187,8 +187,12 @@ export function ProductsPage() {
     if (!deleteTarget) {
       return
     }
-    await window.api.products.delete(deleteTarget.id)
-    show('Produto excluído')
+    const res: any = await window.api.products.delete(deleteTarget.id)
+    if (res && res.ok === false) {
+      show(res.errors?.form || 'Não foi possível excluir este produto.', 'error')
+    } else {
+      show('Produto excluído')
+    }
     setDeleteTarget(null)
     load()
   }

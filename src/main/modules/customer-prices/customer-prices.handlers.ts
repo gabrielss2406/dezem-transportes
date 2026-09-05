@@ -80,10 +80,16 @@ export function registerCustomerPricesHandlers(): void {
   })
 
   ipcMain.handle('customer-prices:delete', (_e, customerId: number, productId: number) => {
-    db()
-      .prepare('DELETE FROM customer_prices WHERE customer_id = ? AND product_id = ?')
-      .run(customerId, productId)
-    return { ok: true }
+    try {
+      db()
+        .prepare('DELETE FROM customer_prices WHERE customer_id = ? AND product_id = ?')
+        .run(customerId, productId)
+      return { ok: true }
+    } catch (error) {
+      console.error('Unexpected error in customer-prices:delete:', error)
+      const errorMessage = error instanceof Error ? error.message : 'Ocorreu um erro inesperado.'
+      return { ok: false, errors: { form: errorMessage } }
+    }
   })
 
   ipcMain.handle('customer-prices:getPrice', (_e, customerId: number, productId: number) => {

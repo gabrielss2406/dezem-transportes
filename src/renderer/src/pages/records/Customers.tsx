@@ -235,8 +235,12 @@ export function CustomersPage() {
     if (!deleteTarget) {
       return
     }
-    await window.api.customers.delete(deleteTarget.id)
-    show('Cliente excluído')
+    const res: any = await window.api.customers.delete(deleteTarget.id)
+    if (res && res.ok === false) {
+      show(res.errors?.form || 'Não foi possível excluir este cliente.', 'error')
+    } else {
+      show('Cliente excluído')
+    }
     setDeleteTarget(null)
     load()
   }

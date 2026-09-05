@@ -198,8 +198,12 @@ export function TrucksPage() {
     if (!deleteTarget) {
       return
     }
-    await window.api.trucks.delete(deleteTarget.id)
-    show('Caminhão excluído')
+    const res: any = await window.api.trucks.delete(deleteTarget.id)
+    if (res && res.ok === false) {
+      show(res.errors?.form || 'Não foi possível excluir este caminhão.', 'error')
+    } else {
+      show('Caminhão excluído')
+    }
     setDeleteTarget(null)
     load()
   }

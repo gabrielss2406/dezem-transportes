@@ -262,8 +262,15 @@ export function PriceManagementPage() {
     if (!deleteTarget) {
       return
     }
-    await window.api.customerPrices.delete(deleteTarget.customerId, deleteTarget.productId)
-    show('Preço removido')
+    const res: any = await window.api.customerPrices.delete(
+      deleteTarget.customerId,
+      deleteTarget.productId,
+    )
+    if (res && res.ok === false) {
+      show(res.errors?.form || 'Não foi possível remover este preço.', 'error')
+    } else {
+      show('Preço removido')
+    }
     setDeleteTarget(null)
     load()
   }

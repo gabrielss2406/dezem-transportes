@@ -30,6 +30,13 @@ function getUniqueConstraintField(message: string): string | null {
   return match ? match[1] : null
 }
 
+// Deleting a record that other records still reference (e.g. a truck with trips) throws this.
+// Surface a friendly message instead of the raw SQLite error and instead of a false success.
+const FOREIGN_KEY_ERROR = {
+  ok: false,
+  errors: { form: 'Não é possível excluir: existem registros vinculados a este item.' },
+} as const
+
 // A handler result of { ok: false, ... } means the mutation was rejected (validation/constraint
 // error), so nothing actually changed and no refresh notification should be sent.
 function wasMutationApplied(result: unknown): boolean {
@@ -69,6 +76,9 @@ export function createValidatedHandler<T extends z.ZodRawShape>(
           return { ok: false, errors: { [field]: 'Este valor já está em uso.' } }
         }
       }
+      if (isSqliteError(error) && error.code === 'SQLITE_CONSTRAINT_FOREIGNKEY') {
+        return FOREIGN_KEY_ERROR
+      }
       // Log the unexpected error for debugging
       console.error(`Unexpected error in ${channel}:`, error)
       const errorMessage = error instanceof Error ? error.message : 'Ocorreu um erro inesperado.'
@@ -102,6 +112,9 @@ export function createValidatedHandlerWithId<T extends z.ZodRawShape>(
           return { ok: false, errors: { [field]: 'Este valor já está em uso.' } }
         }
       }
+      if (isSqliteError(error) && error.code === 'SQLITE_CONSTRAINT_FOREIGNKEY') {
+        return FOREIGN_KEY_ERROR
+      }
       console.error(`Unexpected error in ${channel}:`, error)
       const errorMessage = error instanceof Error ? error.message : 'Ocorreu um erro inesperado.'
       return { ok: false, errors: { form: errorMessage } }
@@ -129,6 +142,9 @@ export function createIdValidatedHandler(channel: string, handler: (id: number) 
           // Assuming DB column name matches form field name (e.g., customId, license_plate)
           return { ok: false, errors: { [field]: 'Este valor já está em uso.' } }
         }
+      }
+      if (isSqliteError(error) && error.code === 'SQLITE_CONSTRAINT_FOREIGNKEY') {
+        return FOREIGN_KEY_ERROR
       }
       console.error(`Unexpected error in ${channel}:`, error)
       const errorMessage = error instanceof Error ? error.message : 'Ocorreu um erro inesperado.'
