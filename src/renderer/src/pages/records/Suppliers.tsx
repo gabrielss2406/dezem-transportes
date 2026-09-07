@@ -190,8 +190,12 @@ export function SuppliersPage() {
     if (!deleteTarget) {
       return
     }
-    await window.api.suppliers.delete(deleteTarget.id)
-    show('Fornecedor excluído')
+    const res: any = await window.api.suppliers.delete(deleteTarget.id)
+    if (res && res.ok === false) {
+      show(res.errors?.form || 'Não foi possível excluir este fornecedor.', 'error')
+    } else {
+      show('Fornecedor excluído')
+    }
     setDeleteTarget(null)
     load()
   }

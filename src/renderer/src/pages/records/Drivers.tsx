@@ -225,8 +225,12 @@ export function DriversPage() {
     if (!deleteTarget) {
       return
     }
-    await window.api.drivers.delete(deleteTarget.id)
-    show('Motorista excluído')
+    const res: any = await window.api.drivers.delete(deleteTarget.id)
+    if (res && res.ok === false) {
+      show(res.errors?.form || 'Não foi possível excluir este motorista.', 'error')
+    } else {
+      show('Motorista excluído')
+    }
     setDeleteTarget(null)
     load()
   }
