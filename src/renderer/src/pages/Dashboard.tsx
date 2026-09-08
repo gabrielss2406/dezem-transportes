@@ -382,7 +382,17 @@ export function DashboardPage() {
               <KpiBlock
                 label="Contas a Pagar"
                 value={formatBRL(summary.costsOpenTotal).replace('R$ ', '')}
-                info="Em aberto (não filtrado por período)"
+                info={
+                  (summary.costsOverdueCount ?? 0) > 0
+                    ? `${summary.costsOverdueCount} atrasado(s) (${formatBRL(summary.costsOverdueTotal ?? 0)})`
+                    : 'Em aberto (não filtrado por período)'
+                }
+              />
+
+              <KpiBlock
+                label="Fluxo de Caixa (Custos Pagos)"
+                value={formatBRL(summary.cashOutCosts ?? 0).replace('R$ ', '')}
+                info="Custos baixados no período (data de pagamento, não de lançamento)"
               />
             </div>
 

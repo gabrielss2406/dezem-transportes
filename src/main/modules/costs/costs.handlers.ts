@@ -72,10 +72,9 @@ export function registerCostHandlers(): void {
       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
     `)
 
+    // Every cost is born 'open' — Fluxo de Caixa only credits it once a real baixa
+    // (costs:markPaid) sets paid_date, mirroring receivables:create.
     if (data.installments <= 1) {
-      const now = new Date()
-      const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
-      const isDue = data.date <= todayStr
       const r = insert.run(
         data.date,
         data.category,
@@ -88,8 +87,8 @@ export function registerCostHandlers(): void {
         null,
         null,
         data.kind,
-        isDue ? 'paid' : 'open',
-        isDue ? data.date : null,
+        'open',
+        null,
       )
       return { id: r.lastInsertRowid }
     }

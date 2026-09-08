@@ -849,11 +849,16 @@ export function CostsPage() {
                               Despesa
                             </span>
                           )}
-                          {row.status === 'open' && (
-                            <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-amber-500/15 text-amber-700">
-                              Em aberto
-                            </span>
-                          )}
+                          {row.status === 'open' &&
+                            (row.date < today() ? (
+                              <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-red-500/15 text-red-700">
+                                Atrasado
+                              </span>
+                            ) : (
+                              <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-amber-500/15 text-amber-700">
+                                Em aberto
+                              </span>
+                            ))}
                         </div>
                       </td>
                       <td className="px-6 py-4 text-sm font-mono text-on-surface-variant">

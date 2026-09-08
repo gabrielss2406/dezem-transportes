@@ -201,6 +201,7 @@ export interface DashboardSummary {
   expenseCost: number
   expenseOpenCount: number
   expenseOpenValue: number
+  cashOutCosts: number
   totalTrips: number
   totalKm: number
   fuelCost: number
@@ -257,6 +258,8 @@ export interface DashboardSummary {
   bankBalance: number
   receivablesOpenTotal: number
   costsOpenTotal: number
+  costsOverdueCount: number
+  costsOverdueTotal: number
 }
 
 export interface CreditorReportLine {

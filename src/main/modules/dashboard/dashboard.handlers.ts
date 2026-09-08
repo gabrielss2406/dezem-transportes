@@ -172,6 +172,22 @@ export function registerDashboardHandlers(): void {
       )
       .get(startDate, endDate) as any
 
+    // Fluxo de Caixa do período — custos efetivamente baixados (paid_date) dentro do
+    // período, ao contrário de directCosts/expenseCost acima que são por competência
+    // (c.date). Um custo lançado agora só entra aqui quando a baixa (costs:markPaid)
+    // acontecer, mantendo o DRE (competência) intacto mesmo que a baixa seja só no mês seguinte.
+    const cashOutCosts = (
+      db()
+        .prepare(
+          `
+        SELECT COALESCE(SUM(value), 0) as total
+        FROM costs
+        WHERE paid_date BETWEEN ? AND ?
+      `,
+        )
+        .get(startDate, endDate) as any
+    ).total
+
     const totalTrips = (
       db()
         .prepare(
@@ -818,6 +834,14 @@ export function registerDashboardHandlers(): void {
         .prepare(`SELECT COALESCE(SUM(value), 0) as total FROM costs WHERE status = 'open'`)
         .get() as any
     ).total
+    // "Atrasado" is derived, not stored: an open cost whose own date has already passed
+    // hasn't been settled yet — no separate due_date field needed to flag it.
+    const costsOverdue = db()
+      .prepare(
+        `SELECT COUNT(*) as c, COALESCE(SUM(value), 0) as total FROM costs
+         WHERE status = 'open' AND date < date('now')`,
+      )
+      .get() as any
     const receivablesPaidTotal = (
       db()
         .prepare(
@@ -845,6 +869,7 @@ export function registerDashboardHandlers(): void {
       expenseCost: Number(expenseCost) || 0,
       expenseOpenCount: Number(expenseOpen.c) || 0,
       expenseOpenValue: Number(expenseOpen.total) || 0,
+      cashOutCosts: Number(cashOutCosts) || 0,
       totalTrips,
       totalKm,
       fuelCost: totalFuelCost,
@@ -858,6 +883,8 @@ export function registerDashboardHandlers(): void {
       bankBalance,
       receivablesOpenTotal: Number(receivablesOpenTotal) || 0,
       costsOpenTotal: Number(costsOpenTotal) || 0,
+      costsOverdueCount: Number(costsOverdue.c) || 0,
+      costsOverdueTotal: Number(costsOverdue.total) || 0,
     }
   })
 
