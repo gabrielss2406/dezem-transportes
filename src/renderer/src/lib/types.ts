@@ -201,7 +201,6 @@ export interface DashboardSummary {
   expenseCost: number
   expenseOpenCount: number
   expenseOpenValue: number
-  cashOutCosts: number
   totalTrips: number
   totalKm: number
   fuelCost: number

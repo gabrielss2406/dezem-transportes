@@ -370,7 +370,7 @@ export function DashboardPage() {
               <KpiBlock
                 label="Saldo Bancário"
                 value={formatBRL(summary.bankBalance).replace('R$ ', '')}
-                info="Recebido − pago (histórico)"
+                info="Recebido − pago no período"
               />
 
               <KpiBlock
@@ -387,12 +387,6 @@ export function DashboardPage() {
                     ? `${summary.costsOverdueCount} atrasado(s) (${formatBRL(summary.costsOverdueTotal ?? 0)})`
                     : 'Em aberto (não filtrado por período)'
                 }
-              />
-
-              <KpiBlock
-                label="Fluxo de Caixa (Custos Pagos)"
-                value={formatBRL(summary.cashOutCosts ?? 0).replace('R$ ', '')}
-                info="Custos baixados no período (data de pagamento, não de lançamento)"
               />
             </div>
 

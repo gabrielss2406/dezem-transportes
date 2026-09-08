@@ -65,7 +65,10 @@ export function registerDashboardHandlers(): void {
       fuelCostsByTrip.map((r: any) => [r.trip_id, r.total]),
     )
 
-    // 2. Total Costs — exclude outsourced trucks and outsourced driver salaries
+    // 2. Total Costs — exclude outsourced trucks and outsourced driver salaries.
+    // Only counted once actually paid (status='paid'), in the month of the baixa
+    // (paid_date), not the month it was lançado — so a cost recorded now but only
+    // settled next month doesn't distort this month's Custos Totais/Saldo.
     const directCosts = (
       db()
         .prepare(
@@ -74,7 +77,7 @@ export function registerDashboardHandlers(): void {
         FROM costs c
         LEFT JOIN trucks t ON c.truck_id = t.id
         LEFT JOIN drivers d ON c.driver_id = d.id
-        WHERE c.date BETWEEN ? AND ?
+        WHERE c.status = 'paid' AND c.paid_date BETWEEN ? AND ?
           AND c.category != 'fuel'
           AND c.kind = 'operational'
           AND (c.truck_id IS NULL OR ${INTERNAL_TRUCK})
@@ -144,7 +147,8 @@ export function registerDashboardHandlers(): void {
     const totalCost = operationalCost + totalTax
 
     // Despesas avulsas (kind = 'expense') — não entram no custo operacional/CPK,
-    // mas são mostradas à parte no Dashboard pra visibilidade financeira.
+    // mas são mostradas à parte no Dashboard pra visibilidade financeira. Mesmo critério
+    // de directCosts: só conta quando paga (status='paid'), no mês da baixa (paid_date).
     const expenseCost = (
       db()
         .prepare(
@@ -153,7 +157,7 @@ export function registerDashboardHandlers(): void {
         FROM costs c
         LEFT JOIN trucks t ON c.truck_id = t.id
         LEFT JOIN drivers d ON c.driver_id = d.id
-        WHERE c.date BETWEEN ? AND ?
+        WHERE c.status = 'paid' AND c.paid_date BETWEEN ? AND ?
           AND c.kind = 'expense'
           AND (c.truck_id IS NULL OR ${INTERNAL_TRUCK})
           AND (c.driver_id IS NULL OR ${INTERNAL_DRIVER})
@@ -171,22 +175,6 @@ export function registerDashboardHandlers(): void {
       `,
       )
       .get(startDate, endDate) as any
-
-    // Fluxo de Caixa do período — custos efetivamente baixados (paid_date) dentro do
-    // período, ao contrário de directCosts/expenseCost acima que são por competência
-    // (c.date). Um custo lançado agora só entra aqui quando a baixa (costs:markPaid)
-    // acontecer, mantendo o DRE (competência) intacto mesmo que a baixa seja só no mês seguinte.
-    const cashOutCosts = (
-      db()
-        .prepare(
-          `
-        SELECT COALESCE(SUM(value), 0) as total
-        FROM costs
-        WHERE paid_date BETWEEN ? AND ?
-      `,
-        )
-        .get(startDate, endDate) as any
-    ).total
 
     const totalTrips = (
       db()
@@ -284,7 +272,7 @@ export function registerDashboardHandlers(): void {
       FROM costs c
       LEFT JOIN trucks t ON c.truck_id = t.id
       LEFT JOIN drivers d ON c.driver_id = d.id
-      WHERE c.date BETWEEN ? AND ?
+      WHERE c.status = 'paid' AND c.paid_date BETWEEN ? AND ?
         AND c.category != 'fuel' AND c.kind = 'operational'
         AND (c.truck_id IS NULL OR ${INTERNAL_TRUCK})
         AND (c.driver_id IS NULL OR ${INTERNAL_DRIVER})
@@ -475,11 +463,11 @@ export function registerDashboardHandlers(): void {
     const directCostsMonthly = db()
       .prepare(
         `
-      SELECT strftime('%Y-%m', c.date) as month, COALESCE(SUM(c.value), 0) as total
+      SELECT strftime('%Y-%m', c.paid_date) as month, COALESCE(SUM(c.value), 0) as total
       FROM costs c
       LEFT JOIN trucks t ON c.truck_id = t.id
       LEFT JOIN drivers d ON c.driver_id = d.id
-      WHERE c.date >= date('now', '-6 months')
+      WHERE c.status = 'paid' AND c.paid_date >= date('now', '-6 months')
         AND c.category != 'fuel' AND c.kind = 'operational'
         AND (c.truck_id IS NULL OR ${INTERNAL_TRUCK})
         AND (c.driver_id IS NULL OR ${INTERNAL_DRIVER})
@@ -543,11 +531,11 @@ export function registerDashboardHandlers(): void {
     const expenseCostMonthly = db()
       .prepare(
         `
-      SELECT strftime('%Y-%m', c.date) as month, COALESCE(SUM(c.value), 0) as total
+      SELECT strftime('%Y-%m', c.paid_date) as month, COALESCE(SUM(c.value), 0) as total
       FROM costs c
       LEFT JOIN trucks t ON c.truck_id = t.id
       LEFT JOIN drivers d ON c.driver_id = d.id
-      WHERE c.date >= date('now', '-6 months') AND c.kind = 'expense'
+      WHERE c.status = 'paid' AND c.paid_date >= date('now', '-6 months') AND c.kind = 'expense'
         AND (c.truck_id IS NULL OR ${INTERNAL_TRUCK})
         AND (c.driver_id IS NULL OR ${INTERNAL_DRIVER})
       GROUP BY month
@@ -665,7 +653,7 @@ export function registerDashboardHandlers(): void {
       FROM costs c
       LEFT JOIN trucks t ON c.truck_id = t.id
       LEFT JOIN drivers d ON c.driver_id = d.id
-      WHERE c.date BETWEEN ? AND ?
+      WHERE c.status = 'paid' AND c.paid_date BETWEEN ? AND ?
         AND c.kind = 'operational'
         AND (c.truck_id IS NULL OR ${INTERNAL_TRUCK})
         AND (c.driver_id IS NULL OR ${INTERNAL_DRIVER})
@@ -815,8 +803,9 @@ export function registerDashboardHandlers(): void {
       )
       .all(startDate, endDate) as any[]
 
-    // Saldo Bancário / Contas a Receber / Contas a Pagar — sempre históricos (todo o
-    // banco), não recortados pelo período do dashboard: são posições atuais, não do range.
+    // Contas a Receber / Contas a Pagar (em aberto) — sempre históricos (todo o banco),
+    // não recortados pelo período do dashboard: são posições atuais, não do range.
+    // Saldo Bancário (abaixo) é diferente: é recortado pelo período, ver comentário lá.
     // Third-party trips' receivables are excluded here too — that cash isn't the
     // company's, even though it may pass through the company's own bank account.
     const receivablesOpenTotal = (
@@ -842,20 +831,27 @@ export function registerDashboardHandlers(): void {
          WHERE status = 'open' AND date < date('now')`,
       )
       .get() as any
+    // Saldo Bancário do período: só conta o que foi efetivamente recebido/pago (paid_date)
+    // dentro do range selecionado — um custo lançado em agosto mas baixado em setembro só
+    // entra no saldo de setembro, nunca no de agosto.
     const receivablesPaidTotal = (
       db()
         .prepare(
           `SELECT COALESCE(SUM(r.amount), 0) as total
            FROM receivables r
            LEFT JOIN trips t ON r.trip_id = t.id
-           WHERE r.status = 'paid' AND (t.is_third_party = 0 OR t.is_third_party IS NULL)`,
+           WHERE r.status = 'paid' AND r.paid_date BETWEEN ? AND ?
+             AND (t.is_third_party = 0 OR t.is_third_party IS NULL)`,
         )
-        .get() as any
+        .get(startDate, endDate) as any
     ).total
     const costsPaidTotal = (
       db()
-        .prepare(`SELECT COALESCE(SUM(value), 0) as total FROM costs WHERE status = 'paid'`)
-        .get() as any
+        .prepare(
+          `SELECT COALESCE(SUM(value), 0) as total FROM costs
+           WHERE status = 'paid' AND paid_date BETWEEN ? AND ?`,
+        )
+        .get(startDate, endDate) as any
     ).total
     const bankBalance = Number(receivablesPaidTotal) - Number(costsPaidTotal)
 
@@ -869,7 +865,6 @@ export function registerDashboardHandlers(): void {
       expenseCost: Number(expenseCost) || 0,
       expenseOpenCount: Number(expenseOpen.c) || 0,
       expenseOpenValue: Number(expenseOpen.total) || 0,
-      cashOutCosts: Number(cashOutCosts) || 0,
       totalTrips,
       totalKm,
       fuelCost: totalFuelCost,
