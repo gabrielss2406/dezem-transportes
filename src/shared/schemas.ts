@@ -250,7 +250,7 @@ export const thirdPartySettlementsMarkSettledSchema = z.object({
 })
 
 export const receivableSchema = z.object({
-  customer_id: idSchema,
+  customer_id: optionalNumber(999999999, 'ID inválido'),
   amount: requiredNumber(10000000, 'Valor máximo de R$ 10.000.000'),
   due_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data inválida'),
   description: z.string().max(255).optional(),

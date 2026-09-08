@@ -518,6 +518,7 @@ export function ReceivablesPage() {
               render={({ field }) => (
                 <Select
                   label="Cliente"
+                  optional
                   value={field.value}
                   onChange={field.onChange}
                   error={errors.customer_id?.message}
