@@ -204,7 +204,15 @@ export const tripSchema = z.object({
 export const maintenanceTypeSchema = z.object({
   name: z.string().trim().min(2, 'Nome deve ter pelo menos 2 caracteres').max(100),
   description: z.string().max(255).optional(),
-  interval_km: requiredNumber(999999, 'KM máximo de 999.999'),
+  // Whether services of this type advance the mileage-based maintenance interval
+  // (oil change, tire rotation). Informational types (side mirror, lights, body
+  // repair) leave this at 0 and don't require an odometer reading.
+  tracks_mileage: z.preprocess(
+    (val) => (val === false || val === 0 || val === '0' ? 0 : 1),
+    z.number().int(),
+  ),
+  // Only meaningful when tracks_mileage = 1; the handler enforces it as required there.
+  interval_km: optionalNumber(999999, 'KM máximo de 999.999'),
   is_active: z.preprocess(
     (val) => (val === true || val === 1 || val === '1' ? 1 : 0),
     z.number().int(),
@@ -215,7 +223,9 @@ export const maintenanceRecordSchema = z.object({
   truck_id: requiredNumber(999999999, 'ID inválido'),
   maintenance_type_id: requiredNumber(999999999, 'ID inválido'),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data inválida'),
-  odometer_at_service: requiredNumber(9999999, 'KM máximo de 9.999.999'),
+  // Optional at the schema level: required only for mileage-tracking types, and
+  // validated against the truck's current odometer — both enforced in the handler.
+  odometer_at_service: optionalNumber(9999999, 'KM máximo de 9.999.999'),
   notes: z.string().max(500).optional(),
 })
 

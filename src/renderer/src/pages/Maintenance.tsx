@@ -36,6 +36,7 @@ interface RecordFormData {
 interface TypeFormData {
   name: string
   description?: string
+  tracks_mileage: number
   interval_km: number | string
   is_active: number
 }
@@ -51,6 +52,7 @@ const EMPTY_RECORD: RecordFormData = {
 const EMPTY_TYPE: TypeFormData = {
   name: '',
   description: '',
+  tracks_mileage: 1,
   interval_km: '',
   is_active: 1,
 }
@@ -142,6 +144,8 @@ export function MaintenancePage() {
     handleSubmit: handleRecord,
     control: controlRecord,
     reset: resetRecord,
+    watch: watchRecord,
+    setError: setRecordError,
     formState: { errors: recordErrors, isDirty: isRecordDirty },
   } = useForm<RecordFormData>({
     resolver: zodResolver(maintenanceRecordSchema) as any,
@@ -157,6 +161,8 @@ export function MaintenancePage() {
     handleSubmit: handleType,
     control: controlType,
     reset: resetType,
+    watch: watchType,
+    setError: setTypeError,
     formState: { errors: typeErrors, isDirty: isTypeDirty },
   } = useForm<TypeFormData>({
     resolver: zodResolver(maintenanceTypeSchema) as any,
@@ -220,10 +226,42 @@ export function MaintenancePage() {
   }, [recordModal, resetRecord])
 
   async function saveRecord(data: RecordFormData) {
+    const type = types.find((t) => t.id === Number(data.maintenance_type_id))
+    const odometer =
+      data.odometer_at_service === '' || data.odometer_at_service == null
+        ? null
+        : Number(data.odometer_at_service)
+
+    // Client-side mirror of the handler rules, so the user gets inline feedback.
+    if (type?.tracks_mileage && odometer == null) {
+      setPendingRecord(null)
+      setRecordError('odometer_at_service', {
+        message: 'Quilometragem operacional é obrigatória para este tipo de manutenção.',
+      })
+      return
+    }
+    if (odometer != null) {
+      const truck = trucks.find((t) => t.id === Number(data.truck_id))
+      if (truck && odometer < truck.current_odometer) {
+        setPendingRecord(null)
+        setRecordError('odometer_at_service', {
+          message: `Não pode ser menor que o odômetro atual do caminhão (${truck.current_odometer.toLocaleString('pt-BR')} km).`,
+        })
+        return
+      }
+    }
+
     const result = await window.api.maintenance.createRecord(data as any)
     if (result?.ok === false) {
       setPendingRecord(null)
-      show((result as any).errors?.form || 'Erro ao registrar', 'error')
+      const errs = (result as any).errors ?? {}
+      if (errs.odometer_at_service) {
+        setRecordError('odometer_at_service', { message: errs.odometer_at_service })
+      }
+      show(
+        errs.form ?? errs.odometer_at_service ?? errs.maintenance_type_id ?? 'Erro ao registrar',
+        'error',
+      )
       return
     }
     show('Manutenção registrada!')
@@ -255,7 +293,8 @@ export function MaintenancePage() {
         ? {
             name: type.name,
             description: type.description ?? '',
-            interval_km: type.interval_km,
+            tracks_mileage: type.tracks_mileage ?? 1,
+            interval_km: type.tracks_mileage ? type.interval_km : '',
             is_active: type.is_active,
           }
         : EMPTY_TYPE,
@@ -273,6 +312,13 @@ export function MaintenancePage() {
   }, [typesView])
 
   async function saveType(data: TypeFormData) {
+    if (data.tracks_mileage === 1 && (data.interval_km === '' || Number(data.interval_km) <= 0)) {
+      setPendingType(null)
+      setTypeError('interval_km', {
+        message: 'Obrigatório para tipos que afetam a quilometragem.',
+      })
+      return
+    }
     let result: any
     if (editingType) {
       result = await window.api.maintenance.updateType(editingType.id, data as any)
@@ -281,7 +327,8 @@ export function MaintenancePage() {
     }
     if (result?.ok === false) {
       setPendingType(null)
-      show((result as any).errors?.form || 'Erro ao salvar', 'error')
+      const errs = (result as any).errors ?? {}
+      show(errs.form ?? errs.interval_km ?? 'Erro ao salvar', 'error')
       return
     }
     show(editingType ? 'Tipo atualizado!' : 'Tipo criado!')
@@ -330,6 +377,16 @@ export function MaintenancePage() {
   // ── Derived data ───────────────────────────────────────────────────────────
 
   const activeTypes = types.filter((t) => t.is_active)
+  const mileageTypes = activeTypes.filter((t) => t.tracks_mileage)
+
+  // Selected type in the record form drives whether operational mileage is required.
+  const watchedRecordTypeId = watchRecord('maintenance_type_id')
+  const watchedRecordTruckId = watchRecord('truck_id')
+  const selectedRecordType = types.find((t) => t.id === Number(watchedRecordTypeId))
+  const recordTracksMileage = selectedRecordType ? !!selectedRecordType.tracks_mileage : true
+  const selectedRecordTruck = trucks.find((t) => t.id === Number(watchedRecordTruckId))
+
+  const typeTracksMileage = watchType('tracks_mileage') === 1
 
   const filteredStatus = useMemo(() => {
     return statusData
@@ -440,7 +497,7 @@ export function MaintenancePage() {
                   optional
                   value={typeFilter}
                   onChange={(v) => setTypeFilter(v === '' ? '' : Number(v))}
-                  options={activeTypes.map((t) => ({ value: t.id, label: t.name }))}
+                  options={mileageTypes.map((t) => ({ value: t.id, label: t.name }))}
                   placeholder="Todos os tipos"
                 />
               </div>
@@ -461,6 +518,12 @@ export function MaintenancePage() {
               </div>
             </div>
           </div>
+
+          <p className="text-xs text-on-surface-variant -mt-6 mb-8 flex items-center gap-1.5">
+            <span className="material-symbols-outlined text-sm">info</span>
+            Mostra apenas tipos de manutenção que afetam o controle de quilometragem. Serviços
+            informativos aparecem apenas no histórico.
+          </p>
 
           {loading ? (
             <div className="flex items-center justify-center py-20 text-on-surface-variant">
@@ -652,14 +715,16 @@ export function MaintenancePage() {
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-surface-container-high">
-                  {['Data', 'Caminhão', 'Tipo de Manutenção', 'Odômetro', 'Notas', ''].map((h) => (
-                    <th
-                      key={h}
-                      className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-on-surface-variant"
-                    >
-                      {h}
-                    </th>
-                  ))}
+                  {['Data', 'Caminhão', 'Tipo de Manutenção', 'Quilometragem', 'Notas', ''].map(
+                    (h) => (
+                      <th
+                        key={h}
+                        className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-on-surface-variant"
+                      >
+                        {h}
+                      </th>
+                    ),
+                  )}
                 </tr>
               </thead>
               <tbody className="divide-y divide-outline-variant/10">
@@ -689,9 +754,19 @@ export function MaintenancePage() {
                         </span>
                         <span className="text-on-surface-variant ml-1.5">{rec.truck_model}</span>
                       </td>
-                      <td className="px-6 py-4 text-sm text-on-surface">{rec.type_name}</td>
                       <td className="px-6 py-4 text-sm text-on-surface">
-                        {rec.odometer_at_service?.toLocaleString('pt-BR')} km
+                        <div className="flex items-center gap-2">
+                          <span>{rec.type_name}</span>
+                          <Badge
+                            label={rec.tracks_mileage ? 'Afeta KM' : 'Informativo'}
+                            color={rec.tracks_mileage ? 'blue' : 'gray'}
+                          />
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-sm text-on-surface">
+                        {rec.odometer_at_service != null
+                          ? `${rec.odometer_at_service.toLocaleString('pt-BR')} km`
+                          : '—'}
                       </td>
                       <td className="px-6 py-4 text-sm text-on-surface-variant">
                         {rec.notes || '—'}
@@ -780,27 +855,45 @@ export function MaintenancePage() {
                 />
               )}
             />
-            <Controller
-              name="odometer_at_service"
-              control={controlRecord}
-              render={({ field }) => (
-                <Input
-                  ref={odometerRef}
-                  label="Odômetro no Serviço (km)"
-                  type="number"
-                  placeholder="Ex: 45000"
-                  value={field.value}
-                  onChange={field.onChange}
-                  error={recordErrors.odometer_at_service?.message as string}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault()
-                      notesRef.current?.focus()
-                    }
-                  }}
-                />
+            <div className="flex flex-col gap-1.5">
+              <Controller
+                name="odometer_at_service"
+                control={controlRecord}
+                render={({ field }) => (
+                  <Input
+                    ref={odometerRef}
+                    label="Quilometragem Operacional (km)"
+                    optional={!recordTracksMileage}
+                    type="number"
+                    placeholder="Ex: 45000"
+                    value={field.value}
+                    onChange={field.onChange}
+                    error={recordErrors.odometer_at_service?.message as string}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault()
+                        notesRef.current?.focus()
+                      }
+                    }}
+                  />
+                )}
+              />
+              {selectedRecordType && (
+                <p className="text-xs text-on-surface-variant">
+                  {recordTracksMileage
+                    ? 'Usada para recalcular e reiniciar o intervalo de manutenção deste tipo.'
+                    : 'Tipo informativo — não afeta o controle de quilometragem da frota. Preenchimento opcional.'}
+                </p>
               )}
-            />
+              {selectedRecordTruck && (
+                <p className="text-xs text-on-surface-variant">
+                  Odômetro atual do caminhão:{' '}
+                  <span className="font-bold text-on-surface">
+                    {selectedRecordTruck.current_odometer.toLocaleString('pt-BR')} km
+                  </span>
+                </p>
+              )}
+            </div>
             <div className="col-span-2">
               <Controller
                 name="notes"
@@ -854,6 +947,9 @@ export function MaintenancePage() {
                         Intervalo
                       </th>
                       <th className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-on-surface-variant">
+                        Rastreio
+                      </th>
+                      <th className="px-4 py-3 text-[10px] font-black uppercase tracking-widest text-on-surface-variant">
                         Status
                       </th>
                       <th className="px-4 py-3" />
@@ -867,7 +963,15 @@ export function MaintenancePage() {
                       >
                         <td className="px-4 py-3 text-sm text-on-surface">{type.name}</td>
                         <td className="px-4 py-3 text-sm text-on-surface">
-                          {type.interval_km.toLocaleString('pt-BR')} km
+                          {type.tracks_mileage
+                            ? `${type.interval_km.toLocaleString('pt-BR')} km`
+                            : '—'}
+                        </td>
+                        <td className="px-4 py-3">
+                          <Badge
+                            label={type.tracks_mileage ? 'Afeta KM' : 'Informativo'}
+                            color={type.tracks_mileage ? 'blue' : 'gray'}
+                          />
                         </td>
                         <td className="px-4 py-3">
                           <Badge
@@ -959,27 +1063,62 @@ export function MaintenancePage() {
                 )}
               />
             </div>
-            <Controller
-              name="interval_km"
-              control={controlType}
-              render={({ field }) => (
-                <Input
-                  ref={intervalRef}
-                  label="Intervalo (km)"
-                  type="number"
-                  placeholder="Ex: 1000"
-                  value={field.value}
-                  onChange={field.onChange}
-                  error={typeErrors.interval_km?.message as string}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault()
-                      handleType(onTypeEnterSubmit as any)()
-                    }
-                  }}
-                />
-              )}
-            />
+            <div className="col-span-2 flex items-start gap-3 rounded-lg bg-surface-container-high/40 p-3">
+              <Controller
+                name="tracks_mileage"
+                control={controlType}
+                render={({ field }) => (
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={field.value === 1}
+                    onClick={() => field.onChange(field.value === 1 ? 0 : 1)}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none shrink-0 mt-0.5 ${
+                      field.value === 1 ? 'bg-primary' : 'bg-outline-variant'
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+                        field.value === 1 ? 'translate-x-6' : 'translate-x-1'
+                      }`}
+                    />
+                  </button>
+                )}
+              />
+              <div>
+                <span className="text-sm font-medium text-on-surface">
+                  Afeta o controle de quilometragem
+                </span>
+                <p className="text-xs text-on-surface-variant mt-0.5">
+                  {typeTracksMileage
+                    ? 'Serviços deste tipo (ex: troca de óleo, rodízio de pneus) exigem a quilometragem operacional e reiniciam o intervalo.'
+                    : 'Tipo informativo (ex: retrovisor, lanternas, funilaria). Registros não exigem quilometragem e nunca marcam o caminhão como vencido.'}
+                </p>
+              </div>
+            </div>
+            {typeTracksMileage && (
+              <Controller
+                name="interval_km"
+                control={controlType}
+                render={({ field }) => (
+                  <Input
+                    ref={intervalRef}
+                    label="Intervalo (km)"
+                    type="number"
+                    placeholder="Ex: 1000"
+                    value={field.value}
+                    onChange={field.onChange}
+                    error={typeErrors.interval_km?.message as string}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault()
+                        handleType(onTypeEnterSubmit as any)()
+                      }
+                    }}
+                  />
+                )}
+              />
+            )}
             <div className="flex items-center gap-3">
               <Controller
                 name="is_active"
