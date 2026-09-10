@@ -209,22 +209,27 @@ export function setupDatabase(): void {
 
     -- Maintenance Types (oil change, tire rotation, etc.)
     CREATE TABLE IF NOT EXISTS maintenance_types (
-      id           INTEGER PRIMARY KEY AUTOINCREMENT,
-      name         TEXT NOT NULL,
-      description  TEXT,
-      interval_km  REAL NOT NULL DEFAULT 1000,
-      is_active    INTEGER NOT NULL DEFAULT 1,
-      is_deletable INTEGER NOT NULL DEFAULT 1,
-      created_at   TEXT DEFAULT (datetime('now'))
+      id             INTEGER PRIMARY KEY AUTOINCREMENT,
+      name           TEXT NOT NULL,
+      description    TEXT,
+      -- 1 = advances the mileage-based maintenance interval (oil change, tire
+      -- rotation); 0 = informational only (side mirror, lights, body repair).
+      tracks_mileage INTEGER NOT NULL DEFAULT 1,
+      interval_km    REAL NOT NULL DEFAULT 1000,
+      is_active      INTEGER NOT NULL DEFAULT 1,
+      is_deletable   INTEGER NOT NULL DEFAULT 1,
+      created_at     TEXT DEFAULT (datetime('now'))
     );
 
-    -- Maintenance Records (history per truck)
+    -- Maintenance Records (history per truck). odometer_at_service is nullable:
+    -- it's only filled for mileage-tracking types and is the sole input to the
+    -- mileage-based interval calculations.
     CREATE TABLE IF NOT EXISTS maintenance_records (
       id                  INTEGER PRIMARY KEY AUTOINCREMENT,
       truck_id            INTEGER NOT NULL REFERENCES trucks(id),
       maintenance_type_id INTEGER NOT NULL REFERENCES maintenance_types(id),
       date                TEXT NOT NULL,
-      odometer_at_service REAL NOT NULL,
+      odometer_at_service REAL,
       notes               TEXT,
       created_at          TEXT DEFAULT (datetime('now'))
     );
@@ -495,6 +500,64 @@ export function setupDatabase(): void {
   }
   if (!costInfo.some((col) => col.name === 'paid_date')) {
     db.exec('ALTER TABLE costs ADD COLUMN paid_date TEXT DEFAULT NULL')
+  }
+
+  // Migration: Add tracks_mileage to maintenance_types if missing. Existing types
+  // keep the mileage behaviour they had before (default 1).
+  const maintenanceTypeInfo = db.pragma('table_info(maintenance_types)') as { name: string }[]
+  if (!maintenanceTypeInfo.some((col) => col.name === 'tracks_mileage')) {
+    db.exec('ALTER TABLE maintenance_types ADD COLUMN tracks_mileage INTEGER NOT NULL DEFAULT 1')
+  }
+
+  // Migration: Make maintenance_records.odometer_at_service nullable, so services
+  // that don't depend on mileage can be recorded without an odometer reading.
+  const maintenanceRecordInfo = db.pragma('table_info(maintenance_records)') as {
+    name: string
+    notnull: number
+  }[]
+  const maintenanceOdometerColumn = (maintenanceRecordInfo as any[]).find(
+    (col) => col.name === 'odometer_at_service',
+  )
+  if (maintenanceOdometerColumn && maintenanceOdometerColumn.notnull === 1) {
+    try {
+      const fkState = db.pragma('foreign_keys', { simple: true })
+      db.pragma('foreign_keys = OFF')
+
+      db.exec(`
+        BEGIN TRANSACTION;
+        CREATE TABLE maintenance_records_new AS SELECT * FROM maintenance_records;
+        DROP TABLE maintenance_records;
+        CREATE TABLE maintenance_records (
+          id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+          truck_id            INTEGER NOT NULL REFERENCES trucks(id),
+          maintenance_type_id INTEGER NOT NULL REFERENCES maintenance_types(id),
+          date                TEXT NOT NULL,
+          odometer_at_service REAL,
+          notes               TEXT,
+          created_at          TEXT DEFAULT (datetime('now'))
+        );
+        INSERT INTO maintenance_records SELECT
+          id, truck_id, maintenance_type_id, date, odometer_at_service, notes, created_at
+        FROM maintenance_records_new;
+        DROP TABLE maintenance_records_new;
+        COMMIT;
+      `)
+
+      // Indexes were dropped with the old table — recreate them.
+      db.exec(
+        'CREATE INDEX IF NOT EXISTS idx_maintenance_records_truck ON maintenance_records(truck_id)',
+      )
+      db.exec(
+        'CREATE INDEX IF NOT EXISTS idx_maintenance_records_type ON maintenance_records(maintenance_type_id)',
+      )
+
+      if (fkState) {
+        db.pragma('foreign_keys = ON')
+      }
+    } catch (error) {
+      db.pragma('foreign_keys = ON')
+      throw error
+    }
   }
 
   // Seed: default supplier types if none exist

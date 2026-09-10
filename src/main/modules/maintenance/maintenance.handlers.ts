@@ -1,7 +1,7 @@
 import type Database from 'better-sqlite3'
 import { ipcMain } from 'electron'
 import { maintenanceRecordSchema, maintenanceTypeSchema } from '../../../shared/schemas'
-import type { TruckMaintenanceStatus } from '../../../shared/types'
+import type { TruckMaintenanceStatus, TruckMaintenanceTypeStatus } from '../../../shared/types'
 import { getDb } from '../../database'
 import {
   createIdValidatedHandler,
@@ -22,12 +22,18 @@ export function getMaintenanceStatus(
   trucksQuery += ' ORDER BY license_plate'
   const trucks = db.prepare(trucksQuery).all(...truckParams) as any[]
 
+  // Only mileage-tracking types produce a due/overdue status — informational types
+  // (e.g. side mirror, light replacement) never mark a truck as overdue.
   const types = db
-    .prepare('SELECT * FROM maintenance_types WHERE is_active = 1 ORDER BY name')
+    .prepare(
+      'SELECT * FROM maintenance_types WHERE is_active = 1 AND tracks_mileage = 1 ORDER BY name',
+    )
     .all() as any[]
 
+  // Records without an operational mileage reading don't move the interval, so they
+  // are ignored when resolving the last mileage-based service for a type.
   const getLastRecord = db.prepare(
-    'SELECT * FROM maintenance_records WHERE truck_id = ? AND maintenance_type_id = ? ORDER BY date DESC, id DESC LIMIT 1',
+    'SELECT * FROM maintenance_records WHERE truck_id = ? AND maintenance_type_id = ? AND odometer_at_service IS NOT NULL ORDER BY date DESC, id DESC LIMIT 1',
   )
 
   const dueSoonKm = (interval_km: number) => Math.min(interval_km * 0.2, 500)
@@ -43,7 +49,7 @@ export function getMaintenanceStatus(
         lastRecord != null ? truck.current_odometer - lastRecord.odometer_at_service : null
       const km_remaining = km_since_last != null ? type.interval_km - km_since_last : null
 
-      let status: string
+      let status: TruckMaintenanceTypeStatus['status']
       if (!lastRecord) {
         status = 'never'
       } else if (km_remaining !== null && km_remaining <= 0) {
@@ -79,29 +85,48 @@ export function registerMaintenanceHandlers(): void {
     return db().prepare(sql).all()
   })
 
+  // interval_km is optional in the schema (informational types don't need one),
+  // so it must be required here when the type advances the mileage interval.
+  const missingInterval = (data: any): boolean =>
+    data.tracks_mileage === 1 && (data.interval_km == null || data.interval_km <= 0)
+
   createValidatedHandler('maintenance:createType', maintenanceTypeSchema, (data) => {
+    if (missingInterval(data)) {
+      return {
+        ok: false,
+        errors: { interval_km: 'Obrigatório para tipos que afetam a quilometragem.' },
+      }
+    }
     const r = db()
       .prepare(
-        'INSERT INTO maintenance_types (name, description, interval_km, is_active) VALUES (?,?,?,?)',
+        'INSERT INTO maintenance_types (name, description, tracks_mileage, interval_km, is_active) VALUES (?,?,?,?,?)',
       )
       .run(
         data.name,
         (data as any).description || null,
-        (data as any).interval_km,
+        (data as any).tracks_mileage,
+        (data as any).tracks_mileage === 1 ? (data as any).interval_km : 0,
         (data as any).is_active ?? 1,
       )
     return { id: r.lastInsertRowid }
   })
 
   createValidatedHandlerWithId('maintenance:updateType', maintenanceTypeSchema, (id, data) => {
+    if (missingInterval(data)) {
+      return {
+        ok: false,
+        errors: { interval_km: 'Obrigatório para tipos que afetam a quilometragem.' },
+      }
+    }
     db()
       .prepare(
-        'UPDATE maintenance_types SET name=?, description=?, interval_km=?, is_active=? WHERE id=?',
+        'UPDATE maintenance_types SET name=?, description=?, tracks_mileage=?, interval_km=?, is_active=? WHERE id=?',
       )
       .run(
         data.name,
         (data as any).description || null,
-        (data as any).interval_km,
+        (data as any).tracks_mileage,
+        (data as any).tracks_mileage === 1 ? (data as any).interval_km : 0,
         (data as any).is_active ?? 1,
         id,
       )
@@ -123,7 +148,7 @@ export function registerMaintenanceHandlers(): void {
     let query = `
       SELECT mr.*,
         t.license_plate as truck_license_plate, t.model as truck_model,
-        mt.name as type_name, mt.interval_km
+        mt.name as type_name, mt.interval_km, mt.tracks_mileage
       FROM maintenance_records mr
       JOIN trucks t ON mr.truck_id = t.id
       JOIN maintenance_types mt ON mr.maintenance_type_id = mt.id
@@ -153,6 +178,40 @@ export function registerMaintenanceHandlers(): void {
   })
 
   createValidatedHandler('maintenance:createRecord', maintenanceRecordSchema, (data) => {
+    const odometer = (data as any).odometer_at_service ?? null
+
+    const type = db()
+      .prepare('SELECT tracks_mileage FROM maintenance_types WHERE id = ?')
+      .get((data as any).maintenance_type_id) as { tracks_mileage: number } | undefined
+
+    // Mileage-tracking types (oil change, tire rotation) can't be recorded without
+    // an operational mileage reading — that's what resets their interval.
+    if (type?.tracks_mileage === 1 && odometer == null) {
+      return {
+        ok: false,
+        errors: {
+          odometer_at_service:
+            'Quilometragem operacional é obrigatória para este tipo de manutenção.',
+        },
+      }
+    }
+
+    // When a reading is given (even for an informational type), it can't be behind
+    // the truck's current recorded odometer.
+    if (odometer != null) {
+      const truck = db()
+        .prepare('SELECT current_odometer FROM trucks WHERE id = ?')
+        .get((data as any).truck_id) as { current_odometer: number } | undefined
+      if (truck && odometer < truck.current_odometer) {
+        return {
+          ok: false,
+          errors: {
+            odometer_at_service: `Não pode ser menor que o odômetro atual do caminhão (${truck.current_odometer.toFixed(0)} km).`,
+          },
+        }
+      }
+    }
+
     const r = db()
       .prepare(
         'INSERT INTO maintenance_records (truck_id, maintenance_type_id, date, odometer_at_service, notes) VALUES (?,?,?,?,?)',
@@ -161,7 +220,7 @@ export function registerMaintenanceHandlers(): void {
         (data as any).truck_id,
         (data as any).maintenance_type_id,
         data.date,
-        (data as any).odometer_at_service,
+        odometer,
         (data as any).notes || null,
       )
     return { id: r.lastInsertRowid }

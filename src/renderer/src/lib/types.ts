@@ -129,6 +129,8 @@ export interface MaintenanceType {
   id: number
   name: string
   description?: string
+  // 1 = advances the mileage-based maintenance interval; 0 = informational only.
+  tracks_mileage: number
   interval_km: number
   is_active: number
   is_deletable: number
@@ -139,7 +141,8 @@ export interface MaintenanceRecord {
   truck_id: number
   maintenance_type_id: number
   date: string
-  odometer_at_service: number
+  // null for informational records that were saved without operational mileage.
+  odometer_at_service: number | null
   notes?: string
   created_at?: string
   // joins
@@ -147,6 +150,7 @@ export interface MaintenanceRecord {
   truck_model?: string
   type_name?: string
   interval_km?: number
+  tracks_mileage?: number
 }
 
 export interface TruckMaintenanceTypeStatus {
