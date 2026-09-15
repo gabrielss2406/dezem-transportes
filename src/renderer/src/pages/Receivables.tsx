@@ -32,6 +32,7 @@ interface ReceivableFormData {
   amount?: number
   due_date: string
   description?: string
+  kind: 'revenue' | 'adjustment'
 }
 
 const EMPTY_RECEIVABLE: ReceivableFormData = {
@@ -39,6 +40,7 @@ const EMPTY_RECEIVABLE: ReceivableFormData = {
   amount: undefined,
   due_date: today(),
   description: '',
+  kind: 'revenue',
 }
 
 export function ReceivablesPage() {
@@ -433,6 +435,11 @@ export function ReceivablesPage() {
                 </td>
                 <td className="px-6 py-1.5 text-sm font-mono text-on-surface-variant">
                   {row.trip_ticket_number ?? row.description ?? '—'}
+                  {row.kind === 'adjustment' ? (
+                    <div className="mt-1">
+                      <Badge label="AJUSTE DE SALDO" color="amber" />
+                    </div>
+                  ) : null}
                 </td>
                 <td className="px-6 py-1.5 text-sm text-on-surface">
                   {row.customer_name ?? '—'}
@@ -560,6 +567,22 @@ export function ReceivablesPage() {
               control={control}
               render={({ field }) => (
                 <Input label="Descrição" optional {...field} error={errors.description?.message} />
+              )}
+            />
+            <Controller
+              name="kind"
+              control={control}
+              render={({ field }) => (
+                <Select
+                  label="Tipo"
+                  value={field.value}
+                  onChange={field.onChange}
+                  error={errors.kind?.message}
+                  options={[
+                    { value: 'revenue', label: 'Receita' },
+                    { value: 'adjustment', label: 'Ajuste de Saldo (não entra no DRE)' },
+                  ]}
+                />
               )}
             />
             <div className="flex justify-end gap-3 mt-2">

@@ -264,6 +264,7 @@ export const receivableSchema = z.object({
   amount: requiredNumber(10000000, 'Valor máximo de R$ 10.000.000'),
   due_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data inválida'),
   description: z.string().max(255).optional(),
+  kind: z.enum(['revenue', 'adjustment']).default('revenue'),
 })
 
 export const customerPriceSchema = z.object({

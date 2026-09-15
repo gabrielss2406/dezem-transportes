@@ -463,6 +463,19 @@ export function setupDatabase(): void {
     }
   }
 
+  // Migration: Add kind column to receivables if missing. Distinguishes standalone
+  // (avulsa) entries that are real revenue ('revenue', default) from ones that are
+  // pure cash-position adjustments ('adjustment', e.g. initial bank balance) — the
+  // latter count toward Saldo Bancário but must not inflate revenue/DRE. Runs after
+  // the trip_id-nullable migration above, which recreates the table without this
+  // column. See dashboard.handlers.ts and DECISOES-AJUSTE-SALDO-DRE.md.
+  const receivableInfoPostMigration = db.pragma('table_info(receivables)') as { name: string }[]
+  if (!receivableInfoPostMigration.some((col) => col.name === 'kind')) {
+    db.exec(
+      `ALTER TABLE receivables ADD COLUMN kind TEXT NOT NULL DEFAULT 'revenue' CHECK (kind IN ('revenue','adjustment'))`,
+    )
+  }
+
   // Migration: Add is_outsourced and contractor_id to drivers if missing
   const driverInfo = db.pragma('table_info(drivers)') as { name: string }[]
   if (!driverInfo.some((col) => col.name === 'is_outsourced')) {

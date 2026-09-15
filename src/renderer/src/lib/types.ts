@@ -292,6 +292,7 @@ export interface Receivable {
   due_date?: string | null
   paid_date?: string | null
   description?: string | null
+  kind: 'revenue' | 'adjustment'
   created_at?: string
   // joins
   trip_ticket_number?: string
