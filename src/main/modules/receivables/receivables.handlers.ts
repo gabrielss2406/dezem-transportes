@@ -57,10 +57,10 @@ export function registerReceivablesHandlers(): void {
   createValidatedHandler('receivables:create', receivableSchema, (data) => {
     const r = db()
       .prepare(
-        `INSERT INTO receivables (customer_id, amount, status, due_date, description, created_at)
-         VALUES (?, ?, 'open', ?, ?, datetime('now'))`,
+        `INSERT INTO receivables (customer_id, amount, status, due_date, description, kind, created_at)
+         VALUES (?, ?, 'open', ?, ?, ?, datetime('now'))`,
       )
-      .run(data.customer_id, data.amount, data.due_date, data.description || null)
+      .run(data.customer_id, data.amount, data.due_date, data.description || null, data.kind)
     return { ok: true, id: r.lastInsertRowid }
   })
 

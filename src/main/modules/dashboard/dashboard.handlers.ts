@@ -29,7 +29,9 @@ export function registerDashboardHandlers(): void {
         .get(startDate, endDate) as any
     ).total
 
-    // Standalone (avulsa) receivables — not tied to a trip, contribute directly to revenue
+    // Standalone (avulsa) receivables — not tied to a trip, contribute directly to revenue.
+    // kind='adjustment' (e.g. initial bank balance) is excluded here: it's a cash
+    // position, not revenue earned in the period — see DECISOES-AJUSTE-SALDO-DRE.md.
     const avulsaReceivables = db()
       .prepare(
         `
@@ -37,7 +39,7 @@ export function registerDashboardHandlers(): void {
                r.amount, r.due_date
         FROM receivables r
         LEFT JOIN customers c ON r.customer_id = c.id
-        WHERE r.trip_id IS NULL AND r.due_date BETWEEN ? AND ?
+        WHERE r.trip_id IS NULL AND r.due_date BETWEEN ? AND ? AND r.kind = 'revenue'
       `,
       )
       .all(startDate, endDate) as any[]
@@ -452,7 +454,7 @@ export function registerDashboardHandlers(): void {
         `
       SELECT strftime('%Y-%m', due_date) as month, SUM(amount) as revenue
       FROM receivables
-      WHERE trip_id IS NULL AND due_date >= date('now', '-6 months')
+      WHERE trip_id IS NULL AND due_date >= date('now', '-6 months') AND kind = 'revenue'
       GROUP BY month
     `,
       )
@@ -814,7 +816,8 @@ export function registerDashboardHandlers(): void {
           `SELECT COALESCE(SUM(r.amount), 0) as total
            FROM receivables r
            LEFT JOIN trips t ON r.trip_id = t.id
-           WHERE r.status = 'open' AND (t.is_third_party = 0 OR t.is_third_party IS NULL)`,
+           WHERE r.status = 'open' AND r.kind = 'revenue'
+             AND (t.is_third_party = 0 OR t.is_third_party IS NULL)`,
         )
         .get() as any
     ).total
@@ -834,6 +837,9 @@ export function registerDashboardHandlers(): void {
     // Saldo Bancário do período: só conta o que foi efetivamente recebido/pago (paid_date)
     // dentro do range selecionado — um custo lançado em agosto mas baixado em setembro só
     // entra no saldo de setembro, nunca no de agosto.
+    // Note: no kind filter here (unlike revenue/DRE above) — kind='adjustment' entries
+    // (e.g. saldo bancário inicial) are real cash and must count toward Saldo Bancário,
+    // just not toward revenue/DRE. See DECISOES-AJUSTE-SALDO-DRE.md.
     const receivablesPaidTotal = (
       db()
         .prepare(
