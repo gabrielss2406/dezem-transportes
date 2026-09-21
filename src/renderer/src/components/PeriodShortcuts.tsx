@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { fortnightRangeFromKey, monthRangeFromKey } from '../lib/utils'
 
 interface PeriodShortcutsProps {
@@ -9,6 +9,22 @@ interface PeriodShortcutsProps {
 
 export function PeriodShortcuts({ monthKey, onMonthChange, onRangeChange }: PeriodShortcutsProps) {
   const [open, setOpen] = useState(false)
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open) {
+      return
+    }
+
+    const handleOutsidePointerDown = (event: PointerEvent) => {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setOpen(false)
+      }
+    }
+
+    document.addEventListener('pointerdown', handleOutsidePointerDown)
+    return () => document.removeEventListener('pointerdown', handleOutsidePointerDown)
+  }, [open])
 
   const applyRange = (range: { start: string; end: string }) => {
     onRangeChange(range)
@@ -16,7 +32,7 @@ export function PeriodShortcuts({ monthKey, onMonthChange, onRangeChange }: Peri
   }
 
   return (
-    <div className="relative shrink-0">
+    <div ref={containerRef} className="relative shrink-0">
       <button
         type="button"
         aria-label="Atalhos de período"
@@ -24,7 +40,7 @@ export function PeriodShortcuts({ monthKey, onMonthChange, onRangeChange }: Peri
         onClick={() => setOpen((current) => !current)}
         className="flex items-center justify-center w-9 h-9 rounded-lg border border-outline-variant/20 text-on-surface-variant hover:text-primary hover:border-primary transition-colors"
       >
-        <span className="material-symbols-outlined">more_horiz</span>
+        <span className="material-symbols-outlined">more_vert</span>
       </button>
       {open && (
         <div className="absolute right-0 top-11 z-30 w-52 rounded-xl border border-outline-variant/20 bg-surface-container-highest p-2 shadow-xl">
