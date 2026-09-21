@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Controller, useForm } from 'react-hook-form'
 import { receivableSchema } from '../../../shared/schemas'
 import { PageHeader } from '../components/PageHeader'
+import { PeriodShortcuts } from '../components/PeriodShortcuts'
 import {
   Badge,
   Button,
@@ -23,7 +24,6 @@ import {
   formatBRL,
   formatDate,
   formatMonthLabel,
-  fortnightRangeFromKey,
   monthRangeFromKey,
   today,
 } from '../lib/utils'
@@ -338,28 +338,14 @@ export function ReceivablesPage() {
               <DatePicker value={rangeStart} onChange={(e) => setRangeStart(e.target.value)} />
               <span className="text-on-surface-variant text-sm">a</span>
               <DatePicker value={rangeEnd} onChange={(e) => setRangeEnd(e.target.value)} />
-              <button
-                type="button"
-                className="px-2 py-1 text-[10px] font-bold rounded border border-outline-variant/20 hover:border-primary text-on-surface-variant"
-                onClick={() => {
-                  const r = fortnightRangeFromKey(receivablesMonth, 1)
-                  setRangeStart(r.start)
-                  setRangeEnd(r.end)
+              <PeriodShortcuts
+                monthKey={receivablesMonth}
+                onMonthChange={setReceivablesMonth}
+                onRangeChange={({ start, end }) => {
+                  setRangeStart(start)
+                  setRangeEnd(end)
                 }}
-              >
-                1ª quinzena
-              </button>
-              <button
-                type="button"
-                className="px-2 py-1 text-[10px] font-bold rounded border border-outline-variant/20 hover:border-primary text-on-surface-variant"
-                onClick={() => {
-                  const r = fortnightRangeFromKey(receivablesMonth, 2)
-                  setRangeStart(r.start)
-                  setRangeEnd(r.end)
-                }}
-              >
-                2ª quinzena
-              </button>
+              />
             </div>
           )}
         </div>

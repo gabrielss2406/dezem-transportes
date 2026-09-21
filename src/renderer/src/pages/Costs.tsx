@@ -4,6 +4,7 @@ import { Controller, useForm } from 'react-hook-form'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { costSchema, fuelRecordSchema } from '../../../shared/schemas'
 import { PageHeader } from '../components/PageHeader'
+import { PeriodShortcuts } from '../components/PeriodShortcuts'
 import {
   Button,
   ConfirmModal,
@@ -32,7 +33,6 @@ import {
   currentMonthRange,
   formatBRL,
   formatDate,
-  fortnightRangeFromKey,
   monthRangeFromKey,
   today,
 } from '../lib/utils'
@@ -127,6 +127,7 @@ export function CostsPage() {
   const [markPaidDate, setMarkPaidDate] = useState(today())
   const [salaryModal, setSalaryModal] = useState(false)
   const [salaryDate, setSalaryDate] = useState(today())
+  const [salarySearch, setSalarySearch] = useState('')
   const [salaryValues, setSalaryValues] = useState<Record<number, number>>({})
   const [salarySelected, setSalarySelected] = useState<Set<number>>(new Set())
 
@@ -586,10 +587,11 @@ export function CostsPage() {
   function openSalaryModal() {
     const eligibleDrivers = drivers.filter((driver) => !driver.is_outsourced)
     setSalaryDate(today())
+    setSalarySearch('')
     setSalaryValues(
       Object.fromEntries(eligibleDrivers.map((driver) => [driver.id, driver.monthly_salary])),
     )
-    setSalarySelected(new Set(eligibleDrivers.map((driver) => driver.id)))
+    setSalarySelected(new Set())
     setSalaryModal(true)
   }
 
@@ -748,28 +750,14 @@ export function CostsPage() {
                     value={costRangeEnd}
                     onChange={(e) => setCostRangeEnd(e.target.value)}
                   />
-                  <button
-                    type="button"
-                    className="px-2 py-1 text-[10px] font-bold rounded border border-outline-variant/20 hover:border-primary text-on-surface-variant"
-                    onClick={() => {
-                      const r = fortnightRangeFromKey(costMonth, 1)
-                      setCostRangeStart(r.start)
-                      setCostRangeEnd(r.end)
+                  <PeriodShortcuts
+                    monthKey={costMonth}
+                    onMonthChange={setCostMonth}
+                    onRangeChange={({ start, end }) => {
+                      setCostRangeStart(start)
+                      setCostRangeEnd(end)
                     }}
-                  >
-                    1ª quinzena
-                  </button>
-                  <button
-                    type="button"
-                    className="px-2 py-1 text-[10px] font-bold rounded border border-outline-variant/20 hover:border-primary text-on-surface-variant"
-                    onClick={() => {
-                      const r = fortnightRangeFromKey(costMonth, 2)
-                      setCostRangeStart(r.start)
-                      setCostRangeEnd(r.end)
-                    }}
-                  >
-                    2ª quinzena
-                  </button>
+                  />
                 </div>
               )}
             </div>
@@ -1214,28 +1202,14 @@ export function CostsPage() {
                     value={creditorRangeEnd}
                     onChange={(e) => setCreditorRangeEnd(e.target.value)}
                   />
-                  <button
-                    type="button"
-                    className="px-2 py-1 text-[10px] font-bold rounded border border-outline-variant/20 hover:border-primary text-on-surface-variant"
-                    onClick={() => {
-                      const r = fortnightRangeFromKey(creditorMonth, 1)
-                      setCreditorRangeStart(r.start)
-                      setCreditorRangeEnd(r.end)
+                  <PeriodShortcuts
+                    monthKey={creditorMonth}
+                    onMonthChange={setCreditorMonth}
+                    onRangeChange={({ start, end }) => {
+                      setCreditorRangeStart(start)
+                      setCreditorRangeEnd(end)
                     }}
-                  >
-                    1ª quinzena
-                  </button>
-                  <button
-                    type="button"
-                    className="px-2 py-1 text-[10px] font-bold rounded border border-outline-variant/20 hover:border-primary text-on-surface-variant"
-                    onClick={() => {
-                      const r = fortnightRangeFromKey(creditorMonth, 2)
-                      setCreditorRangeStart(r.start)
-                      setCreditorRangeEnd(r.end)
-                    }}
-                  >
-                    2ª quinzena
-                  </button>
+                  />
                 </div>
               )}
             </div>
@@ -1384,9 +1358,18 @@ export function CostsPage() {
               Selecione os motoristas e informe quanto será lançado nesta operação. Você poderá
               repetir o processo no mesmo mês para adiantamentos e complementos.
             </p>
+            <Input
+              label="Buscar motorista"
+              placeholder="Digite um nome"
+              value={salarySearch}
+              onChange={(event) => setSalarySearch(event.target.value)}
+            />
             <div className="max-h-80 overflow-y-auto border border-outline-variant/10 rounded-lg">
               {drivers
                 .filter((driver) => !driver.is_outsourced)
+                .filter((driver) =>
+                  driver.name.toLocaleLowerCase().includes(salarySearch.toLocaleLowerCase()),
+                )
                 .map((driver) => {
                   const selected = salarySelected.has(driver.id)
                   return (

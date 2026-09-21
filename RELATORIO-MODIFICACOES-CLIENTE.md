@@ -177,9 +177,14 @@ O projeto não possui uma suíte automatizada configurada no script `npm test`. 
 1. Alterar o saldo pelo botão do menu e confirmar que o card do Dashboard foi atualizado.
 2. Criar ou baixar receitas e custos e confirmar que o saldo manual não mudou.
 3. Reiniciar o aplicativo e confirmar que o saldo foi preservado.
-4. Lançar valores diferentes para motoristas diferentes.
-5. Lançar duas parcelas para o mesmo motorista no mesmo mês.
-6. Conferir litros e L/km no card geral e por caminhão.
-7. Testar caminhão sem quilometragem suficiente e conferir o indicador N/D.
-8. Testar as duas quinzenas em meses de 28, 29, 30 e 31 dias.
-9. Exportar PDFs e conferir se as descrições aparecem em negrito.
+4. Abrir **Lançar Salários** e confirmar que nenhum motorista vem selecionado por padrão.
+5. Pesquisar um motorista pelo nome e confirmar que a lista é filtrada.
+6. Selecionar motoristas diferentes e lançar valores diferentes para cada um.
+7. Lançar duas parcelas para o mesmo motorista no mesmo mês.
+8. Conferir litros e L/km no card geral e por caminhão.
+9. Testar caminhão sem quilometragem suficiente e conferir o indicador N/D.
+10. Confirmar que o filtro de período exibe apenas o botão de três pontos antes das datas.
+11. Abrir o menu de três pontos e testar 1ª quinzena e 2ª quinzena.
+12. Usar a opção **Escolher mês**, selecionar outro mês e confirmar que o período completo é aplicado.
+13. Testar as duas quinzenas em meses de 28, 29, 30 e 31 dias.
+14. Exportar PDFs e conferir se as descrições aparecem em negrito.
