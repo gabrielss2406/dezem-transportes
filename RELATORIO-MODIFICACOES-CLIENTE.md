@@ -31,8 +31,9 @@ Essa abordagem fazia com que um saldo já existente pudesse ser confundido com r
 - Receitas, custos, salários e baixas não alteram o saldo automaticamente.
 - O valor não entra em receita, lucro, CPK ou qualquer cálculo do DRE.
 - Foi criada uma edição pelo próprio Dashboard.
-- Foi adicionado um botão **Saldo Bancário** no menu lateral.
-- O botão do menu abre o Dashboard já com o modal de edição aberto.
+- Foi adicionado um card e uma ação rápida de **Saldo Bancário** na tela Menu.
+- O saldo pode ser editado por um modal aberto diretamente no Menu.
+- O Dashboard mantém um botão contextual para editar o saldo junto ao card financeiro.
 - O campo foi removido da tela de Configurações.
 
 ## 2. Lançamento parcial de salários
@@ -158,6 +159,7 @@ O saldo bancário manual já foi implementado de forma independente. O card deta
 - `src/renderer/src/pages/Trips.tsx`
 - `src/renderer/src/pages/Settings.tsx`
 - `src/renderer/src/components/Sidebar.tsx`
+- `src/renderer/src/pages/Overview.tsx`
 - `src/renderer/src/lib/pdfGenerator.ts`
 - `src/renderer/src/lib/utils.ts`
 
