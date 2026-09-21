@@ -1354,10 +1354,6 @@ export function CostsPage() {
                 onChange={(e) => setSalaryDate(e.target.value)}
               />
             </div>
-            <p className="text-sm text-on-surface-variant">
-              Selecione os motoristas e informe quanto será lançado nesta operação. Você poderá
-              repetir o processo no mesmo mês para adiantamentos e complementos.
-            </p>
             <Input
               label="Buscar motorista"
               placeholder="Digite um nome"
