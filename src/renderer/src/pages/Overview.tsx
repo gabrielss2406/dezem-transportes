@@ -185,33 +185,12 @@ export function OverviewPage({ user, onNavigate }: OverviewProps) {
           className="inline-flex items-center gap-2 px-4 py-3 bg-surface-container-highest text-on-surface font-bold rounded-lg hover:bg-surface-container-high active:scale-95 transition-all text-sm border border-outline-variant/20"
         >
           <span className="material-symbols-outlined text-lg">account_balance</span>
-          Saldo Bancário
+          <span>Saldo Bancário</span>
+          <span className="text-xs font-medium text-on-surface-variant">
+            {formatBRL(bankBalance)}
+          </span>
         </button>
       </div>
-
-      <button
-        type="button"
-        onClick={openBankBalance}
-        className="group w-full mb-12 rounded-2xl bg-gradient-to-br from-primary to-primary-container p-6 text-left text-on-primary shadow-lg shadow-primary/10 transition-all hover:-translate-y-0.5 hover:shadow-xl"
-      >
-        <div className="flex items-center gap-4">
-          <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-white/15">
-            <span className="material-symbols-outlined text-3xl">account_balance</span>
-          </div>
-          <div className="flex-1">
-            <p className="text-xs font-black uppercase tracking-widest text-on-primary/70">
-              Saldo bancário atual
-            </p>
-            <p className="mt-1 text-3xl font-black font-headline">{formatBRL(bankBalance)}</p>
-            <p className="mt-1 text-xs text-on-primary/75">
-              Valor informado manualmente · clique para editar
-            </p>
-          </div>
-          <span className="material-symbols-outlined opacity-70 transition-transform group-hover:translate-x-1">
-            edit
-          </span>
-        </div>
-      </button>
 
       {/* Modules Grid by Section */}
       {sections.map((section) => (
