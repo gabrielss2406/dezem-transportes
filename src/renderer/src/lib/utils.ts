@@ -34,6 +34,16 @@ export function monthRangeFromKey(monthKey: string): { start: string; end: strin
   }
 }
 
+export function fortnightRangeFromKey(
+  monthKey: string,
+  fortnight: 1 | 2,
+): { start: string; end: string } {
+  const { end: monthEnd } = monthRangeFromKey(monthKey)
+  return fortnight === 1
+    ? { start: `${monthKey}-01`, end: `${monthKey}-15` }
+    : { start: `${monthKey}-16`, end: monthEnd }
+}
+
 export function currentMonthRange(): { start: string; end: string } {
   return monthRangeFromKey(currentMonthKey())
 }

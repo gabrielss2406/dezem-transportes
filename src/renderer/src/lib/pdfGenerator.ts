@@ -102,6 +102,12 @@ export function generatePdf({
       fontStyle: 'bold',
       halign: 'left',
     },
+    didParseCell: (hookData) => {
+      const header = headers[hookData.column.index]?.toLowerCase() ?? ''
+      if (hookData.section === 'body' && header.includes('descri')) {
+        hookData.cell.styles.fontStyle = 'bold'
+      }
+    },
   })
 
   // doc.save(`${fileName}.pdf`) // Removido

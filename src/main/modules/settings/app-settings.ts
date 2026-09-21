@@ -5,11 +5,13 @@ const APP_SETTINGS_KEY = 'app_settings'
 export interface AppSettings {
   taxRate: number
   commissionRate: number
+  bankBalance: number
 }
 
 const DEFAULTS: AppSettings = {
   taxRate: 0,
   commissionRate: 0,
+  bankBalance: 0,
 }
 
 export function getAppSettings(): AppSettings {

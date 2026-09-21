@@ -23,6 +23,7 @@ import {
   formatBRL,
   formatDate,
   formatMonthLabel,
+  fortnightRangeFromKey,
   monthRangeFromKey,
   today,
 } from '../lib/utils'
@@ -337,6 +338,28 @@ export function ReceivablesPage() {
               <DatePicker value={rangeStart} onChange={(e) => setRangeStart(e.target.value)} />
               <span className="text-on-surface-variant text-sm">a</span>
               <DatePicker value={rangeEnd} onChange={(e) => setRangeEnd(e.target.value)} />
+              <button
+                type="button"
+                className="px-2 py-1 text-[10px] font-bold rounded border border-outline-variant/20 hover:border-primary text-on-surface-variant"
+                onClick={() => {
+                  const r = fortnightRangeFromKey(receivablesMonth, 1)
+                  setRangeStart(r.start)
+                  setRangeEnd(r.end)
+                }}
+              >
+                1ª quinzena
+              </button>
+              <button
+                type="button"
+                className="px-2 py-1 text-[10px] font-bold rounded border border-outline-variant/20 hover:border-primary text-on-surface-variant"
+                onClick={() => {
+                  const r = fortnightRangeFromKey(receivablesMonth, 2)
+                  setRangeStart(r.start)
+                  setRangeEnd(r.end)
+                }}
+              >
+                2ª quinzena
+              </button>
             </div>
           )}
         </div>
@@ -433,7 +456,7 @@ export function ReceivablesPage() {
                 <td className="px-6 py-1.5 text-sm text-on-surface-variant">
                   {formatDate(row.trip_date || row.due_date || '')}
                 </td>
-                <td className="px-6 py-1.5 text-sm font-mono text-on-surface-variant">
+                <td className="px-6 py-1.5 text-sm font-mono font-bold text-on-surface-variant">
                   {row.trip_ticket_number ?? row.description ?? '—'}
                   {row.kind === 'adjustment' ? (
                     <div className="mt-1">

@@ -26,6 +26,8 @@ interface SectionProps {
   children: React.ReactNode
 }
 
+type TaxFormData = Pick<AppSettings, 'taxRate' | 'commissionRate'>
+
 function Section({ title, subtitle, icon, children }: SectionProps) {
   return (
     <div className="bg-surface-container-low p-6 rounded-xl border border-outline-variant/10">
@@ -236,6 +238,7 @@ function TaxSettings() {
   const [settings, setSettings] = useState<AppSettings>({
     taxRate: 0,
     commissionRate: 0,
+    bankBalance: 0,
   })
   const [loading, setLoading] = useState(true)
   const { toast, show } = useToast()
@@ -248,23 +251,24 @@ function TaxSettings() {
     formState: { errors },
     reset,
     control,
-  } = useForm<AppSettings>({
+  } = useForm<TaxFormData>({
     resolver: zodResolver(appSettingsSchema),
-    defaultValues: settings,
+    defaultValues: { taxRate: settings.taxRate, commissionRate: settings.commissionRate },
   })
 
   useEffect(() => {
     window.api.settings.getApp().then((data) => {
       setSettings(data)
-      reset(data)
+      reset({ taxRate: data.taxRate, commissionRate: data.commissionRate })
       setLoading(false)
     })
   }, [reset])
 
-  const onSubmit = async (data: AppSettings) => {
+  const onSubmit = async (data: TaxFormData) => {
     try {
-      await window.api.settings.saveApp(data)
-      setSettings(data)
+      const nextSettings = { ...settings, ...data }
+      await window.api.settings.saveApp(nextSettings)
+      setSettings(nextSettings)
       show('Configurações salvas com sucesso!')
     } catch (error: any) {
       show(error.message || 'Erro ao salvar.', 'error')

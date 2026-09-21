@@ -75,6 +75,14 @@ export function Sidebar({ onLogout }: SidebarProps) {
             )}
           </NavLink>
         ))}
+        <button
+          type="button"
+          onClick={() => navigate('/', { state: { openBankBalance: true } })}
+          className="flex items-center gap-4 px-4 py-3.5 w-full rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-colors group text-sm font-medium"
+        >
+          <span className="material-symbols-outlined text-xl">account_balance</span>
+          <span>Saldo Bancário</span>
+        </button>
       </nav>
 
       {/* Bottom */}

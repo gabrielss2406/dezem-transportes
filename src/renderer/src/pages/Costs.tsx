@@ -32,6 +32,7 @@ import {
   currentMonthRange,
   formatBRL,
   formatDate,
+  fortnightRangeFromKey,
   monthRangeFromKey,
   today,
 } from '../lib/utils'
@@ -124,6 +125,10 @@ export function CostsPage() {
   const [showCostDiscardConfirm, setShowCostDiscardConfirm] = useState(false)
   const [markPaidTarget, setMarkPaidTarget] = useState<Cost | null>(null)
   const [markPaidDate, setMarkPaidDate] = useState(today())
+  const [salaryModal, setSalaryModal] = useState(false)
+  const [salaryDate, setSalaryDate] = useState(today())
+  const [salaryValues, setSalaryValues] = useState<Record<number, number>>({})
+  const [salarySelected, setSalarySelected] = useState<Set<number>>(new Set())
 
   // ── Fuel state ──
   const [fuelRecords, setFuelRecords] = useState<FuelRecord[]>([])
@@ -578,11 +583,27 @@ export function CostsPage() {
     }
   }
 
+  function openSalaryModal() {
+    const eligibleDrivers = drivers.filter((driver) => !driver.is_outsourced)
+    setSalaryDate(today())
+    setSalaryValues(
+      Object.fromEntries(eligibleDrivers.map((driver) => [driver.id, driver.monthly_salary])),
+    )
+    setSalarySelected(new Set(eligibleDrivers.map((driver) => driver.id)))
+    setSalaryModal(true)
+  }
+
   async function issueSalaries() {
-    const month = currentMonthKey()
-    const r = await window.api.costs.issueMonthlySalaries(month)
-    show(r.issued > 0 ? `${r.issued} salário(s) lançado(s)!` : 'Salários já lançados neste mês')
-    loadCosts()
+    const entries = Array.from(salarySelected).map((driver_id) => ({
+      driver_id,
+      value: Number(salaryValues[driver_id] || 0),
+    }))
+    const r = await window.api.costs.issueSalaries({ date: salaryDate, entries })
+    if (r.ok) {
+      show(`${r.issued} salário(s) lançado(s)!`)
+      setSalaryModal(false)
+      loadCosts()
+    }
   }
 
   const filteredCosts = filterCategory ? costs.filter((c) => c.category === filterCategory) : costs
@@ -727,13 +748,35 @@ export function CostsPage() {
                     value={costRangeEnd}
                     onChange={(e) => setCostRangeEnd(e.target.value)}
                   />
+                  <button
+                    type="button"
+                    className="px-2 py-1 text-[10px] font-bold rounded border border-outline-variant/20 hover:border-primary text-on-surface-variant"
+                    onClick={() => {
+                      const r = fortnightRangeFromKey(costMonth, 1)
+                      setCostRangeStart(r.start)
+                      setCostRangeEnd(r.end)
+                    }}
+                  >
+                    1ª quinzena
+                  </button>
+                  <button
+                    type="button"
+                    className="px-2 py-1 text-[10px] font-bold rounded border border-outline-variant/20 hover:border-primary text-on-surface-variant"
+                    onClick={() => {
+                      const r = fortnightRangeFromKey(costMonth, 2)
+                      setCostRangeStart(r.start)
+                      setCostRangeEnd(r.end)
+                    }}
+                  >
+                    2ª quinzena
+                  </button>
                 </div>
               )}
             </div>
             <div className="flex gap-3">
               <button
                 type="button"
-                onClick={issueSalaries}
+                onClick={openSalaryModal}
                 className="flex items-center gap-2 px-4 py-2.5 text-sm font-bold border border-outline-variant/30 text-on-surface-variant hover:text-on-surface hover:border-primary/40 rounded transition-all"
               >
                 <span className="material-symbols-outlined text-sm">payments</span>
@@ -1171,6 +1214,28 @@ export function CostsPage() {
                     value={creditorRangeEnd}
                     onChange={(e) => setCreditorRangeEnd(e.target.value)}
                   />
+                  <button
+                    type="button"
+                    className="px-2 py-1 text-[10px] font-bold rounded border border-outline-variant/20 hover:border-primary text-on-surface-variant"
+                    onClick={() => {
+                      const r = fortnightRangeFromKey(creditorMonth, 1)
+                      setCreditorRangeStart(r.start)
+                      setCreditorRangeEnd(r.end)
+                    }}
+                  >
+                    1ª quinzena
+                  </button>
+                  <button
+                    type="button"
+                    className="px-2 py-1 text-[10px] font-bold rounded border border-outline-variant/20 hover:border-primary text-on-surface-variant"
+                    onClick={() => {
+                      const r = fortnightRangeFromKey(creditorMonth, 2)
+                      setCreditorRangeStart(r.start)
+                      setCreditorRangeEnd(r.end)
+                    }}
+                  >
+                    2ª quinzena
+                  </button>
                 </div>
               )}
             </div>
@@ -1289,7 +1354,7 @@ export function CostsPage() {
                           {cat?.label ?? row.category}
                         </span>
                       </td>
-                      <td className="px-6 py-4 text-sm text-on-surface-variant">
+                      <td className="px-6 py-4 text-sm font-bold text-on-surface-variant">
                         {row.description}
                       </td>
                       <td className="px-6 py-4 font-black font-headline text-on-surface text-sm">
@@ -1305,6 +1370,73 @@ export function CostsPage() {
       )}
 
       {/* ── COST MODAL ── */}
+      {salaryModal && (
+        <Modal title="Lançar salários" onClose={() => setSalaryModal(false)} size="lg">
+          <div className="space-y-5">
+            <div className="max-w-xs">
+              <DatePicker
+                label="Data do lançamento"
+                value={salaryDate}
+                onChange={(e) => setSalaryDate(e.target.value)}
+              />
+            </div>
+            <p className="text-sm text-on-surface-variant">
+              Selecione os motoristas e informe quanto será lançado nesta operação. Você poderá
+              repetir o processo no mesmo mês para adiantamentos e complementos.
+            </p>
+            <div className="max-h-80 overflow-y-auto border border-outline-variant/10 rounded-lg">
+              {drivers
+                .filter((driver) => !driver.is_outsourced)
+                .map((driver) => {
+                  const selected = salarySelected.has(driver.id)
+                  return (
+                    <div
+                      key={driver.id}
+                      className="flex items-center gap-3 p-3 border-b border-outline-variant/10 last:border-b-0"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selected}
+                        onChange={() => {
+                          setSalarySelected((current) => {
+                            const next = new Set(current)
+                            if (next.has(driver.id)) {
+                              next.delete(driver.id)
+                            } else {
+                              next.add(driver.id)
+                            }
+                            return next
+                          })
+                        }}
+                      />
+                      <span className="flex-1 font-bold text-sm text-on-surface">
+                        {driver.name}
+                      </span>
+                      <div className="w-40">
+                        <CurrencyInput
+                          label="Valor"
+                          value={salaryValues[driver.id] ?? 0}
+                          onChange={(value) =>
+                            setSalaryValues((current) => ({ ...current, [driver.id]: value }))
+                          }
+                        />
+                      </div>
+                    </div>
+                  )
+                })}
+            </div>
+            <div className="flex justify-end gap-3">
+              <Button variant="ghost" onClick={() => setSalaryModal(false)}>
+                Cancelar
+              </Button>
+              <Button disabled={salarySelected.size === 0} onClick={issueSalaries}>
+                Lançar selecionados
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
       {costModal && (
         <Modal
           title={editingCost ? 'Editar Custo' : 'Novo Custo'}

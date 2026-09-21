@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { ipcMain } from 'electron'
-import { costSchema, costsMarkPaidSchema } from '../../../shared/schemas'
+import { costSchema, costsMarkPaidSchema, salaryLaunchSchema } from '../../../shared/schemas'
 import { getDb } from '../../database'
 import {
   createIdValidatedHandler,
@@ -248,36 +248,33 @@ export function registerCostHandlers(): void {
       .all(...params)
   })
 
-  ipcMain.handle('costs:issueMonthlySalaries', (_e, monthYear: string) => {
-    // monthYear format: 'YYYY-MM'
+  createValidatedHandler('costs:issueSalaries', salaryLaunchSchema, (data) => {
     const drivers = db()
       .prepare(
-        'SELECT * FROM drivers WHERE active = 1 AND (is_outsourced = 0 OR is_outsourced IS NULL)',
+        'SELECT id, name FROM drivers WHERE active = 1 AND (is_outsourced = 0 OR is_outsourced IS NULL)',
       )
-      .all() as any[]
-    const date = `${monthYear}-01`
-    let issued = 0
+      .all() as { id: number; name: string }[]
+    const eligible = new Map(drivers.map((driver) => [driver.id, driver]))
     const insert = db().prepare(`
-      INSERT INTO costs (date, category, value, driver_id, description)
-      VALUES (?, 'salary', ?, ?, ?)
+      INSERT INTO costs (date, category, value, driver_id, description, kind, status, paid_date)
+      VALUES (?, 'salary', ?, ?, ?, 'operational', 'open', NULL)
     `)
+
     const transaction = db().transaction(() => {
-      for (const d of drivers) {
-        // Check if already issued
-        const existing = db()
-          .prepare(
-            `
-          SELECT id FROM costs WHERE category='salary' AND driver_id=? AND date LIKE ?
-        `,
-          )
-          .get(d.id, `${monthYear}%`)
-        if (!existing) {
-          insert.run(date, d.monthly_salary, d.id, `Salário ${d.name} — ${monthYear}`)
-          issued++
+      let issued = 0
+      for (const entry of data.entries) {
+        const driver = eligible.get(entry.driver_id)
+        if (!driver) {
+          throw new Error('Motorista inválido ou não elegível para lançamento de salário.')
         }
+        if (entry.value <= 0) {
+          continue
+        }
+        insert.run(data.date, entry.value, driver.id, `Salário ${driver.name} — ${data.date}`)
+        issued++
       }
-    })
-    transaction()
-    return { ok: true, issued }
+      return issued
+    })()
+    return { ok: true, issued: transaction }
   })
 }

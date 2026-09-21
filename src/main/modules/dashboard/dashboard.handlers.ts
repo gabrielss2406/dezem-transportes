@@ -1,6 +1,7 @@
 import { ipcMain } from 'electron'
 import { getDb } from '../../database'
 import { getMaintenanceStatus } from '../maintenance/maintenance.handlers'
+import { getAppSettings } from '../settings/app-settings'
 
 export function registerDashboardHandlers(): void {
   const db = () => getDb()
@@ -266,6 +267,33 @@ export function registerDashboardHandlers(): void {
     const fuelStopsCostMap = new Map(fuelStopsCostPerTruck.map((r) => [r.truck_id, r.total]))
     const fuelRecordsCostMap = new Map(fuelRecordsCostPerTruck.map((r) => [r.truck_id, r.total]))
 
+    const fuelStopsLitersPerTruck = db()
+      .prepare(
+        `SELECT tr.truck_id, COALESCE(SUM(fs.liters), 0) as total
+         FROM trip_fuel_stops fs
+         JOIN trips tr ON fs.trip_id = tr.id
+         JOIN drivers d ON tr.driver_id = d.id
+         JOIN trucks t ON tr.truck_id = t.id
+         WHERE tr.date BETWEEN ? AND ? AND ${INTERNAL_TRUCK} AND ${INTERNAL_DRIVER} AND ${NOT_THIRD_PARTY}
+         GROUP BY tr.truck_id`,
+      )
+      .all(startDate, endDate) as any[]
+
+    const fuelRecordsLitersPerTruck = db()
+      .prepare(
+        `SELECT fr.truck_id, COALESCE(SUM(fr.liters), 0) as total
+         FROM fuel_records fr
+         JOIN trucks t ON fr.truck_id = t.id
+         WHERE fr.date BETWEEN ? AND ? AND ${INTERNAL_TRUCK}
+         GROUP BY fr.truck_id`,
+      )
+      .all(startDate, endDate) as any[]
+
+    const fuelStopsLitersMap = new Map(fuelStopsLitersPerTruck.map((r) => [r.truck_id, r.total]))
+    const fuelRecordsLitersMap = new Map(
+      fuelRecordsLitersPerTruck.map((r) => [r.truck_id, r.total]),
+    )
+
     // Total cost per truck (matching global query pattern)
     const directCostsPerTruck = db()
       .prepare(
@@ -343,6 +371,8 @@ export function registerDashboardHandlers(): void {
       const fuelStopsCost = fuelStopsCostMap.get(t.id) || 0
       const fuelRecordsCost = fuelRecordsCostMap.get(t.id) || 0
       const fuelCost = Number(fuelStopsCost) + Number(fuelRecordsCost)
+      const fuelLiters =
+        Number(fuelStopsLitersMap.get(t.id) || 0) + Number(fuelRecordsLitersMap.get(t.id) || 0)
       return {
         license_plate: t.license_plate,
         model: t.model,
@@ -354,6 +384,8 @@ export function registerDashboardHandlers(): void {
           (commissionCostMap.get(t.id) || 0) +
           (taxMap.get(t.id) || 0),
         fuelCost,
+        fuelLiters,
+        fuelEfficiency: km > 0 && fuelLiters > 0 ? fuelLiters / km : null,
         profit:
           t.revenue -
           ((directCostsMap.get(t.id) || 0) +
@@ -834,32 +866,9 @@ export function registerDashboardHandlers(): void {
          WHERE status = 'open' AND date < date('now')`,
       )
       .get() as any
-    // Saldo Bancário do período: só conta o que foi efetivamente recebido/pago (paid_date)
-    // dentro do range selecionado — um custo lançado em agosto mas baixado em setembro só
-    // entra no saldo de setembro, nunca no de agosto.
-    // Note: no kind filter here (unlike revenue/DRE above) — kind='adjustment' entries
-    // (e.g. saldo bancário inicial) are real cash and must count toward Saldo Bancário,
-    // just not toward revenue/DRE. See DECISOES-AJUSTE-SALDO-DRE.md.
-    const receivablesPaidTotal = (
-      db()
-        .prepare(
-          `SELECT COALESCE(SUM(r.amount), 0) as total
-           FROM receivables r
-           LEFT JOIN trips t ON r.trip_id = t.id
-           WHERE r.status = 'paid' AND r.paid_date BETWEEN ? AND ?
-             AND (t.is_third_party = 0 OR t.is_third_party IS NULL)`,
-        )
-        .get(startDate, endDate) as any
-    ).total
-    const costsPaidTotal = (
-      db()
-        .prepare(
-          `SELECT COALESCE(SUM(value), 0) as total FROM costs
-           WHERE status = 'paid' AND paid_date BETWEEN ? AND ?`,
-        )
-        .get(startDate, endDate) as any
-    ).total
-    const bankBalance = Number(receivablesPaidTotal) - Number(costsPaidTotal)
+    // Saldo Bancário is a manually maintained cash position. It is intentionally
+    // independent from DRE and from receivables/costs movements.
+    const bankBalance = getAppSettings().bankBalance
 
     return {
       revenue,
@@ -875,6 +884,7 @@ export function registerDashboardHandlers(): void {
       totalKm,
       fuelCost: totalFuelCost,
       fuelLiters: totalFuelLiters,
+      fuelEfficiency: totalKm > 0 && totalFuelLiters > 0 ? totalFuelLiters / totalKm : null,
       perTruck: trucksWithMetrics,
       monthlyRevenue,
       maintenanceSummary,

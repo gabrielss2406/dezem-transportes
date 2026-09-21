@@ -20,7 +20,7 @@ import {
 import { generatePdf } from '../lib/pdfGenerator'
 import { TRIP_EXPORT_FIELDS, getDefaultTripExportFieldKeys } from '../lib/tripExportFields'
 import type { Contractor, Customer, Driver, Product, Trip, Truck } from '../lib/types'
-import { formatBRL, formatDate, today } from '../lib/utils'
+import { currentMonthKey, formatBRL, formatDate, fortnightRangeFromKey, today } from '../lib/utils'
 
 interface TripFormData {
   date: string
@@ -605,6 +605,28 @@ export function TripsPage() {
               value={filters.endDate}
               onChange={(e) => setFilters((f) => ({ ...f, endDate: e.target.value }))}
             />
+          </div>
+          <div className="flex gap-1 pb-0.5">
+            <button
+              type="button"
+              className="px-2 py-2 text-[10px] font-bold rounded border border-outline-variant/20 hover:border-primary text-on-surface-variant whitespace-nowrap"
+              onClick={() => {
+                const r = fortnightRangeFromKey(currentMonthKey(), 1)
+                setFilters((f) => ({ ...f, startDate: r.start, endDate: r.end }))
+              }}
+            >
+              1ª quinzena
+            </button>
+            <button
+              type="button"
+              className="px-2 py-2 text-[10px] font-bold rounded border border-outline-variant/20 hover:border-primary text-on-surface-variant whitespace-nowrap"
+              onClick={() => {
+                const r = fortnightRangeFromKey(currentMonthKey(), 2)
+                setFilters((f) => ({ ...f, startDate: r.start, endDate: r.end }))
+              }}
+            >
+              2ª quinzena
+            </button>
           </div>
           <div className="flex-1 min-w-[150px]">
             <Select
