@@ -1,4 +1,5 @@
 import { ipcMain } from 'electron'
+import { calculateFuelEfficiencyKmPerLiter } from '../../../shared/fuel'
 import { getDb } from '../../database'
 import { getMaintenanceStatus } from '../maintenance/maintenance.handlers'
 import { getAppSettings } from '../settings/app-settings'
@@ -385,7 +386,7 @@ export function registerDashboardHandlers(): void {
           (taxMap.get(t.id) || 0),
         fuelCost,
         fuelLiters,
-        fuelEfficiency: km > 0 && fuelLiters > 0 ? fuelLiters / km : null,
+        fuelEfficiency: calculateFuelEfficiencyKmPerLiter(km, fuelLiters),
         profit:
           t.revenue -
           ((directCostsMap.get(t.id) || 0) +
@@ -884,7 +885,7 @@ export function registerDashboardHandlers(): void {
       totalKm,
       fuelCost: totalFuelCost,
       fuelLiters: totalFuelLiters,
-      fuelEfficiency: totalKm > 0 && totalFuelLiters > 0 ? totalFuelLiters / totalKm : null,
+      fuelEfficiency: calculateFuelEfficiencyKmPerLiter(totalKm, totalFuelLiters),
       perTruck: trucksWithMetrics,
       monthlyRevenue,
       maintenanceSummary,

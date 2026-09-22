@@ -49,8 +49,8 @@ export function generatePdf({
   // Subtítulo (Filtros)
   if (subtitle) {
     doc.setFontSize(9)
-    doc.setTextColor(...mutedColor)
-    doc.setFont('helvetica', 'normal')
+    doc.setTextColor(...textColor)
+    doc.setFont('helvetica', 'bold')
     doc.text(subtitle, 14, 30)
     startY = 38
   }
@@ -101,12 +101,6 @@ export function generatePdf({
       textColor: primaryColor,
       fontStyle: 'bold',
       halign: 'left',
-    },
-    didParseCell: (hookData) => {
-      const header = headers[hookData.column.index]?.toLowerCase() ?? ''
-      if (hookData.section === 'body' && header.includes('descri')) {
-        hookData.cell.styles.fontStyle = 'bold'
-      }
     },
   })
 

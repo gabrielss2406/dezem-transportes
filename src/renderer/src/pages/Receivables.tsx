@@ -442,7 +442,7 @@ export function ReceivablesPage() {
                 <td className="px-6 py-1.5 text-sm text-on-surface-variant">
                   {formatDate(row.trip_date || row.due_date || '')}
                 </td>
-                <td className="px-6 py-1.5 text-sm font-mono font-bold text-on-surface-variant">
+                <td className="px-6 py-1.5 text-sm font-mono text-on-surface-variant">
                   {row.trip_ticket_number ?? row.description ?? '—'}
                   {row.kind === 'adjustment' ? (
                     <div className="mt-1">

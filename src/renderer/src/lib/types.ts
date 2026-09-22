@@ -195,6 +195,14 @@ export interface Cost {
   driver_name?: string
 }
 
+export interface SalarySummary {
+  id: number
+  name: string
+  monthly_salary: number
+  issued_salary: number
+  remaining_salary: number
+}
+
 export interface DashboardSummary {
   revenue: number
   netRevenue: number
@@ -427,6 +435,7 @@ declare global {
           date: string
           entries: { driver_id: number; value: number }[]
         }): Promise<{ ok: boolean; issued: number }>
+        salarySummary(startDate: string, endDate: string): Promise<SalarySummary[]>
         byCreditor(filters?: any): Promise<CreditorReportLine[]>
       }
       dashboard: {

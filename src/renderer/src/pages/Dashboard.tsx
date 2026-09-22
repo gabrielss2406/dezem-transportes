@@ -387,7 +387,7 @@ export function DashboardPage() {
                 label="CPK (Custo por Quilômetro)"
                 value={fleetCpk.toFixed(2)}
                 trend="KM da Frota / Gastos Totais"
-                info={`${summary.totalKm.toFixed(0)} km · ${fleetFuelLiters.toFixed(2)} L · ${fleetFuelEfficiency != null ? `${fleetFuelEfficiency.toFixed(3)} L/km` : 'L/km N/D'}`}
+                info={`${summary.totalKm.toFixed(0)} km · ${fleetFuelLiters.toFixed(2)} L · ${fleetFuelEfficiency != null ? `${fleetFuelEfficiency.toFixed(3)} km/L` : 'km/L N/D'}`}
               />
 
               <KpiBlock
@@ -723,7 +723,7 @@ export function DashboardPage() {
                       Litros
                     </th>
                     <th className="px-8 py-4 text-[10px] font-black uppercase tracking-widest text-on-surface-variant text-right">
-                      L/km
+                      km/L
                     </th>
                     <th className="px-8 py-4 text-[10px] font-black uppercase tracking-widest text-on-surface-variant text-right">
                       Lucro
@@ -761,7 +761,7 @@ export function DashboardPage() {
                         {t.fuelLiters.toFixed(2)} L
                       </td>
                       <td className="px-8 py-5 text-right font-bold text-on-surface">
-                        {t.fuelEfficiency != null ? `${t.fuelEfficiency.toFixed(3)} L/km` : 'N/D'}
+                        {t.fuelEfficiency != null ? `${t.fuelEfficiency.toFixed(3)} km/L` : 'N/D'}
                       </td>
                       <td
                         className={`px-8 py-5 text-right font-headline font-black ${

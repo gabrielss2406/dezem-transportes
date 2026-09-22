@@ -117,6 +117,8 @@ contextBridge.exposeInMainWorld('api', {
     markPaid: (data: any) => ipcRenderer.invoke('costs:markPaid', data),
     issueSalaries: (data: { date: string; entries: { driver_id: number; value: number }[] }) =>
       ipcRenderer.invoke('costs:issueSalaries', data),
+    salarySummary: (startDate: string, endDate: string) =>
+      ipcRenderer.invoke('costs:salarySummary', startDate, endDate),
     byCreditor: (filters?: any) => ipcRenderer.invoke('costs:byCreditor', filters),
   },
 
