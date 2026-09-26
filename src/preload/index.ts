@@ -115,8 +115,10 @@ contextBridge.exposeInMainWorld('api', {
     update: (id: number, data: any) => ipcRenderer.invoke('costs:update', id, data),
     delete: (id: number) => ipcRenderer.invoke('costs:delete', id),
     markPaid: (data: any) => ipcRenderer.invoke('costs:markPaid', data),
-    issueMonthlySalaries: (monthYear: string) =>
-      ipcRenderer.invoke('costs:issueMonthlySalaries', monthYear),
+    issueSalaries: (data: { date: string; entries: { driver_id: number; value: number }[] }) =>
+      ipcRenderer.invoke('costs:issueSalaries', data),
+    salarySummary: (startDate: string, endDate: string) =>
+      ipcRenderer.invoke('costs:salarySummary', startDate, endDate),
     byCreditor: (filters?: any) => ipcRenderer.invoke('costs:byCreditor', filters),
   },
 

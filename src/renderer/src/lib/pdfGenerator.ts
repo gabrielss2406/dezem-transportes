@@ -49,8 +49,8 @@ export function generatePdf({
   // Subtítulo (Filtros)
   if (subtitle) {
     doc.setFontSize(9)
-    doc.setTextColor(...mutedColor)
-    doc.setFont('helvetica', 'normal')
+    doc.setTextColor(...textColor)
+    doc.setFont('helvetica', 'bold')
     doc.text(subtitle, 14, 30)
     startY = 38
   }

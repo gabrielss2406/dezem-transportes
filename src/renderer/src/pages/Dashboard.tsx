@@ -1,8 +1,8 @@
 import { toPng } from 'html-to-image'
 import { useEffect, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { PageHeader } from '../components/PageHeader'
-import { Button, DatePicker, Toast, useToast } from '../components/ui'
+import { Button, CurrencyInput, DatePicker, Modal, Toast, useToast } from '../components/ui'
 import type { DashboardSummary } from '../lib/types'
 import { currentMonthRange, formatBRL } from '../lib/utils'
 
@@ -85,6 +85,7 @@ function SectionHeader({ title, icon }: { title: string; icon: string }) {
 
 export function DashboardPage() {
   const navigate = useNavigate()
+  const location = useLocation()
   const [summary, setSummary] = useState<DashboardSummary | null>(null)
   const [loading, setLoading] = useState(true)
   const [range, setRange] = useState(currentMonthRange())
@@ -97,8 +98,17 @@ export function DashboardPage() {
     net: true,
   })
   const [pctBase, setPctBase] = useState<PctBase>('total')
+  const [bankBalanceModal, setBankBalanceModal] = useState(false)
+  const [bankBalanceInput, setBankBalanceInput] = useState(0)
   const chartRef = useRef<HTMLDivElement>(null)
   const { toast, show } = useToast()
+
+  useEffect(() => {
+    if (location.state?.openBankBalance) {
+      setBankBalanceModal(true)
+      navigate('/', { replace: true, state: {} })
+    }
+  }, [location, navigate])
 
   const calcPct = (
     value: number,
@@ -165,6 +175,7 @@ export function DashboardPage() {
       .summary(range.start, range.end)
       .then((r) => {
         setSummary(r)
+        setBankBalanceInput(r.bankBalance)
       })
       .catch((err) => {
         console.error('Failed to load dashboard summary:', err)
@@ -220,6 +231,7 @@ export function DashboardPage() {
 
   const fleetCpk = summary ? (summary.totalKm > 0 ? summary.fuelCost / summary.totalKm : 0) : 0
   const fleetFuelLiters = summary?.fuelLiters ?? 0
+  const fleetFuelEfficiency = summary?.fuelEfficiency ?? null
   const displayedTrucks = showAllTrucks
     ? summary?.perTruck || []
     : (summary?.perTruck || []).slice(0, 5)
@@ -229,6 +241,17 @@ export function DashboardPage() {
       {toast && <Toast message={toast.message} type={toast.type} />}
       <PageHeader title="Visão Geral Operacional" subtitle={monthLabel}>
         <div className="flex gap-3 items-center">
+          <button
+            type="button"
+            onClick={() => {
+              setBankBalanceInput(summary?.bankBalance ?? 0)
+              setBankBalanceModal(true)
+            }}
+            className="flex items-center gap-2 px-4 py-2 rounded text-sm font-bold bg-primary text-on-primary hover:brightness-110 transition-all"
+          >
+            <span className="material-symbols-outlined text-base">account_balance</span>
+            Saldo bancário
+          </button>
           <button
             type="button"
             onClick={() => handlePreset('current')}
@@ -364,13 +387,13 @@ export function DashboardPage() {
                 label="CPK (Custo por Quilômetro)"
                 value={fleetCpk.toFixed(2)}
                 trend="KM da Frota / Gastos Totais"
-                info={`${summary.totalKm.toFixed(0)} km`}
+                info={`${summary.totalKm.toFixed(0)} km · ${fleetFuelLiters.toFixed(2)} L · ${fleetFuelEfficiency != null ? `${fleetFuelEfficiency.toFixed(3)} km/L` : 'km/L N/D'}`}
               />
 
               <KpiBlock
                 label="Saldo Bancário"
                 value={formatBRL(summary.bankBalance).replace('R$ ', '')}
-                info="Recebido − pago no período"
+                info="Saldo informado manualmente"
               />
 
               <KpiBlock
@@ -697,6 +720,12 @@ export function DashboardPage() {
                       CPK
                     </th>
                     <th className="px-8 py-4 text-[10px] font-black uppercase tracking-widest text-on-surface-variant text-right">
+                      Litros
+                    </th>
+                    <th className="px-8 py-4 text-[10px] font-black uppercase tracking-widest text-on-surface-variant text-right">
+                      km/L
+                    </th>
+                    <th className="px-8 py-4 text-[10px] font-black uppercase tracking-widest text-on-surface-variant text-right">
                       Lucro
                     </th>
                   </tr>
@@ -727,6 +756,12 @@ export function DashboardPage() {
                             N/D
                           </span>
                         )}
+                      </td>
+                      <td className="px-8 py-5 text-right font-bold text-on-surface">
+                        {t.fuelLiters.toFixed(2)} L
+                      </td>
+                      <td className="px-8 py-5 text-right font-bold text-on-surface">
+                        {t.fuelEfficiency != null ? `${t.fuelEfficiency.toFixed(3)} km/L` : 'N/D'}
                       </td>
                       <td
                         className={`px-8 py-5 text-right font-headline font-black ${
@@ -877,6 +912,43 @@ export function DashboardPage() {
               </div>
             </div>
           </div>
+        )}
+
+        {bankBalanceModal && (
+          <Modal title="Saldo bancário atual" onClose={() => setBankBalanceModal(false)}>
+            <div className="space-y-4">
+              <p className="text-sm text-on-surface-variant">
+                Informe o valor que está atualmente no banco. Esse valor não será alterado por
+                receitas, custos ou baixas financeiras.
+              </p>
+              <CurrencyInput
+                label="Saldo atual"
+                value={bankBalanceInput}
+                onChange={setBankBalanceInput}
+              />
+              <div className="flex justify-end gap-3">
+                <Button variant="ghost" onClick={() => setBankBalanceModal(false)}>
+                  Cancelar
+                </Button>
+                <Button
+                  onClick={async () => {
+                    const settings = await window.api.settings.getApp()
+                    await window.api.settings.saveApp({
+                      ...settings,
+                      bankBalance: bankBalanceInput,
+                    })
+                    setSummary((current) =>
+                      current ? { ...current, bankBalance: bankBalanceInput } : current,
+                    )
+                    setBankBalanceModal(false)
+                    show('Saldo bancário atualizado!', 'success')
+                  }}
+                >
+                  Salvar saldo
+                </Button>
+              </div>
+            </div>
+          </Modal>
         )}
       </div>
     </div>

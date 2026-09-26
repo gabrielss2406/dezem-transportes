@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { ipcMain } from 'electron'
-import { costSchema, costsMarkPaidSchema } from '../../../shared/schemas'
+import { calculateSalaryRemaining } from '../../../shared/salary'
+import { costSchema, costsMarkPaidSchema, salaryLaunchSchema } from '../../../shared/schemas'
 import { getDb } from '../../database'
 import {
   createIdValidatedHandler,
@@ -248,36 +249,85 @@ export function registerCostHandlers(): void {
       .all(...params)
   })
 
-  ipcMain.handle('costs:issueMonthlySalaries', (_e, monthYear: string) => {
-    // monthYear format: 'YYYY-MM'
+  ipcMain.handle('costs:salarySummary', (_e, startDate: string, endDate: string) => {
+    return db()
+      .prepare(
+        `
+          SELECT
+            d.id,
+            d.name,
+            d.monthly_salary,
+            COALESCE(SUM(c.value), 0) as issued_salary
+          FROM drivers d
+          LEFT JOIN costs c ON c.driver_id = d.id
+            AND c.category = 'salary'
+            AND c.date >= ?
+            AND c.date <= ?
+          WHERE d.active = 1
+            AND (d.is_outsourced = 0 OR d.is_outsourced IS NULL)
+          GROUP BY d.id, d.name, d.monthly_salary
+          ORDER BY d.name COLLATE NOCASE ASC
+        `,
+      )
+      .all(startDate, endDate)
+      .map((row: any) => ({
+        ...row,
+        issued_salary: Number(row.issued_salary || 0),
+        remaining_salary: calculateSalaryRemaining(row.monthly_salary, row.issued_salary),
+      }))
+  })
+
+  createValidatedHandler('costs:issueSalaries', salaryLaunchSchema, (data) => {
     const drivers = db()
       .prepare(
-        'SELECT * FROM drivers WHERE active = 1 AND (is_outsourced = 0 OR is_outsourced IS NULL)',
+        'SELECT id, name, monthly_salary FROM drivers WHERE active = 1 AND (is_outsourced = 0 OR is_outsourced IS NULL)',
       )
-      .all() as any[]
-    const date = `${monthYear}-01`
-    let issued = 0
-    const insert = db().prepare(`
-      INSERT INTO costs (date, category, value, driver_id, description)
-      VALUES (?, 'salary', ?, ?, ?)
-    `)
-    const transaction = db().transaction(() => {
-      for (const d of drivers) {
-        // Check if already issued
-        const existing = db()
-          .prepare(
-            `
-          SELECT id FROM costs WHERE category='salary' AND driver_id=? AND date LIKE ?
+      .all() as { id: number; name: string; monthly_salary: number }[]
+    const eligible = new Map(drivers.map((driver) => [driver.id, driver]))
+    const monthStart = `${data.date.slice(0, 7)}-01`
+    const [, month] = data.date.split('-').map(Number)
+    const nextMonth = new Date(Number(data.date.slice(0, 4)), month, 0)
+    const monthEnd = `${data.date.slice(0, 7)}-${String(nextMonth.getDate()).padStart(2, '0')}`
+    const issuedThisMonth = db()
+      .prepare(
+        `
+          SELECT driver_id, COALESCE(SUM(value), 0) as issued_salary
+          FROM costs
+          WHERE category = 'salary' AND date >= ? AND date <= ?
+          GROUP BY driver_id
         `,
-          )
-          .get(d.id, `${monthYear}%`)
-        if (!existing) {
-          insert.run(date, d.monthly_salary, d.id, `Salário ${d.name} — ${monthYear}`)
-          issued++
+      )
+      .all(monthStart, monthEnd) as { driver_id: number; issued_salary: number }[]
+    const issuedByDriver = new Map(
+      issuedThisMonth.map((row) => [row.driver_id, Number(row.issued_salary)]),
+    )
+    const insert = db().prepare(`
+      INSERT INTO costs (date, category, value, driver_id, description, kind, status, paid_date)
+      VALUES (?, 'salary', ?, ?, ?, 'operational', 'open', NULL)
+    `)
+
+    const transaction = db().transaction(() => {
+      let issued = 0
+      for (const entry of data.entries) {
+        const driver = eligible.get(entry.driver_id)
+        if (!driver) {
+          throw new Error('Motorista inválido ou não elegível para lançamento de salário.')
         }
+        if (entry.value <= 0) {
+          continue
+        }
+        const remaining = calculateSalaryRemaining(
+          driver.monthly_salary,
+          issuedByDriver.get(driver.id) || 0,
+        )
+        if (entry.value > remaining) {
+          throw new Error(`O valor do salário de ${driver.name} supera o saldo restante do mês.`)
+        }
+        insert.run(data.date, entry.value, driver.id, `Salário ${driver.name} — ${data.date}`)
+        issued++
       }
-    })
-    transaction()
-    return { ok: true, issued }
+      return issued
+    })()
+    return { ok: true, issued: transaction }
   })
 }

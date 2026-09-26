@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Controller, useForm } from 'react-hook-form'
 import { receivableSchema } from '../../../shared/schemas'
 import { PageHeader } from '../components/PageHeader'
+import { PeriodShortcuts } from '../components/PeriodShortcuts'
 import {
   Badge,
   Button,
@@ -337,6 +338,14 @@ export function ReceivablesPage() {
               <DatePicker value={rangeStart} onChange={(e) => setRangeStart(e.target.value)} />
               <span className="text-on-surface-variant text-sm">a</span>
               <DatePicker value={rangeEnd} onChange={(e) => setRangeEnd(e.target.value)} />
+              <PeriodShortcuts
+                monthKey={receivablesMonth}
+                onMonthChange={setReceivablesMonth}
+                onRangeChange={({ start, end }) => {
+                  setRangeStart(start)
+                  setRangeEnd(end)
+                }}
+              />
             </div>
           )}
         </div>

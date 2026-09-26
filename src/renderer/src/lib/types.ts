@@ -195,6 +195,14 @@ export interface Cost {
   driver_name?: string
 }
 
+export interface SalarySummary {
+  id: number
+  name: string
+  monthly_salary: number
+  issued_salary: number
+  remaining_salary: number
+}
+
 export interface DashboardSummary {
   revenue: number
   netRevenue: number
@@ -209,6 +217,7 @@ export interface DashboardSummary {
   totalKm: number
   fuelCost: number
   fuelLiters: number
+  fuelEfficiency: number | null
   perTruck: Array<{
     license_plate: string
     model: string
@@ -216,6 +225,8 @@ export interface DashboardSummary {
     km: number
     cost: number
     fuelCost: number
+    fuelLiters: number
+    fuelEfficiency: number | null
     profit: number
     cpk: number | null
     trip_count: number
@@ -420,7 +431,11 @@ declare global {
           ok: boolean
           updated?: number
         }>
-        issueMonthlySalaries(monthYear: string): Promise<{ ok: boolean; issued: number }>
+        issueSalaries(data: {
+          date: string
+          entries: { driver_id: number; value: number }[]
+        }): Promise<{ ok: boolean; issued: number }>
+        salarySummary(startDate: string, endDate: string): Promise<SalarySummary[]>
         byCreditor(filters?: any): Promise<CreditorReportLine[]>
       }
       dashboard: {

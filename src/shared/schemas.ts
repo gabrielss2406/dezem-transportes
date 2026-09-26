@@ -254,6 +254,18 @@ export const costsMarkPaidSchema = z.object({
   paid_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data inválida'),
 })
 
+export const salaryLaunchSchema = z.object({
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data inválida'),
+  entries: z
+    .array(
+      z.object({
+        driver_id: idSchema,
+        value: z.number().min(0, 'O valor não pode ser negativo').max(1000000),
+      }),
+    )
+    .min(1, 'Selecione ao menos um motorista'),
+})
+
 export const thirdPartySettlementsMarkSettledSchema = z.object({
   ids: z.array(idSchema).min(1, 'Selecione ao menos um item'),
   settled_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data inválida'),
@@ -285,6 +297,13 @@ export const appSettingsSchema = z.object({
   commissionRate: z.preprocess(
     (val) => (val === '' || val === null || val === undefined ? 0 : Number(val)),
     z.number().min(0).max(100, 'Máximo de 100%'),
+  ),
+  bankBalance: z.preprocess(
+    (val) => (val === '' || val === null || val === undefined ? 0 : Number(val)),
+    z
+      .number()
+      .min(0, 'O saldo não pode ser negativo')
+      .max(1000000000, 'Saldo máximo de R$ 1.000.000.000'),
   ),
 })
 

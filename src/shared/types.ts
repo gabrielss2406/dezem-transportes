@@ -1,6 +1,7 @@
 export interface AppSettings {
   taxRate: number
   commissionRate: number
+  bankBalance: number
 }
 
 export interface BackupConfig {

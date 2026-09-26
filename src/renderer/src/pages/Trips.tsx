@@ -5,6 +5,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { tripSchema } from '../../../shared/schemas'
 import { FieldSelectionModal } from '../components/FieldSelectionModal'
 import { PageHeader } from '../components/PageHeader'
+import { PeriodShortcuts } from '../components/PeriodShortcuts'
 import {
   Badge,
   Button,
@@ -20,7 +21,7 @@ import {
 import { generatePdf } from '../lib/pdfGenerator'
 import { TRIP_EXPORT_FIELDS, getDefaultTripExportFieldKeys } from '../lib/tripExportFields'
 import type { Contractor, Customer, Driver, Product, Trip, Truck } from '../lib/types'
-import { formatBRL, formatDate, today } from '../lib/utils'
+import { currentMonthKey, formatBRL, formatDate, today } from '../lib/utils'
 
 interface TripFormData {
   date: string
@@ -122,6 +123,7 @@ export function TripsPage() {
   const [thirdPartyFilter, setThirdPartyFilter] = useState<'all' | 'regular' | 'third_party'>('all')
   const [noPriceRegistered, setNoPriceRegistered] = useState(false)
   const [manualUnitPrice, setManualUnitPrice] = useState<number | null>(null)
+  const [tripFilterMonth, setTripFilterMonth] = useState(currentMonthKey())
   const [filters, setFilters] = useState({
     startDate: '',
     endDate: '',
@@ -606,6 +608,13 @@ export function TripsPage() {
               onChange={(e) => setFilters((f) => ({ ...f, endDate: e.target.value }))}
             />
           </div>
+          <PeriodShortcuts
+            monthKey={tripFilterMonth}
+            onMonthChange={setTripFilterMonth}
+            onRangeChange={({ start, end }) =>
+              setFilters((f) => ({ ...f, startDate: start, endDate: end }))
+            }
+          />
           <div className="flex-1 min-w-[150px]">
             <Select
               label="Caminhão"

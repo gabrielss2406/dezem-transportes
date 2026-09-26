@@ -1,4 +1,5 @@
 import { ipcMain } from 'electron'
+import { appSettingsSchema } from '../../../shared/schemas'
 import { getAppSettings, saveAppSettings } from './app-settings'
 import { getTripExportFieldsConfig, saveTripExportFieldsConfig } from './export-settings'
 
@@ -8,7 +9,8 @@ export function registerSettingsHandlers(): void {
   })
 
   ipcMain.handle('settings:save-app', (_, data: unknown) => {
-    saveAppSettings(data as any)
+    const settings = appSettingsSchema.parse(data)
+    saveAppSettings(settings)
     return { ok: true }
   })
 

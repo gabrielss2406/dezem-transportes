@@ -2,8 +2,10 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Controller, useForm } from 'react-hook-form'
 import { useLocation, useNavigate } from 'react-router-dom'
+import { getInitialSalaryLaunchDate, getNextSalaryDriverId } from '../../../shared/salary'
 import { costSchema, fuelRecordSchema } from '../../../shared/schemas'
 import { PageHeader } from '../components/PageHeader'
+import { PeriodShortcuts } from '../components/PeriodShortcuts'
 import {
   Button,
   ConfirmModal,
@@ -24,6 +26,7 @@ import type {
   CreditorReportLine,
   Driver,
   FuelRecord,
+  SalarySummary,
   Supplier,
   Truck,
 } from '../lib/types'
@@ -124,6 +127,13 @@ export function CostsPage() {
   const [showCostDiscardConfirm, setShowCostDiscardConfirm] = useState(false)
   const [markPaidTarget, setMarkPaidTarget] = useState<Cost | null>(null)
   const [markPaidDate, setMarkPaidDate] = useState(today())
+  const [salaryModal, setSalaryModal] = useState(false)
+  const [salaryMonth, setSalaryMonth] = useState(currentMonthKey())
+  const [salaryDate, setSalaryDate] = useState(getInitialSalaryLaunchDate())
+  const [salarySearch, setSalarySearch] = useState('')
+  const [salarySummary, setSalarySummary] = useState<SalarySummary[]>([])
+  const [salaryValues, setSalaryValues] = useState<Record<number, number>>({})
+  const [salaryLoading, setSalaryLoading] = useState(false)
 
   // ── Fuel state ──
   const [fuelRecords, setFuelRecords] = useState<FuelRecord[]>([])
@@ -159,6 +169,8 @@ export function CostsPage() {
   const supplierSelectRef = useRef<SelectRef>(null)
   const driverSelectRef = useRef<SelectRef>(null)
   const descRef = useRef<HTMLInputElement>(null)
+  const firstSalaryValueRef = useRef<HTMLInputElement>(null)
+  const salaryValueRefs = useRef<Record<number, HTMLInputElement | null>>({})
   const [isInstallment, setIsInstallment] = useState(false)
 
   const {
@@ -226,6 +238,22 @@ export function CostsPage() {
     })
     setCosts(c)
   }, [costMonth, filterSupplierId, filterStatus, costFilterMode, costRangeStart, costRangeEnd])
+
+  useEffect(() => {
+    if (!salaryModal) {
+      return
+    }
+    const { start, end } = monthRangeFromKey(salaryMonth)
+    setSalaryLoading(true)
+    window.api.costs
+      .salarySummary(start, end)
+      .then((summary) => {
+        setSalarySummary(summary)
+        setSalaryValues(Object.fromEntries(summary.map((driver) => [driver.id, 0])))
+        window.setTimeout(() => firstSalaryValueRef.current?.focus(), 0)
+      })
+      .finally(() => setSalaryLoading(false))
+  }, [salaryModal, salaryMonth])
 
   const loadFuel = useCallback(async () => {
     const { start, end } = monthRangeFromKey(fuelMonth)
@@ -578,11 +606,44 @@ export function CostsPage() {
     }
   }
 
+  function openSalaryModal() {
+    const selectedMonth = costMonth
+    setSalaryMonth(selectedMonth)
+    setSalaryDate(getInitialSalaryLaunchDate())
+    setSalarySearch('')
+    setSalarySummary([])
+    setSalaryValues({})
+    setSalaryModal(true)
+  }
+
+  function changeSalaryMonth(nextMonth: string) {
+    setSalaryMonth(nextMonth)
+    if (salaryDate.slice(0, 7) !== nextMonth) {
+      setSalaryDate(monthRangeFromKey(nextMonth).start)
+    }
+  }
+
   async function issueSalaries() {
-    const month = currentMonthKey()
-    const r = await window.api.costs.issueMonthlySalaries(month)
-    show(r.issued > 0 ? `${r.issued} salário(s) lançado(s)!` : 'Salários já lançados neste mês')
-    loadCosts()
+    if (salaryDate.slice(0, 7) !== salaryMonth) {
+      show('A data deve pertencer ao mês selecionado.', 'error')
+      return
+    }
+    const entries = salarySummary
+      .map((driver) => ({
+        driver_id: driver.id,
+        value: Math.min(Number(salaryValues[driver.id] || 0), driver.remaining_salary),
+      }))
+      .filter((entry) => entry.value > 0)
+    if (entries.length === 0) {
+      show('Nenhum saldo restante para lançar.', 'error')
+      return
+    }
+    const r = await window.api.costs.issueSalaries({ date: salaryDate, entries })
+    if (r.ok) {
+      show(`${r.issued} salário(s) lançado(s)!`)
+      setSalaryModal(false)
+      loadCosts()
+    }
   }
 
   const filteredCosts = filterCategory ? costs.filter((c) => c.category === filterCategory) : costs
@@ -727,13 +788,21 @@ export function CostsPage() {
                     value={costRangeEnd}
                     onChange={(e) => setCostRangeEnd(e.target.value)}
                   />
+                  <PeriodShortcuts
+                    monthKey={costMonth}
+                    onMonthChange={setCostMonth}
+                    onRangeChange={({ start, end }) => {
+                      setCostRangeStart(start)
+                      setCostRangeEnd(end)
+                    }}
+                  />
                 </div>
               )}
             </div>
             <div className="flex gap-3">
               <button
                 type="button"
-                onClick={issueSalaries}
+                onClick={openSalaryModal}
                 className="flex items-center gap-2 px-4 py-2.5 text-sm font-bold border border-outline-variant/30 text-on-surface-variant hover:text-on-surface hover:border-primary/40 rounded transition-all"
               >
                 <span className="material-symbols-outlined text-sm">payments</span>
@@ -1171,6 +1240,14 @@ export function CostsPage() {
                     value={creditorRangeEnd}
                     onChange={(e) => setCreditorRangeEnd(e.target.value)}
                   />
+                  <PeriodShortcuts
+                    monthKey={creditorMonth}
+                    onMonthChange={setCreditorMonth}
+                    onRangeChange={({ start, end }) => {
+                      setCreditorRangeStart(start)
+                      setCreditorRangeEnd(end)
+                    }}
+                  />
                 </div>
               )}
             </div>
@@ -1305,6 +1382,130 @@ export function CostsPage() {
       )}
 
       {/* ── COST MODAL ── */}
+      {salaryModal && (
+        <Modal title="Lançar salários" onClose={() => setSalaryModal(false)} size="xl">
+          <div className="space-y-5">
+            <div className="grid grid-cols-2 gap-4">
+              <MonthNavigator monthKey={salaryMonth} onChange={changeSalaryMonth} />
+              <DatePicker
+                label="Data do lançamento"
+                value={salaryDate}
+                min={`${salaryMonth}-01`}
+                max={monthRangeFromKey(salaryMonth).end}
+                onChange={(e) => setSalaryDate(e.target.value)}
+              />
+            </div>
+            <Input
+              label="Buscar motorista"
+              placeholder="Digite um nome"
+              value={salarySearch}
+              onChange={(event) => setSalarySearch(event.target.value)}
+            />
+            <div className="border border-outline-variant/10 rounded-lg overflow-hidden">
+              <div className="grid grid-cols-[minmax(0,1.5fr)_repeat(3,minmax(0,1fr))_10rem] gap-3 px-4 py-3 bg-surface-container-high text-[10px] font-black uppercase tracking-widest text-on-surface-variant">
+                <span>Motorista</span>
+                <span>Salário mensal</span>
+                <span>Já lançado</span>
+                <span>Falta pagar</span>
+                <span>Valor do lançamento</span>
+              </div>
+              <div className="max-h-80 overflow-y-auto">
+                {salarySummary
+                  .filter((driver) =>
+                    driver.name.toLocaleLowerCase().includes(salarySearch.toLocaleLowerCase()),
+                  )
+                  .map((driver) => {
+                    const canLaunch = driver.remaining_salary > 0
+                    return (
+                      <div
+                        key={driver.id}
+                        className="grid grid-cols-[minmax(0,1.5fr)_repeat(3,minmax(0,1fr))_10rem] items-center gap-3 p-3 border-b border-outline-variant/10 last:border-b-0"
+                      >
+                        <span className="font-bold text-sm text-on-surface">{driver.name}</span>
+                        <span className="text-sm text-on-surface-variant">
+                          {formatBRL(driver.monthly_salary)}
+                        </span>
+                        <span className="text-sm text-on-surface-variant">
+                          {formatBRL(driver.issued_salary)}
+                        </span>
+                        <span
+                          className={`text-sm font-bold ${canLaunch ? 'text-primary' : 'text-tertiary'}`}
+                        >
+                          {formatBRL(driver.remaining_salary)}
+                        </span>
+                        <div>
+                          <CurrencyInput
+                            ref={(element) => {
+                              salaryValueRefs.current[driver.id] = element
+                              if (driver.id === salarySummary[0]?.id) {
+                                firstSalaryValueRef.current = element
+                              }
+                            }}
+                            value={salaryValues[driver.id] ?? 0}
+                            onChange={(value) =>
+                              setSalaryValues((current) => ({
+                                ...current,
+                                [driver.id]: Math.min(value, driver.remaining_salary),
+                              }))
+                            }
+                            onKeyDown={(event) => {
+                              if (event.key === 'Tab') {
+                                const visibleDriverIds = salarySummary
+                                  .filter((item) =>
+                                    item.name
+                                      .toLocaleLowerCase()
+                                      .includes(salarySearch.toLocaleLowerCase()),
+                                  )
+                                  .map((item) => item.id)
+                                const nextDriverId = getNextSalaryDriverId(
+                                  visibleDriverIds,
+                                  driver.id,
+                                  event.shiftKey ? -1 : 1,
+                                )
+                                if (nextDriverId !== null) {
+                                  event.preventDefault()
+                                  salaryValueRefs.current[nextDriverId]?.focus()
+                                }
+                              } else if (event.key === 'Enter') {
+                                event.preventDefault()
+                                issueSalaries()
+                              }
+                            }}
+                            disabled={salaryLoading}
+                          />
+                        </div>
+                      </div>
+                    )
+                  })}
+                {!salaryLoading && salarySummary.length === 0 && (
+                  <div className="p-8 text-center text-sm text-on-surface-variant">
+                    Nenhum motorista elegível.
+                  </div>
+                )}
+                {salaryLoading && (
+                  <div className="p-8 text-center text-sm text-on-surface-variant">
+                    Carregando saldos...
+                  </div>
+                )}
+              </div>
+            </div>
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-xs text-on-surface-variant">
+                Tab: próximo valor · Enter: lançar · Esc: fechar
+              </span>
+              <div className="flex gap-3">
+                <Button variant="ghost" onClick={() => setSalaryModal(false)}>
+                  Cancelar
+                </Button>
+                <Button disabled={salaryLoading} onClick={issueSalaries}>
+                  Lançar salários
+                </Button>
+              </div>
+            </div>
+          </div>
+        </Modal>
+      )}
+
       {costModal && (
         <Modal
           title={editingCost ? 'Editar Custo' : 'Novo Custo'}

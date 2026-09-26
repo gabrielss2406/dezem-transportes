@@ -136,11 +136,22 @@ interface CurrencyInputProps {
   placeholder?: string
   className?: string
   onKeyDown?: React.KeyboardEventHandler<HTMLInputElement>
+  disabled?: boolean
 }
 
 export const CurrencyInput = forwardRef<HTMLInputElement, CurrencyInputProps>(
   (
-    { label, optional, error, value, onChange, placeholder = '0,00', className = '', onKeyDown },
+    {
+      label,
+      optional,
+      error,
+      value,
+      onChange,
+      placeholder = '0,00',
+      className = '',
+      onKeyDown,
+      disabled,
+    },
     ref,
   ) => {
     const id = React.useId()
@@ -183,6 +194,7 @@ export const CurrencyInput = forwardRef<HTMLInputElement, CurrencyInputProps>(
             value={format(value)}
             onChange={handleChange}
             onKeyDown={onKeyDown}
+            disabled={disabled}
             placeholder={placeholder}
             className={`w-full bg-surface-container-lowest border ${stateClasses} rounded-lg pl-10 pr-4 py-3 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:outline-none focus:ring-2 transition-all ${className}`}
           />
