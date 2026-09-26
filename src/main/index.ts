@@ -8,6 +8,7 @@ import { setupDatabase } from './database'
 import { registerAuthHandlers } from './modules/auth/auth.handlers'
 import { startBackupScheduler } from './modules/backup/backup-scheduler'
 import { registerBackupHandlers } from './modules/backup/backup.handlers'
+import { registerBankBalanceHandlers } from './modules/bank-balances/bank-balances.handlers'
 import { registerContractorHandlers } from './modules/contractors/contractors.handlers'
 import { registerCostCategoryHandlers } from './modules/cost-categories/cost-categories.handlers'
 import { registerCostHandlers } from './modules/costs/costs.handlers'
@@ -49,6 +50,7 @@ app.whenReady().then(async () => {
   }
 
   registerAuthHandlers()
+  registerBankBalanceHandlers()
   registerContractorHandlers()
   registerCostCategoryHandlers()
   registerCostHandlers()

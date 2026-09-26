@@ -298,7 +298,13 @@ export const appSettingsSchema = z.object({
     (val) => (val === '' || val === null || val === undefined ? 0 : Number(val)),
     z.number().min(0).max(100, 'Máximo de 100%'),
   ),
-  bankBalance: z.preprocess(
+})
+
+// One manual bank balance snapshot per month. The month is part of the identity, not a
+// filter: saving a month replaces only that month's value (see bank-balances.handlers).
+export const bankBalanceSchema = z.object({
+  month: z.string().regex(/^[0-9]{4}-(0[1-9]|1[0-2])$/, 'Mês inválido'),
+  balance: z.preprocess(
     (val) => (val === '' || val === null || val === undefined ? 0 : Number(val)),
     z
       .number()

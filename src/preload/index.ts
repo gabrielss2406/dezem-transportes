@@ -172,6 +172,14 @@ contextBridge.exposeInMainWorld('api', {
     },
   },
 
+  // Bank Balances (manual monthly snapshots)
+  bankBalances: {
+    list: () => ipcRenderer.invoke('bank-balances:list'),
+    get: (month: string) => ipcRenderer.invoke('bank-balances:get', month),
+    set: (data: { month: string; balance: number }) =>
+      ipcRenderer.invoke('bank-balances:set', data),
+  },
+
   // Settings
   settings: {
     getApp: () => ipcRenderer.invoke('settings:get-app'),

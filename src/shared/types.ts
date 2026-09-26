@@ -1,7 +1,16 @@
 export interface AppSettings {
   taxRate: number
   commissionRate: number
-  bankBalance: number
+}
+
+// A manually entered monthly snapshot of the bank balance. month is a 'YYYY-MM' key and
+// the primary key: there is at most one record per month, and months with no record are
+// simply absent (never zero-filled, never inferred from another month).
+export interface BankBalanceRecord {
+  month: string
+  balance: number
+  created_at: string
+  updated_at: string
 }
 
 export interface BackupConfig {

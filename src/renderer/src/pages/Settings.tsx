@@ -238,7 +238,6 @@ function TaxSettings() {
   const [settings, setSettings] = useState<AppSettings>({
     taxRate: 0,
     commissionRate: 0,
-    bankBalance: 0,
   })
   const [loading, setLoading] = useState(true)
   const { toast, show } = useToast()
