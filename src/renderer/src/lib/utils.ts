@@ -17,6 +17,19 @@ export function formatDate(dateStr: string): string {
   return `${d}/${m}/${y}`
 }
 
+/**
+ * Formats a SQLite datetime ('YYYY-MM-DD HH:MM:SS', stored in local time) as
+ * 'DD/MM/YYYY HH:MM'. Falls back to the date alone when there is no time part.
+ */
+export function formatDateTime(value?: string | null): string {
+  if (!value) {
+    return ''
+  }
+  const [datePart, timePart] = value.split(' ')
+  const date = formatDate(datePart)
+  return timePart ? `${date} ${timePart.slice(0, 5)}` : date
+}
+
 export function currentMonthKey(): string {
   const now = new Date()
   const y = now.getFullYear()

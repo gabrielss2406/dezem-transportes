@@ -2,7 +2,6 @@ import { ipcMain } from 'electron'
 import { calculateFuelEfficiencyKmPerLiter } from '../../../shared/fuel'
 import { getDb } from '../../database'
 import { getMaintenanceStatus } from '../maintenance/maintenance.handlers'
-import { getAppSettings } from '../settings/app-settings'
 
 export function registerDashboardHandlers(): void {
   const db = () => getDb()
@@ -867,9 +866,15 @@ export function registerDashboardHandlers(): void {
          WHERE status = 'open' AND date < date('now')`,
       )
       .get() as any
-    // Saldo Bancário is a manually maintained cash position. It is intentionally
-    // independent from DRE and from receivables/costs movements.
-    const bankBalance = getAppSettings().bankBalance
+    // Saldo Bancário is a manually entered monthly snapshot, intentionally independent
+    // from DRE and from receivables/costs movements. Only the month the period starts in
+    // is read, and a month the user never informed stays null — no neighbouring month is
+    // substituted in, so the card never implies a figure that was never recorded.
+    const bankBalanceMonth = startDate.slice(0, 7)
+    const bankBalanceRow = db()
+      .prepare('SELECT balance FROM bank_balances WHERE month = ?')
+      .get(bankBalanceMonth) as { balance: number } | undefined
+    const bankBalance = bankBalanceRow ? Number(bankBalanceRow.balance) : null
 
     return {
       revenue,
@@ -893,6 +898,7 @@ export function registerDashboardHandlers(): void {
       perCustomer,
       perProduct,
       bankBalance,
+      bankBalanceMonth,
       receivablesOpenTotal: Number(receivablesOpenTotal) || 0,
       costsOpenTotal: Number(costsOpenTotal) || 0,
       costsOverdueCount: Number(costsOverdue.c) || 0,

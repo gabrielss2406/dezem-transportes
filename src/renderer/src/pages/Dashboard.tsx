@@ -1,10 +1,11 @@
 import { toPng } from 'html-to-image'
-import { useEffect, useRef, useState } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { BankBalanceHistory } from '../components/BankBalanceHistory'
 import { PageHeader } from '../components/PageHeader'
-import { Button, CurrencyInput, DatePicker, Modal, Toast, useToast } from '../components/ui'
+import { Button, DatePicker, Toast, useToast } from '../components/ui'
 import type { DashboardSummary } from '../lib/types'
-import { currentMonthRange, formatBRL } from '../lib/utils'
+import { currentMonthRange, formatBRL, formatMonthLabel } from '../lib/utils'
 
 const CHART_SERIES = [
   { key: 'revenue', label: 'Fat. Bruto', color: 'bg-chart-blue', dot: 'bg-chart-blue' },
@@ -85,7 +86,6 @@ function SectionHeader({ title, icon }: { title: string; icon: string }) {
 
 export function DashboardPage() {
   const navigate = useNavigate()
-  const location = useLocation()
   const [summary, setSummary] = useState<DashboardSummary | null>(null)
   const [loading, setLoading] = useState(true)
   const [range, setRange] = useState(currentMonthRange())
@@ -98,17 +98,9 @@ export function DashboardPage() {
     net: true,
   })
   const [pctBase, setPctBase] = useState<PctBase>('total')
-  const [bankBalanceModal, setBankBalanceModal] = useState(false)
-  const [bankBalanceInput, setBankBalanceInput] = useState(0)
   const chartRef = useRef<HTMLDivElement>(null)
+  const bankBalanceRef = useRef<HTMLDivElement>(null)
   const { toast, show } = useToast()
-
-  useEffect(() => {
-    if (location.state?.openBankBalance) {
-      setBankBalanceModal(true)
-      navigate('/', { replace: true, state: {} })
-    }
-  }, [location, navigate])
 
   const calcPct = (
     value: number,
@@ -169,37 +161,42 @@ export function DashboardPage() {
     }
   }
 
-  useEffect(() => {
-    setLoading(true)
-    window.api.dashboard
+  const refreshSummary = useCallback(() => {
+    return window.api.dashboard
       .summary(range.start, range.end)
-      .then((r) => {
-        setSummary(r)
-        setBankBalanceInput(r.bankBalance)
-      })
+      .then(setSummary)
       .catch((err) => {
         console.error('Failed to load dashboard summary:', err)
       })
-      .finally(() => {
-        setLoading(false)
-      })
   }, [range])
+
+  useEffect(() => {
+    setLoading(true)
+    refreshSummary().finally(() => {
+      setLoading(false)
+    })
+  }, [refreshSummary])
 
   // Trucks/trips/costs/fuel/maintenance all feed into this summary — refetch whenever any
   // of them change elsewhere in the app, instead of only on mount or date-range change.
+  // bank-balances is in the list too: the Saldo Bancário card reads the snapshot recorded
+  // for the period, which another window may have just changed.
   useEffect(() => {
-    const relevantEntities = new Set(['trucks', 'trips', 'costs', 'fuel', 'maintenance', 'drivers'])
+    const relevantEntities = new Set([
+      'trucks',
+      'trips',
+      'costs',
+      'fuel',
+      'maintenance',
+      'drivers',
+      'bank-balances',
+    ])
     return window.api.onDataChanged((entity) => {
       if (relevantEntities.has(entity)) {
-        window.api.dashboard
-          .summary(range.start, range.end)
-          .then(setSummary)
-          .catch((err) => {
-            console.error('Failed to refresh dashboard summary:', err)
-          })
+        refreshSummary()
       }
     })
-  }, [range])
+  }, [refreshSummary])
 
   const handlePreset = (preset: 'current' | 'previous' | 'custom') => {
     if (preset === 'current') {
@@ -243,10 +240,9 @@ export function DashboardPage() {
         <div className="flex gap-3 items-center">
           <button
             type="button"
-            onClick={() => {
-              setBankBalanceInput(summary?.bankBalance ?? 0)
-              setBankBalanceModal(true)
-            }}
+            onClick={() =>
+              bankBalanceRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+            }
             className="flex items-center gap-2 px-4 py-2 rounded text-sm font-bold bg-primary text-on-primary hover:brightness-110 transition-all"
           >
             <span className="material-symbols-outlined text-base">account_balance</span>
@@ -392,8 +388,16 @@ export function DashboardPage() {
 
               <KpiBlock
                 label="Saldo Bancário"
-                value={formatBRL(summary.bankBalance).replace('R$ ', '')}
-                info="Saldo informado manualmente"
+                value={
+                  summary.bankBalance === null
+                    ? '—'
+                    : formatBRL(summary.bankBalance).replace('R$ ', '')
+                }
+                info={
+                  summary.bankBalance === null
+                    ? `Não informado para ${formatMonthLabel(summary.bankBalanceMonth)}`
+                    : `Informado manualmente · ${formatMonthLabel(summary.bankBalanceMonth)}`
+                }
               />
 
               <KpiBlock
@@ -693,6 +697,11 @@ export function DashboardPage() {
               </div>
             </div>
 
+            {/* Histórico de Saldo Bancário */}
+            <div ref={bankBalanceRef}>
+              <BankBalanceHistory onError={(message) => show(message, 'error')} />
+            </div>
+
             {/* Rentabilidade por Caminhão — Limitado */}
             <div className="bg-surface-container rounded-2xl overflow-hidden border border-outline-variant/10">
               <div className="p-8 pb-4 flex items-center justify-between">
@@ -912,43 +921,6 @@ export function DashboardPage() {
               </div>
             </div>
           </div>
-        )}
-
-        {bankBalanceModal && (
-          <Modal title="Saldo bancário atual" onClose={() => setBankBalanceModal(false)}>
-            <div className="space-y-4">
-              <p className="text-sm text-on-surface-variant">
-                Informe o valor que está atualmente no banco. Esse valor não será alterado por
-                receitas, custos ou baixas financeiras.
-              </p>
-              <CurrencyInput
-                label="Saldo atual"
-                value={bankBalanceInput}
-                onChange={setBankBalanceInput}
-              />
-              <div className="flex justify-end gap-3">
-                <Button variant="ghost" onClick={() => setBankBalanceModal(false)}>
-                  Cancelar
-                </Button>
-                <Button
-                  onClick={async () => {
-                    const settings = await window.api.settings.getApp()
-                    await window.api.settings.saveApp({
-                      ...settings,
-                      bankBalance: bankBalanceInput,
-                    })
-                    setSummary((current) =>
-                      current ? { ...current, bankBalance: bankBalanceInput } : current,
-                    )
-                    setBankBalanceModal(false)
-                    show('Saldo bancário atualizado!', 'success')
-                  }}
-                >
-                  Salvar saldo
-                </Button>
-              </div>
-            </div>
-          </Modal>
         )}
       </div>
     </div>

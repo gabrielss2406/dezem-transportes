@@ -207,6 +207,21 @@ export function setupDatabase(): void {
       value TEXT NOT NULL
     );
 
+    -- Bank Balances (manual monthly snapshots of the cash position). One row per
+    -- month ('YYYY-MM'), always typed in by hand: never derived from trips,
+    -- receivables or costs, and writing one month never touches another. A month
+    -- with no row means "não informado" — no value is ever carried over from a
+    -- neighbouring month. This table is the only source for the Saldo Bancário
+    -- card and for the bank balance history chart.
+    -- Timestamps use 'localtime' (unlike the other tables' created_at) because
+    -- they are shown to the user as the date the balance was registered/updated.
+    CREATE TABLE IF NOT EXISTS bank_balances (
+      month      TEXT PRIMARY KEY,
+      balance    REAL NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+    );
+
     -- Maintenance Types (oil change, tire rotation, etc.)
     CREATE TABLE IF NOT EXISTS maintenance_types (
       id             INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -474,6 +489,30 @@ export function setupDatabase(): void {
     db.exec(
       `ALTER TABLE receivables ADD COLUMN kind TEXT NOT NULL DEFAULT 'revenue' CHECK (kind IN ('revenue','adjustment'))`,
     )
+  }
+
+  // Migration: carry the legacy single bank balance (settings.app_settings.bankBalance,
+  // one global value with no month attached) into bank_balances as the current month's
+  // snapshot, so nobody loses the figure they had typed in. Only runs while the table is
+  // still empty; from then on bank_balances is the single source and the settings field
+  // is ignored (and no longer written).
+  const bankBalanceCount = (db.prepare('SELECT COUNT(*) as c FROM bank_balances').get() as any).c
+  if (bankBalanceCount === 0) {
+    const legacyRow = db.prepare("SELECT value FROM settings WHERE key = 'app_settings'").get() as
+      | { value: string }
+      | undefined
+    if (legacyRow) {
+      try {
+        const legacyBalance = Number(JSON.parse(legacyRow.value)?.bankBalance)
+        if (Number.isFinite(legacyBalance) && legacyBalance > 0) {
+          db.prepare(
+            "INSERT INTO bank_balances (month, balance) VALUES (strftime('%Y-%m', 'now', 'localtime'), ?)",
+          ).run(legacyBalance)
+        }
+      } catch {
+        // Malformed settings JSON — nothing to carry over.
+      }
+    }
   }
 
   // Migration: Add is_outsourced and contractor_id to drivers if missing

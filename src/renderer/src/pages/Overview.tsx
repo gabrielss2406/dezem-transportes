@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Button, CurrencyInput, Modal, Toast, useToast } from '../components/ui'
-import { formatBRL } from '../lib/utils'
+import { currentMonthKey, formatBRL, formatMonthLabel } from '../lib/utils'
 
 interface OverviewProps {
   user?: string
@@ -115,26 +115,36 @@ const sections = [
 ]
 
 export function OverviewPage({ user, onNavigate }: OverviewProps) {
-  const [bankBalance, setBankBalance] = useState(0)
+  // The quick action only ever reads and writes the current month's snapshot. Earlier
+  // months are edited from the Histórico de Saldo Bancário section on the Dashboard.
+  const [month] = useState(currentMonthKey())
+  const [bankBalance, setBankBalance] = useState<number | null>(null)
   const [bankBalanceInput, setBankBalanceInput] = useState(0)
   const [bankBalanceModal, setBankBalanceModal] = useState(false)
   const { toast, show } = useToast()
 
+  const loadBankBalance = useCallback(async () => {
+    const record = await window.api.bankBalances.get(month)
+    setBankBalance(record ? record.balance : null)
+  }, [month])
+
   useEffect(() => {
-    window.api.settings.getApp().then((settings) => {
-      setBankBalance(settings.bankBalance)
-      setBankBalanceInput(settings.bankBalance)
+    loadBankBalance().catch((error) => {
+      console.error('Failed to load bank balance:', error)
     })
-  }, [])
+  }, [loadBankBalance])
 
   const openBankBalance = () => {
-    setBankBalanceInput(bankBalance)
+    setBankBalanceInput(bankBalance ?? 0)
     setBankBalanceModal(true)
   }
 
   const saveBankBalance = async () => {
-    const settings = await window.api.settings.getApp()
-    await window.api.settings.saveApp({ ...settings, bankBalance: bankBalanceInput })
+    const result = await window.api.bankBalances.set({ month, balance: bankBalanceInput })
+    if (!result.ok) {
+      show(Object.values(result.errors ?? {})[0] ?? 'Erro ao salvar o saldo.', 'error')
+      return
+    }
     setBankBalance(bankBalanceInput)
     setBankBalanceModal(false)
     show('Saldo bancário atualizado!', 'success')
@@ -187,7 +197,7 @@ export function OverviewPage({ user, onNavigate }: OverviewProps) {
           <span className="material-symbols-outlined text-lg">account_balance</span>
           <span>Saldo Bancário</span>
           <span className="text-xs font-medium text-on-surface-variant">
-            {formatBRL(bankBalance)}
+            {bankBalance === null ? 'Não informado' : formatBRL(bankBalance)}
           </span>
         </button>
       </div>
@@ -228,14 +238,19 @@ export function OverviewPage({ user, onNavigate }: OverviewProps) {
       ))}
 
       {bankBalanceModal && (
-        <Modal title="Saldo bancário atual" onClose={() => setBankBalanceModal(false)}>
+        <Modal
+          title={`Saldo bancário · ${formatMonthLabel(month)}`}
+          onClose={() => setBankBalanceModal(false)}
+        >
           <div className="space-y-4">
             <p className="text-sm text-on-surface-variant">
-              Informe o valor que está atualmente no banco. Receitas, custos e baixas não alteram
-              esse valor automaticamente.
+              Informe o valor que está atualmente no banco. Ele fica registrado como o saldo de{' '}
+              <span className="font-bold capitalize">{formatMonthLabel(month)}</span> e não é
+              alterado por receitas, custos ou baixas. Para corrigir meses anteriores, use o
+              histórico de saldo bancário no Dashboard.
             </p>
             <CurrencyInput
-              label="Saldo atual"
+              label="Saldo do mês"
               value={bankBalanceInput}
               onChange={setBankBalanceInput}
             />

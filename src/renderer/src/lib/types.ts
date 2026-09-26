@@ -269,7 +269,10 @@ export interface DashboardSummary {
     tonnage: number
     trips: number
   }>
-  bankBalance: number
+  /** Manual snapshot recorded for bankBalanceMonth, or null when that month has none. */
+  bankBalance: number | null
+  /** 'YYYY-MM' the snapshot above refers to — the month the selected period starts in. */
+  bankBalanceMonth: string
   receivablesOpenTotal: number
   costsOpenTotal: number
   costsOverdueCount: number
@@ -497,6 +500,14 @@ declare global {
         onStatusUpdate(
           callback: (status: import('../../../shared/types').BackupStatus) => void,
         ): () => void
+      }
+      bankBalances: {
+        list(): Promise<import('../../../shared/types').BankBalanceRecord[]>
+        get(month: string): Promise<import('../../../shared/types').BankBalanceRecord | null>
+        set(data: { month: string; balance: number }): Promise<{
+          ok: boolean
+          errors?: Record<string, string>
+        }>
       }
       settings: {
         getApp(): Promise<import('../../../shared/types').AppSettings>
