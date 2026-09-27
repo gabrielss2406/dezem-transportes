@@ -27,6 +27,10 @@ export const contractorSchema = z.object({
     .string()
     .optional()
     .refine((val) => !val || isValidPhone(val), { message: 'Telefone inválido' }),
+  customer_id: z.preprocess(
+    (val) => (val === '' || val === null || val === undefined ? null : Number(val)),
+    z.number().int().positive().nullable().optional(),
+  ),
 })
 
 export const customerSchema = z.object({
@@ -63,6 +67,10 @@ export const supplierSchema = z.object({
   ),
   name: z.string().min(3, 'Nome deve ter pelo menos 3 caracteres').max(100),
   type: z.string().max(50).optional(),
+  customer_id: z.preprocess(
+    (val) => (val === '' || val === null || val === undefined ? null : Number(val)),
+    z.number().int().positive().nullable().optional(),
+  ),
   phone: z
     .string()
     .optional()
@@ -162,9 +170,14 @@ export const fuelRecordSchema = z.object({
   truck_id: requiredNumber(999999999, 'ID inválido'),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data inválida'),
   liters: optionalNumber(10000, 'Máximo de 10.000 litros'),
-  value: requiredNumber(1000000, 'Valor máximo de R$ 1.000.000'),
+  value: optionalNumber(1000000, 'Valor máximo de R$ 1.000.000'),
+  price_per_liter: optionalNumber(10000, 'Preço por litro inválido'),
   odometer_at_service: requiredNumber(9999999, 'KM máximo de 9.999.999'),
   supplier_id: optionalNumber(999999999, 'ID inválido'),
+  voucher_number: z.string().trim().min(1, 'Informe o número do vale').max(100),
+  fuel_mode: z.enum(['credit', 'normal'], {
+    message: 'Classifique o abastecimento como crédito ou normal',
+  }),
   notes: z.string().max(500).optional(),
 })
 
@@ -277,6 +290,50 @@ export const receivableSchema = z.object({
   due_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data inválida'),
   description: z.string().max(255).optional(),
   kind: z.enum(['revenue', 'adjustment']).default('revenue'),
+})
+
+const oilAmount = (message: string) =>
+  z.preprocess(
+    (val) => (val === '' || val === null || val === undefined ? null : Number(val)),
+    z.number().positive(message).max(10000000, message).nullable().optional(),
+  )
+
+export const oilCreditSchema = z.object({
+  customer_id: requiredNumber(999999999, 'Cliente inválido'),
+  supplier_id: requiredNumber(999999999, 'Fornecedor inválido'),
+  amount: oilAmount('Valor de crédito inválido'),
+  liters: oilAmount('Quantidade de litros inválida'),
+  price_per_liter: oilAmount('Preço por litro inválido'),
+  movement_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data inválida'),
+  due_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Vencimento inválido'),
+  description: z.string().max(255).optional(),
+})
+
+export const oilAdjustmentSchema = oilCreditSchema.extend({
+  amount: z.preprocess(
+    (val) => (val === '' || val === null ? null : Number(val)),
+    z.number().max(10000000).nullable().optional(),
+  ),
+  liters: z.preprocess(
+    (val) => (val === '' || val === null ? null : Number(val)),
+    z.number().max(10000000).nullable().optional(),
+  ),
+})
+
+export const oilSettlementSchema = z.object({
+  customer_id: requiredNumber(999999999, 'Cliente inválido'),
+  supplier_id: requiredNumber(999999999, 'Fornecedor inválido'),
+  start_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data inicial inválida'),
+  end_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data final inválida'),
+  due_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Vencimento inválido'),
+  fuel_record_ids: z.array(idSchema).default([]),
+})
+
+export const oilSettlementUpdateSchema = oilSettlementSchema
+
+export const fuelMarkPaidSchema = z.object({
+  id: idSchema,
+  paid_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data inválida'),
 })
 
 export const customerPriceSchema = z.object({

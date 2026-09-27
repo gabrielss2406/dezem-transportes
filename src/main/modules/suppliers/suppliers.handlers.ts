@@ -11,7 +11,8 @@ export function registerSupplierHandlers(): void {
   const db = () => getDb()
 
   ipcMain.handle('suppliers:list', (_e, filters: any = {}) => {
-    let query = 'SELECT * FROM suppliers WHERE 1=1'
+    let query = `SELECT s.*, c.name as customer_name
+      FROM suppliers s LEFT JOIN customers c ON c.id = s.customer_id WHERE 1=1`
     const params: any[] = []
 
     const nameSearch = typeof filters === 'string' ? filters : filters.name
@@ -34,15 +35,17 @@ export function registerSupplierHandlers(): void {
 
   createValidatedHandler('suppliers:create', supplierSchema, (data) => {
     const r = db()
-      .prepare('INSERT INTO suppliers (name, type, phone, customId) VALUES (?,?,?,?)')
-      .run(data.name, data.type, data.phone, data.customId)
+      .prepare(
+        'INSERT INTO suppliers (name, type, phone, customId, customer_id) VALUES (?,?,?,?,?)',
+      )
+      .run(data.name, data.type, data.phone, data.customId, data.customer_id || null)
     return { id: r.lastInsertRowid }
   })
 
   createValidatedHandlerWithId('suppliers:update', supplierSchema, (id, data) => {
     db()
-      .prepare('UPDATE suppliers SET name=?, type=?, phone=?, customId=? WHERE id=?')
-      .run(data.name, data.type, data.phone, data.customId, id)
+      .prepare('UPDATE suppliers SET name=?, type=?, phone=?, customId=?, customer_id=? WHERE id=?')
+      .run(data.name, data.type, data.phone, data.customId, data.customer_id || null, id)
     return { ok: true }
   })
 

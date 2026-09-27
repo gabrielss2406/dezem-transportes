@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { MemoryRouter, Route, Routes, useNavigate } from 'react-router-dom'
+import { MemoryRouter, Navigate, Route, Routes, useNavigate } from 'react-router-dom'
 import { Sidebar } from './components/Sidebar'
 import { CostsPage } from './pages/Costs'
 import { DashboardPage } from './pages/Dashboard'
@@ -76,6 +76,7 @@ function AppRoutes() {
                 <Route path="/prices" element={<PriceManagementPage />} />
                 <Route path="/costs" element={<CostsPage />} />{' '}
                 <Route path="/receivables" element={<ReceivablesPage />} />
+                <Route path="/oil-credits" element={<Navigate to="/costs" replace />} />
                 <Route path="/third-party-settlements" element={<ThirdPartySettlementsPage />} />
                 <Route path="/trucks" element={<TrucksPage />} />
                 <Route path="/drivers" element={<DriversPage />} />

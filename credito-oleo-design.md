@@ -1,161 +1,164 @@
-# Crédito de Óleo — Análise e Proposta
+# Crédito de Óleo — Solução Implementada
 
 ## Objetivo
 
-Permitir que uma empresa atendida como cliente também seja cadastrada como fornecedora de óleo diesel, mantendo um crédito de óleo para abatimento nos fechamentos de cobrança.
+Controlar créditos de óleo diesel entre um cliente e seu fornecedor vinculado,
+registrar abastecimentos como consumo de crédito ou compra normal e gerar
+fechamentos de cobrança com o valor líquido a receber.
 
-O fechamento deve mostrar o valor dos fretes do período, o óleo abastecido usando crédito, o saldo de crédito e o valor líquido a receber, com uma data de vencimento definida.
+## Arquitetura
 
-## Contexto atual
+Foi criado um módulo financeiro próprio. Os abastecimentos continuam em
+`fuel_records`, enquanto `oil_credit_movements` é o ledger e a fonte de verdade
+do saldo. A separação preserva histórico e permite auditar créditos, consumos e
+ajustes sem misturar compras normais com crédito.
 
-O sistema já possui:
+## Regras de negócio
 
-- cadastro separado de clientes e fornecedores;
-- abastecimentos avulsos com fornecedor, valor, litros e data;
-- abastecimentos vinculados a viagens;
-- contas a pagar e contas a receber;
-- relatório de contas a pagar por credor;
-- vencimento em contas a receber;
-- exportação de relatórios em PDF.
+### Cliente e fornecedor
 
-O que falta é relacionar cliente e fornecedor, controlar o crédito de óleo e classificar cada abastecimento quanto ao uso desse crédito.
+- Clientes e fornecedores continuam sendo cadastros independentes.
+- Um fornecedor pode ser vinculado a um cliente.
+- O vínculo é obrigatório para lançar ou consumir crédito.
+- O fornecedor só pode ser usado com o cliente ao qual está vinculado.
 
-## Alternativas analisadas
+### Saldo
 
-### 1. Ajustar diretamente os abastecimentos existentes
+Existe uma conta única por combinação cliente/fornecedor. O saldo é calculado
+pelos movimentos:
 
-Adicionar campos de crédito aos registros atuais de abastecimento.
+`saldo = créditos + ajustes - consumos`
 
-**Vantagens:** implementação inicial mais rápida.
+O saldo é mantido em reais e litros. O vencimento é atualizado pelo crédito ou
+ajuste mais recente. Crédito vencido pode ser consumido, mas retorna alerta.
 
-**Riscos:** mistura abastecimento, crédito e contas a pagar na mesma estrutura; dificulta auditoria, histórico e cálculo de saldo.
+### Medidas
 
-### 2. Manter apenas um saldo simples no cadastro
+Para créditos, ajustes e abastecimentos, duas entre valor total, litros e preço
+por litro devem ser informadas. O sistema calcula a terceira. Valor ou litragem
+consumidos acima do saldo disponível são rejeitados.
 
-Adicionar um saldo de crédito diretamente ao cliente ou fornecedor.
+### Abastecimentos
 
-**Vantagens:** operação simples.
+Novos abastecimentos exigem vale único globalmente, caminhão, data, fornecedor,
+medidas e classificação:
 
-**Riscos:** não preserva adequadamente histórico de lançamentos, ajustes e fechamentos; dificulta explicar como o saldo foi formado.
+- **Crédito:** reduz o saldo em reais e litros e fica disponível para fechamento;
+- **Normal:** não altera o crédito e aparece no Contas a Pagar;
+- **Histórico sem classificação:** registros anteriores à funcionalidade.
 
-### 3. Criar um módulo próprio de crédito e fechamento — recomendada
-
-Criar uma camada financeira específica para créditos de óleo, usos de crédito e fechamentos, mantendo os abastecimentos atuais como origem operacional.
-
-**Vantagens:** separa responsabilidades, permite auditoria, mantém compatibilidade com os módulos atuais e suporta relatórios oficiais salvos.
-
-**Custo:** envolve banco de dados, IPC, formulários e relatório próprios.
-
-## Regras de negócio definidas
-
-### Relação cliente-fornecedor
-
-- Clientes e fornecedores continuam sendo cadastros separados.
-- Um fornecedor poderá ser vinculado a um cliente correspondente.
-- Esse vínculo identifica a empresa que contrata o frete e fornece o óleo.
-
-### Crédito
-
-- O crédito será controlado em um saldo único por cliente/fornecedor.
-- Novos créditos somam ao saldo existente.
-- O saldo deverá controlar valor em reais e quantidade de litros.
-- O crédito terá data de vencimento/referência de validade.
-- O saldo não utilizado será carregado para períodos seguintes, conforme a regra aprovada.
-
-### Valor, litros e preço por litro
-
-Na experiência de lançamento, o usuário informará duas das três informações:
-
-- valor total;
-- quantidade de litros;
-- preço por litro.
-
-O sistema calculará automaticamente a terceira informação, evitando divergências entre valor e litragem.
-
-### Abastecimento
-
-Todo abastecimento do fornecedor vinculado deverá permitir registrar:
-
-- número do vale;
-- litragem;
-- valor;
-- preço por litro;
-- data;
-- caminhão;
-- fornecedor/cliente relacionado.
-
-Cada abastecimento poderá ser classificado como:
-
-- **Usar crédito:** reduz o saldo de valor e litros e entra como débito de óleo no fechamento;
-- **Fluxo normal:** não reduz o crédito e gera uma conta a pagar normal para o fornecedor;
-- **Pendente:** fica sem impacto financeiro até ser classificado.
-
-O crédito não será consumido automaticamente. A decisão será feita por abastecimento.
+Abastecimentos normais usam o próprio `fuel_record` como conta a pagar. A baixa
+registra a data de pagamento e não cria uma linha duplicada em `costs`.
 
 ### Fechamento
 
-O usuário escolherá:
+O fechamento seleciona cliente, fornecedor, período dos fretes, vencimento e
+abastecimentos de crédito ainda não usados em outro fechamento.
 
-- cliente;
-- período X dos fretes;
-- data de vencimento Y;
-- abastecimentos de crédito que compõem o débito de óleo.
+`frete bruto = soma das viagens do cliente no período`
 
-O fechamento somará todos os fretes/viagens do cliente no período, independentemente de a conta a receber já ter sido paga.
+`débito de óleo = soma dos abastecimentos de crédito selecionados`
 
-Fórmula principal:
+`valor líquido = frete bruto - débito de óleo`
 
-```text
-Valor líquido a receber = total dos fretes do período - óleo abastecido usando crédito
+O valor líquido não pode ser negativo. O fechamento cria uma conta consolidada
+em Contas a Receber e marca os recebíveis individuais das viagens como
+consolidados, evitando duplicidade. Fechamentos abertos podem ser editados; a
+edição recalcula valores, vencimento, itens e cobrança vinculada.
+
+## Banco de dados
+
+As migrações são idempotentes e preservam bancos existentes.
+
+### Alterações
+
+- `suppliers.customer_id`;
+- `fuel_records.voucher_number`;
+- `fuel_records.price_per_liter`;
+- `fuel_records.fuel_mode`;
+- `fuel_records.status`;
+- `fuel_records.paid_date`;
+- `receivables.settlement_id`;
+- `receivables.consolidated_into_id`.
+
+Registros antigos permanecem com os novos campos nulos: não recebem
+classificação automática, não alteram saldo e não entram automaticamente em
+fechamentos.
+
+### Novas tabelas
+
+- `oil_credit_accounts`: conta única por cliente/fornecedor e vencimento atual;
+- `oil_credit_movements`: movimentos `credit`, `consumption` e `adjustment`,
+  com valor, litros, preço, data e origem;
+- `oil_settlements`: fechamento, período, fretes, óleo, líquido, status e
+  recebível consolidado;
+- `oil_settlement_items`: vales, litros, preço e valor de cada abastecimento.
+
+## IPC e APIs
+
+O preload expõe:
+
+```ts
+oilCredits.listAccounts()
+oilCredits.getAccount(customerId, supplierId?)
+oilCredits.addCredit(data)
+oilCredits.adjust(data)
+oilCredits.createSettlement(data)
+oilCredits.updateSettlement(id, data)
+oilCredits.listSettlements(filters?)
+oilCredits.getSettlement(id)
+oilCredits.exportData(id)
 ```
 
-O relatório deverá apresentar:
+Também foi adicionada a baixa de abastecimento normal:
 
-- total dos fretes;
-- crédito disponível;
-- débito de óleo do fechamento;
-- saldo de crédito após o abatimento;
-- valor líquido a receber;
-- data de vencimento;
-- detalhes dos vales e litros utilizados.
+```ts
+fuel.markPaid({ id, paid_date })
+```
 
-O fechamento confirmado deverá ser salvo/congelado, para que alterações futuras em abastecimentos ou viagens não modifiquem um documento já entregue.
+## Interface
 
-## Fluxo operacional proposto
+Dentro da página `Custos`, a aba `Crédito de Óleo` oferece lista de contas, saldos em reais/litros,
+vencimento e alerta, seleção de cliente/fornecedor, crédito, ajuste, criação e
+edição de fechamento, resumo de fretes/óleo/líquido e exportação PDF com vales,
+litros, preço por litro e valores.
 
-1. Cadastrar a empresa em Clientes e Fornecedores.
-2. Vincular o fornecedor ao cliente correspondente.
-3. Informar ou atualizar o saldo de crédito em valor e litros.
-4. Registrar os abastecimentos com vale, litragem, valor e preço por litro.
-5. Classificar cada abastecimento como crédito, fluxo normal ou pendente.
-6. Gerar o fechamento escolhendo o período e o vencimento.
-7. Conferir o resumo e os abastecimentos detalhados.
-8. Confirmar e salvar o fechamento.
-9. Exportar o relatório para cobrança.
+O item independente da barra lateral foi removido. A rota antiga `/oil-credits`
+redireciona para `/costs`, mantendo compatibilidade com acessos salvos.
 
-## Tratamento do histórico
+O cadastro de fornecedores permite o vínculo com cliente. O formulário de
+abastecimento inclui vale, preço por litro e classificação normal/crédito.
+Abastecimentos normais aparecem no Contas a Pagar e podem ser baixados.
+Contas a Receber identifica a cobrança consolidada e oculta seus recebíveis
+individuais consolidados para evitar duplicidade.
 
-Abastecimentos anteriores à funcionalidade devem permanecer como histórico neutro por padrão: não alteram o saldo e não entram automaticamente em fechamentos novos.
+## Fluxo operacional
 
-Como possibilidade futura, poderá existir uma ação manual para importar/classificar abastecimentos antigos quando houver necessidade de regularização.
+1. Cadastre a empresa em Clientes.
+2. Cadastre o fornecedor e vincule-o ao cliente.
+3. Lance o crédito com duas medidas e vencimento.
+4. Registre abastecimentos com vale, medidas e classificação.
+5. Use a tela Crédito de Óleo para conferir saldo e fechar o período.
+6. Salve ou edite o fechamento e exporte o PDF da cobrança.
 
-## Impactos técnicos previstos
+## Compatibilidade e segurança
 
-- Migração SQLite para armazenar o vínculo cliente-fornecedor.
-- Estrutura própria para saldo/crédito de óleo.
-- Registro da classificação e dos dados de vale no abastecimento.
-- Registro dos fechamentos confirmados e seus itens.
-- Atualização dos schemas Zod, tipos TypeScript e API preload.
-- Novos handlers IPC para crédito, classificação e fechamento.
-- Ajustes nas telas de Fornecedores, Custos/Abastecimentos e Contas a Receber.
-- Novo relatório PDF de fechamento de cobrança.
-- Validações para impedir consumo acima do saldo de valor ou litros, com confirmação explícita para ajustes autorizados.
+- Migrações verificam colunas antes de executar `ALTER TABLE`.
+- O vale possui unicidade global para novos lançamentos.
+- Crédito vencido alerta, mas não bloqueia o consumo.
+- Saldo insuficiente, fornecedor sem vínculo e óleo acima dos fretes são
+  rejeitados.
+- Abastecimento já usado em fechamento não pode ser reutilizado ou excluído.
 
-## Pontos a validar antes da implementação
+## Verificação
 
-- Se o saldo vencido deve apenas gerar alerta ou bloquear o uso.
-- Se o fechamento pode ser reaberto/cancelado após confirmado.
-- Se o abastecimento em fluxo normal deve ser criado imediatamente no contas a pagar ou permanecer pendente até confirmação.
-- Se o número do vale deve ser único dentro do fornecedor.
-- Se a data de vencimento será uma data do fechamento ou também deverá atualizar contas a receber.
+Executados com sucesso:
 
+```text
+npm run type-check
+npm run build
+npm run lint
+```
+
+O projeto não possui uma suíte automatizada de testes configurada no
+`package.json`.

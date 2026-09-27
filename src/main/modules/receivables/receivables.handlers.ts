@@ -14,12 +14,16 @@ export function registerReceivablesHandlers(): void {
         t.is_third_party            as is_third_party,
         t.third_party_contractor_id as third_party_contractor_id,
         tpc.name                    as third_party_contractor_name,
-        c.name                      as customer_name
+        c.name                      as customer_name,
+        CASE WHEN r.settlement_id IS NOT NULL THEN 1 ELSE 0 END as is_oil_settlement,
+        os.start_date               as oil_start_date,
+        os.end_date                 as oil_end_date
       FROM receivables r
       LEFT JOIN trips t ON r.trip_id = t.id
       LEFT JOIN contractors tpc ON t.third_party_contractor_id = tpc.id
       LEFT JOIN customers c ON r.customer_id = c.id
-      WHERE 1=1
+      LEFT JOIN oil_settlements os ON r.settlement_id = os.id
+      WHERE r.consolidated_into_id IS NULL
     `
     const params: any[] = []
     if (filters.customer_id) {

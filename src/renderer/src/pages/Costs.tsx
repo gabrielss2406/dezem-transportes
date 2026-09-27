@@ -38,6 +38,7 @@ import {
   monthRangeFromKey,
   today,
 } from '../lib/utils'
+import { OilCreditsPage } from './OilCredits'
 
 interface CostFormData {
   date: string
@@ -58,6 +59,9 @@ interface FuelFormData {
   value: number
   odometer_at_service: number
   supplier_id: number | null
+  voucher_number: string
+  price_per_liter: number | null
+  fuel_mode: 'credit' | 'normal'
   notes?: string
 }
 
@@ -80,6 +84,9 @@ const EMPTY_FUEL: FuelFormData = {
   value: 0,
   odometer_at_service: 0,
   supplier_id: null,
+  voucher_number: '',
+  price_per_liter: null,
+  fuel_mode: 'normal',
   notes: '',
 }
 
@@ -93,7 +100,9 @@ const categoryBadge: Record<string, string> = {
 }
 
 export function CostsPage() {
-  const [activeTab, setActiveTab] = useState<'costs' | 'fuel' | 'commissions' | 'creditor'>('costs')
+  const [activeTab, setActiveTab] = useState<'costs' | 'fuel' | 'oil' | 'commissions' | 'creditor'>(
+    'costs',
+  )
 
   // ── Commissions state ──
   const [commissionData, setCommissionData] = useState<CommissionByDriver[]>([])
@@ -385,10 +394,13 @@ export function CostsPage() {
     if (!markPaidTarget) {
       return
     }
-    const result = await window.api.costs.markPaid({
-      ids: [markPaidTarget.id],
-      paid_date: markPaidDate,
-    })
+    const result =
+      markPaidTarget.source === 'fuel_record'
+        ? await window.api.fuel.markPaid({
+            id: Math.abs(markPaidTarget.id),
+            paid_date: markPaidDate,
+          })
+        : await window.api.costs.markPaid({ ids: [markPaidTarget.id], paid_date: markPaidDate })
     if (result?.ok === false) {
       show('Erro ao dar baixa', 'error')
       return
@@ -682,9 +694,13 @@ export function CostsPage() {
         pretitle="Gestão Financeira"
         title="Custos da Frota"
         subtitle="Gerencie despesas operacionais e histórico de abastecimentos."
-        secondaryActionLabel="Exportar PDF"
+        secondaryActionLabel={activeTab === 'oil' ? undefined : 'Exportar PDF'}
         onSecondaryAction={
-          activeTab === 'creditor' ? handleExportCreditorPdf : handleExportCostsPdf
+          activeTab === 'oil'
+            ? undefined
+            : activeTab === 'creditor'
+              ? handleExportCreditorPdf
+              : handleExportCostsPdf
         }
       />
 
@@ -725,6 +741,18 @@ export function CostsPage() {
         >
           <span className="material-symbols-outlined text-lg">payments</span>
           Comissões
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('oil')}
+          className={`flex items-center gap-2 px-5 py-3 text-sm font-bold transition-all border-b-2 -mb-px ${
+            activeTab === 'oil'
+              ? 'border-primary text-primary'
+              : 'border-transparent text-on-surface-variant hover:text-on-surface'
+          }`}
+        >
+          <span className="material-symbols-outlined text-lg">oil_barrel</span>
+          Crédito de Óleo
         </button>
         <button
           type="button"
@@ -958,20 +986,24 @@ export function CostsPage() {
                               <span className="material-symbols-outlined text-xl">paid</span>
                             </button>
                           )}
-                          <button
-                            type="button"
-                            onClick={() => openEditCost(row)}
-                            className="p-2 text-on-surface-variant hover:text-primary hover:bg-primary/10 rounded-lg transition-all"
-                          >
-                            <span className="material-symbols-outlined text-xl">edit</span>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setDeleteCostTarget(row)}
-                            className="p-2 text-on-surface-variant hover:text-error hover:bg-error/10 rounded-lg transition-all"
-                          >
-                            <span className="material-symbols-outlined text-xl">delete</span>
-                          </button>
+                          {row.source !== 'fuel_record' && (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => openEditCost(row)}
+                                className="p-2 text-on-surface-variant hover:text-primary hover:bg-primary/10 rounded-lg transition-all"
+                              >
+                                <span className="material-symbols-outlined text-xl">edit</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setDeleteCostTarget(row)}
+                                className="p-2 text-on-surface-variant hover:text-error hover:bg-error/10 rounded-lg transition-all"
+                              >
+                                <span className="material-symbols-outlined text-xl">delete</span>
+                              </button>
+                            </>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -1100,6 +1132,8 @@ export function CostsPage() {
           </div>
         </div>
       )}
+
+      {activeTab === 'oil' && <OilCreditsPage embedded />}
 
       {/* ── COMMISSIONS TAB ── */}
       {activeTab === 'commissions' && (
@@ -1938,6 +1972,49 @@ export function CostsPage() {
                 )}
               />
             </div>
+            <Controller
+              name="voucher_number"
+              control={fuelControl}
+              render={({ field }) => (
+                <Input
+                  label="Número do vale"
+                  value={field.value}
+                  onChange={field.onChange}
+                  error={fuelErrors.voucher_number?.message}
+                />
+              )}
+            />
+            <Controller
+              name="price_per_liter"
+              control={fuelControl}
+              render={({ field }) => (
+                <Input
+                  label="Preço por litro"
+                  optional
+                  type="number"
+                  step="0.001"
+                  value={field.value ?? ''}
+                  onChange={field.onChange}
+                  error={fuelErrors.price_per_liter?.message}
+                />
+              )}
+            />
+            <Controller
+              name="fuel_mode"
+              control={fuelControl}
+              render={({ field }) => (
+                <Select
+                  label="Classificação"
+                  value={field.value}
+                  onChange={field.onChange}
+                  error={fuelErrors.fuel_mode?.message}
+                  options={[
+                    { value: 'normal', label: 'Normal — Contas a Pagar' },
+                    { value: 'credit', label: 'Usar crédito de óleo' },
+                  ]}
+                />
+              )}
+            />
             <div className="col-span-2">
               <Controller
                 name="notes"

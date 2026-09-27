@@ -62,6 +62,7 @@ export function setupDatabase(): void {
       name       TEXT NOT NULL,
       type       TEXT NOT NULL,
       phone      TEXT,
+      customer_id INTEGER REFERENCES customers(id) ON DELETE SET NULL,
       created_at TEXT DEFAULT (datetime('now'))
     );
 
@@ -129,6 +130,8 @@ export function setupDatabase(): void {
       due_date     TEXT DEFAULT NULL,
       paid_date    TEXT DEFAULT NULL,
       description  TEXT DEFAULT NULL,
+      settlement_id INTEGER REFERENCES oil_settlements(id) ON DELETE SET NULL,
+      consolidated_into_id INTEGER REFERENCES receivables(id) ON DELETE SET NULL,
       created_at   TEXT DEFAULT (datetime('now'))
     );
 
@@ -190,7 +193,63 @@ export function setupDatabase(): void {
       odometer_at_service REAL NOT NULL,
       supplier_id         INTEGER REFERENCES suppliers(id),
       notes               TEXT,
+      voucher_number      TEXT,
+      price_per_liter     REAL,
+      fuel_mode           TEXT,
+      status              TEXT,
+      paid_date           TEXT,
       created_at          TEXT DEFAULT (datetime('now'))
+    );
+
+    -- Oil credit ledger. Each customer/supplier pair has one account; movements
+    -- are the source of truth for both the monetary and litre balances.
+    CREATE TABLE IF NOT EXISTS oil_credit_accounts (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      customer_id INTEGER NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+      supplier_id INTEGER NOT NULL REFERENCES suppliers(id) ON DELETE CASCADE,
+      due_date TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now')),
+      UNIQUE(customer_id, supplier_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS oil_credit_movements (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      account_id INTEGER NOT NULL REFERENCES oil_credit_accounts(id) ON DELETE CASCADE,
+      movement_type TEXT NOT NULL CHECK (movement_type IN ('credit','consumption','adjustment')),
+      amount REAL NOT NULL DEFAULT 0,
+      liters REAL NOT NULL DEFAULT 0,
+      price_per_liter REAL,
+      movement_date TEXT NOT NULL,
+      fuel_record_id INTEGER UNIQUE REFERENCES fuel_records(id) ON DELETE SET NULL,
+      description TEXT,
+      created_at TEXT DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS oil_settlements (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      customer_id INTEGER NOT NULL REFERENCES customers(id),
+      supplier_id INTEGER NOT NULL REFERENCES suppliers(id),
+      start_date TEXT NOT NULL,
+      end_date TEXT NOT NULL,
+      due_date TEXT NOT NULL,
+      gross_freight REAL NOT NULL DEFAULT 0,
+      oil_debit REAL NOT NULL DEFAULT 0,
+      net_amount REAL NOT NULL DEFAULT 0,
+      status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open','paid','cancelled')),
+      receivable_id INTEGER UNIQUE REFERENCES receivables(id) ON DELETE SET NULL,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS oil_settlement_items (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      settlement_id INTEGER NOT NULL REFERENCES oil_settlements(id) ON DELETE CASCADE,
+      fuel_record_id INTEGER NOT NULL UNIQUE REFERENCES fuel_records(id),
+      voucher_number TEXT,
+      liters REAL NOT NULL DEFAULT 0,
+      price_per_liter REAL,
+      amount REAL NOT NULL DEFAULT 0
     );
 
     -- Customer Prices
@@ -262,6 +321,11 @@ export function setupDatabase(): void {
     CREATE INDEX IF NOT EXISTS idx_maintenance_records_type  ON maintenance_records(maintenance_type_id);
     CREATE INDEX IF NOT EXISTS idx_fuel_records_truck ON fuel_records(truck_id);
     CREATE INDEX IF NOT EXISTS idx_fuel_records_date  ON fuel_records(date);
+    CREATE INDEX IF NOT EXISTS idx_fuel_records_supplier ON fuel_records(supplier_id);
+    CREATE INDEX IF NOT EXISTS idx_oil_movements_account ON oil_credit_movements(account_id);
+    CREATE INDEX IF NOT EXISTS idx_oil_movements_date ON oil_credit_movements(movement_date);
+    CREATE INDEX IF NOT EXISTS idx_oil_settlements_customer ON oil_settlements(customer_id);
+    CREATE INDEX IF NOT EXISTS idx_oil_settlement_items_settlement ON oil_settlement_items(settlement_id);
     CREATE INDEX IF NOT EXISTS idx_receivables_customer ON receivables(customer_id);
     CREATE INDEX IF NOT EXISTS idx_receivables_status ON receivables(status);
     CREATE INDEX IF NOT EXISTS idx_third_party_settlements_status ON third_party_settlements(status);
@@ -488,6 +552,102 @@ export function setupDatabase(): void {
   if (!receivableInfoPostMigration.some((col) => col.name === 'kind')) {
     db.exec(
       `ALTER TABLE receivables ADD COLUMN kind TEXT NOT NULL DEFAULT 'revenue' CHECK (kind IN ('revenue','adjustment'))`,
+    )
+  }
+
+  // Oil credit migrations. These are deliberately additive so existing databases
+  // keep their historical fuel rows unchanged and without a classification.
+  const supplierInfoPostMigration = db.pragma('table_info(suppliers)') as { name: string }[]
+  if (!supplierInfoPostMigration.some((col) => col.name === 'customer_id')) {
+    db.exec(
+      'ALTER TABLE suppliers ADD COLUMN customer_id INTEGER REFERENCES customers(id) ON DELETE SET NULL',
+    )
+  }
+
+  const fuelInfoPostMigration = db.pragma('table_info(fuel_records)') as { name: string }[]
+  if (!fuelInfoPostMigration.some((col) => col.name === 'voucher_number')) {
+    db.exec('ALTER TABLE fuel_records ADD COLUMN voucher_number TEXT')
+  }
+  if (!fuelInfoPostMigration.some((col) => col.name === 'price_per_liter')) {
+    db.exec('ALTER TABLE fuel_records ADD COLUMN price_per_liter REAL')
+  }
+  if (!fuelInfoPostMigration.some((col) => col.name === 'fuel_mode')) {
+    db.exec('ALTER TABLE fuel_records ADD COLUMN fuel_mode TEXT')
+  }
+  if (!fuelInfoPostMigration.some((col) => col.name === 'status')) {
+    db.exec('ALTER TABLE fuel_records ADD COLUMN status TEXT')
+  }
+  if (!fuelInfoPostMigration.some((col) => col.name === 'paid_date')) {
+    db.exec('ALTER TABLE fuel_records ADD COLUMN paid_date TEXT')
+  }
+  db.exec('CREATE INDEX IF NOT EXISTS idx_suppliers_customer ON suppliers(customer_id)')
+  try {
+    db.exec(
+      "CREATE UNIQUE INDEX IF NOT EXISTS idx_fuel_records_voucher ON fuel_records(voucher_number) WHERE voucher_number IS NOT NULL AND voucher_number <> ''",
+    )
+  } catch (error) {
+    // Pre-existing duplicate/blank vouchers must not prevent the application from
+    // opening; the handler still enforces uniqueness for every new record.
+    console.error('Could not create unique fuel voucher index:', error)
+  }
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS oil_credit_accounts (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      customer_id INTEGER NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+      supplier_id INTEGER NOT NULL REFERENCES suppliers(id) ON DELETE CASCADE,
+      due_date TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now')),
+      UNIQUE(customer_id, supplier_id)
+    );
+    CREATE TABLE IF NOT EXISTS oil_credit_movements (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      account_id INTEGER NOT NULL REFERENCES oil_credit_accounts(id) ON DELETE CASCADE,
+      movement_type TEXT NOT NULL CHECK (movement_type IN ('credit','consumption','adjustment')),
+      amount REAL NOT NULL DEFAULT 0,
+      liters REAL NOT NULL DEFAULT 0,
+      price_per_liter REAL,
+      movement_date TEXT NOT NULL,
+      fuel_record_id INTEGER UNIQUE REFERENCES fuel_records(id) ON DELETE SET NULL,
+      description TEXT,
+      created_at TEXT DEFAULT (datetime('now'))
+    );
+    CREATE TABLE IF NOT EXISTS oil_settlements (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      customer_id INTEGER NOT NULL REFERENCES customers(id),
+      supplier_id INTEGER NOT NULL REFERENCES suppliers(id),
+      start_date TEXT NOT NULL,
+      end_date TEXT NOT NULL,
+      due_date TEXT NOT NULL,
+      gross_freight REAL NOT NULL DEFAULT 0,
+      oil_debit REAL NOT NULL DEFAULT 0,
+      net_amount REAL NOT NULL DEFAULT 0,
+      status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open','paid','cancelled')),
+      receivable_id INTEGER UNIQUE REFERENCES receivables(id) ON DELETE SET NULL,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now'))
+    );
+    CREATE TABLE IF NOT EXISTS oil_settlement_items (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      settlement_id INTEGER NOT NULL REFERENCES oil_settlements(id) ON DELETE CASCADE,
+      fuel_record_id INTEGER NOT NULL UNIQUE REFERENCES fuel_records(id),
+      voucher_number TEXT,
+      liters REAL NOT NULL DEFAULT 0,
+      price_per_liter REAL,
+      amount REAL NOT NULL DEFAULT 0
+    );
+    CREATE INDEX IF NOT EXISTS idx_oil_movements_account ON oil_credit_movements(account_id);
+    CREATE INDEX IF NOT EXISTS idx_oil_settlements_customer ON oil_settlements(customer_id);
+    CREATE INDEX IF NOT EXISTS idx_oil_settlement_items_settlement ON oil_settlement_items(settlement_id);
+  `)
+  if (!receivableInfoPostMigration.some((col) => col.name === 'settlement_id')) {
+    db.exec(
+      'ALTER TABLE receivables ADD COLUMN settlement_id INTEGER REFERENCES oil_settlements(id) ON DELETE SET NULL',
+    )
+  }
+  if (!receivableInfoPostMigration.some((col) => col.name === 'consolidated_into_id')) {
+    db.exec(
+      'ALTER TABLE receivables ADD COLUMN consolidated_into_id INTEGER REFERENCES receivables(id) ON DELETE SET NULL',
     )
   }
 

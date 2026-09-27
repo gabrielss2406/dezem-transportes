@@ -29,6 +29,8 @@ export interface Supplier {
   name: string
   type: 'gas_station' | 'workshop' | 'quarry' | 'other'
   phone?: string
+  customer_id?: number | null
+  customer_name?: string
 }
 
 export interface Contractor {
@@ -90,6 +92,11 @@ export interface FuelRecord {
   truck_license_plate?: string
   truck_model?: string
   supplier_name?: string
+  voucher_number?: string | null
+  price_per_liter?: number | null
+  fuel_mode?: 'credit' | 'normal' | null
+  status?: 'open' | 'paid' | null
+  paid_date?: string | null
 }
 
 export interface Trip {
@@ -189,6 +196,9 @@ export interface Cost {
   kind: 'operational' | 'expense'
   status: 'open' | 'paid'
   paid_date?: string | null
+  source?: 'cost' | 'fuel_record'
+  liters?: number | null
+  voucher_number?: string | null
   // joins
   truck_license_plate?: string
   supplier_name?: string

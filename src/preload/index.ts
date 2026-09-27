@@ -127,6 +127,22 @@ contextBridge.exposeInMainWorld('api', {
     list: (filters?: any) => ipcRenderer.invoke('fuel:list', filters),
     create: (data: any) => ipcRenderer.invoke('fuel:create', data),
     delete: (id: number) => ipcRenderer.invoke('fuel:delete', id),
+    markPaid: (data: any) => ipcRenderer.invoke('fuel:markPaid', data),
+  },
+
+  // Oil credit and billing settlements
+  oilCredits: {
+    listAccounts: () => ipcRenderer.invoke('oilCredits:listAccounts'),
+    getAccount: (customerId: number, supplierId?: number) =>
+      ipcRenderer.invoke('oilCredits:getAccount', customerId, supplierId),
+    addCredit: (data: any) => ipcRenderer.invoke('oilCredits:addCredit', data),
+    adjust: (data: any) => ipcRenderer.invoke('oilCredits:adjust', data),
+    createSettlement: (data: any) => ipcRenderer.invoke('oilCredits:createSettlement', data),
+    updateSettlement: (id: number, data: any) =>
+      ipcRenderer.invoke('oilCredits:updateSettlement', id, data),
+    listSettlements: (filters?: any) => ipcRenderer.invoke('oilCredits:listSettlements', filters),
+    getSettlement: (id: number) => ipcRenderer.invoke('oilCredits:getSettlement', id),
+    exportData: (id: number) => ipcRenderer.invoke('oilCredits:exportData', id),
   },
 
   // Dashboard

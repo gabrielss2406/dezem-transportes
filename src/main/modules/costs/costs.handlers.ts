@@ -62,9 +62,50 @@ export function registerCostHandlers(): void {
       params.push(filters.status)
     }
     query += ' ORDER BY co.date DESC'
-    return db()
+    const costRows = db()
       .prepare(query)
       .all(...params)
+    let fuelQuery = `
+      SELECT -fr.id as id, 'fuel_record' as source, fr.date, 'fuel' as category,
+        fr.value, ('Abastecimento — Vale ' || COALESCE(fr.voucher_number, '')) as description,
+        fr.truck_id, fr.supplier_id, fr.status, fr.paid_date,
+        t.license_plate as truck_license_plate, s.name as supplier_name,
+        fr.liters, fr.voucher_number
+      FROM fuel_records fr
+      JOIN suppliers s ON s.id = fr.supplier_id
+      LEFT JOIN trucks t ON t.id = fr.truck_id
+      WHERE fr.fuel_mode = 'normal'
+    `
+    const fuelParams: any[] = []
+    if (filters.category && filters.category !== 'fuel') {
+      fuelQuery += ' AND 1 = 0'
+    }
+    if (filters.startDate) {
+      fuelQuery += ' AND fr.date >= ?'
+      fuelParams.push(filters.startDate)
+    }
+    if (filters.endDate) {
+      fuelQuery += ' AND fr.date <= ?'
+      fuelParams.push(filters.endDate)
+    }
+    if (filters.truck_id) {
+      fuelQuery += ' AND fr.truck_id = ?'
+      fuelParams.push(filters.truck_id)
+    }
+    if (filters.supplier_id) {
+      fuelQuery += ' AND fr.supplier_id = ?'
+      fuelParams.push(filters.supplier_id)
+    }
+    if (filters.status) {
+      fuelQuery += ' AND fr.status = ?'
+      fuelParams.push(filters.status)
+    }
+    const fuelRows = db()
+      .prepare(fuelQuery)
+      .all(...fuelParams)
+    return [...(costRows as any[]), ...(fuelRows as any[])].sort((a, b) =>
+      String(b.date).localeCompare(String(a.date)),
+    )
   })
 
   createValidatedHandler('costs:create', costSchema, (data) => {
@@ -181,7 +222,8 @@ export function registerCostHandlers(): void {
     let costsPart = `
       SELECT co.id as id, 'cost' as source, co.date as date, co.category as category,
         co.value as value, co.description as description,
-        co.supplier_id as supplier_id, s.name as supplier_name
+        co.supplier_id as supplier_id, s.name as supplier_name,
+        NULL as liters, NULL as voucher_number
       FROM costs co
       JOIN suppliers s ON co.supplier_id = s.id
       WHERE 1=1
@@ -201,12 +243,13 @@ export function registerCostHandlers(): void {
 
     let fuelRecordsPart = `
       SELECT fr.id as id, 'fuel_record' as source, fr.date as date, 'fuel' as category,
-        fr.value as value, ('Abastecimento — ' || t.license_plate) as description,
-        fr.supplier_id as supplier_id, s.name as supplier_name
+        fr.value as value, ('Abastecimento — Vale ' || COALESCE(fr.voucher_number, '') || ' — ' || t.license_plate) as description,
+        fr.supplier_id as supplier_id, s.name as supplier_name,
+        fr.liters as liters, fr.voucher_number as voucher_number
       FROM fuel_records fr
       JOIN trucks t ON fr.truck_id = t.id
       JOIN suppliers s ON fr.supplier_id = s.id
-      WHERE 1=1
+      WHERE fr.fuel_mode = 'normal'
     `
     if (filters.startDate) {
       fuelRecordsPart += ' AND fr.date >= ?'
@@ -224,7 +267,8 @@ export function registerCostHandlers(): void {
     let tripFuelStopsPart = `
       SELECT fs.id as id, 'trip_fuel_stop' as source, tr.date as date, 'fuel' as category,
         fs.value as value, ('Abastecimento em viagem — ' || tr.ticket_number) as description,
-        fs.supplier_id as supplier_id, s.name as supplier_name
+        fs.supplier_id as supplier_id, s.name as supplier_name,
+        fs.liters as liters, NULL as voucher_number
       FROM trip_fuel_stops fs
       JOIN trips tr ON fs.trip_id = tr.id
       JOIN suppliers s ON fs.supplier_id = s.id

@@ -18,6 +18,7 @@ import { registerDashboardHandlers } from './modules/dashboard/dashboard.handler
 import { registerDriverHandlers } from './modules/drivers/drivers.handlers'
 import { registerFuelHandlers } from './modules/fuel/fuel.handlers'
 import { registerMaintenanceHandlers } from './modules/maintenance/maintenance.handlers'
+import { registerOilCreditHandlers } from './modules/oil-credits/oil-credits.handlers'
 import { registerProductHandlers } from './modules/products/products.handlers'
 import { registerReceivablesHandlers } from './modules/receivables/receivables.handlers'
 import { registerSettingsHandlers } from './modules/settings/settings.handlers'
@@ -65,6 +66,7 @@ app.whenReady().then(async () => {
   registerSupplierTypesHandlers()
   registerFuelHandlers()
   registerMaintenanceHandlers()
+  registerOilCreditHandlers()
   registerThirdPartySettlementsHandlers()
   registerTripHandlers()
   registerTruckHandlers()

@@ -11,6 +11,7 @@ interface SupplierFormData {
   type?: string
   phone?: string
   customId?: number
+  customer_id?: number | null
 }
 
 const EMPTY_VALUES: SupplierFormData = {
@@ -18,6 +19,7 @@ const EMPTY_VALUES: SupplierFormData = {
   type: 'gas_station',
   phone: '',
   customId: undefined,
+  customer_id: null,
 }
 
 const typeIcon: Record<string, string> = {
@@ -63,6 +65,7 @@ function ConfirmModal({
 export function SuppliersPage() {
   const [rows, setRows] = useState<Supplier[]>([])
   const [supplierTypes, setSupplierTypes] = useState<{ value: string; label: string }[]>([])
+  const [customers, setCustomers] = useState<{ id: number; name: string }[]>([])
   const [modal, setModal] = useState(false)
   const [editing, setEditing] = useState<Supplier | null>(null)
   const [filters, setFilters] = useState({ name: '', type: '' })
@@ -99,12 +102,14 @@ export function SuppliersPage() {
       : '(00) 0000-0000'
 
   const load = useCallback(async () => {
-    const [s, st] = await Promise.all([
+    const [s, st, c] = await Promise.all([
       window.api.suppliers.list(appliedFilters as any),
       window.api['supplier-types'].list(),
+      window.api.customers.list(),
     ])
     setRows(s)
     setSupplierTypes(st)
+    setCustomers(c)
   }, [appliedFilters])
 
   useEffect(() => {
@@ -207,6 +212,7 @@ export function SuppliersPage() {
       type: row.type,
       phone: row.phone ?? '',
       customId: row.customId ?? undefined,
+      customer_id: row.customer_id ?? null,
     })
     setModal(true)
   }
@@ -423,6 +429,23 @@ export function SuppliersPage() {
                   onChange={field.onChange}
                   error={errors.name?.message}
                   onKeyDown={(e) => e.key === 'Enter' && typeSelectRef.current?.open()}
+                />
+              )}
+            />
+            <Controller
+              name="customer_id"
+              control={control}
+              render={({ field }) => (
+                <Select
+                  label="Cliente vinculado (crédito de óleo)"
+                  optional
+                  value={field.value ?? ''}
+                  onChange={field.onChange}
+                  error={errors.customer_id?.message}
+                  options={customers.map((customer) => ({
+                    value: customer.id,
+                    label: customer.name,
+                  }))}
                 />
               )}
             />
