@@ -2,7 +2,7 @@ import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { PageHeader } from '../components/PageHeader'
-import { Button, DatePicker, Input, Select, Toast, useToast } from '../components/ui'
+import { Button, DatePicker, Input, Modal, Select, Toast, useToast } from '../components/ui'
 
 type Account = {
   id: number
@@ -45,6 +45,9 @@ export function OilCreditsPage({ embedded = false }: { embedded?: boolean }) {
   const [suppliers, setSuppliers] = useState<any[]>([])
   const [settlements, setSettlements] = useState<any[]>([])
   const [editingSettlement, setEditingSettlement] = useState<number | null>(null)
+  const [creditModal, setCreditModal] = useState(false)
+  const [adjustmentMode, setAdjustmentMode] = useState(false)
+  const [settlementModal, setSettlementModal] = useState(false)
   const [selected, setSelected] = useState<Account | null>(null)
   const [form, setForm] = useState<FormState>(emptyForm())
   const [settlementForm, setSettlementForm] = useState({
@@ -101,6 +104,8 @@ export function OilCreditsPage({ embedded = false }: { embedded?: boolean }) {
     }
     show(adjust ? 'Ajuste lançado.' : 'Crédito lançado.')
     setForm(emptyForm())
+    setCreditModal(false)
+    setAdjustmentMode(false)
     await load()
   }
   const createSettlement = async () => {
@@ -129,6 +134,7 @@ export function OilCreditsPage({ embedded = false }: { embedded?: boolean }) {
         : 'Fechamento salvo e cobrança consolidada criada.',
     )
     setEditingSettlement(null)
+    setSettlementModal(false)
     await load()
   }
   const editSettlement = async (id: number) => {
@@ -149,6 +155,20 @@ export function OilCreditsPage({ embedded = false }: { embedded?: boolean }) {
       due_date: data.due_date,
     })
     setEditingSettlement(id)
+    setSettlementModal(true)
+  }
+  const openCreditModal = (adjust = false) => {
+    if (selected) {
+      setForm((current) => ({
+        ...current,
+        customer_id: String(selected.customer_id),
+        supplier_id: String(selected.supplier_id),
+      }))
+    } else {
+      setForm(emptyForm())
+    }
+    setAdjustmentMode(adjust)
+    setCreditModal(true)
   }
   const exportSettlement = async (id: number) => {
     const data = await window.api.oilCredits.exportData(id)
@@ -250,85 +270,130 @@ export function OilCreditsPage({ embedded = false }: { embedded?: boolean }) {
           </div>
         </section>
         <section className="bg-surface-container rounded-xl p-6 border border-outline-variant/10">
-          <h2 className="text-lg font-bold mb-5">Lançar crédito / ajuste</h2>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="col-span-2">
-              <Select
-                label="Cliente"
-                value={form.customer_id}
-                onChange={(value) => {
-                  update('customer_id', String(value || ''))
-                  update('supplier_id', '')
-                }}
-                options={customers.map((customer) => ({
-                  value: customer.id,
-                  label: customer.name,
-                }))}
-              />
+          <h2 className="text-lg font-bold mb-2">Operações</h2>
+          {selected ? (
+            <>
+              <p className="font-bold text-on-surface">{selected.customer_name}</p>
+              <p className="text-sm text-on-surface-variant">{selected.supplier_name}</p>
+              <div className="grid grid-cols-2 gap-3 mt-5">
+                <div className="bg-surface-container-high rounded-lg p-3">
+                  <p className="text-xs text-on-surface-variant">Saldo em reais</p>
+                  <p className="text-xl font-black text-primary">{brl(selected.amount)}</p>
+                </div>
+                <div className="bg-surface-container-high rounded-lg p-3">
+                  <p className="text-xs text-on-surface-variant">Saldo em litros</p>
+                  <p className="text-xl font-black text-primary">
+                    {Number(selected.liters).toFixed(2)} L
+                  </p>
+                </div>
+              </div>
+              <div className="flex flex-col gap-2 mt-5">
+                <Button onClick={() => openCreditModal(false)}>Adicionar crédito</Button>
+                <Button variant="ghost" onClick={() => openCreditModal(true)}>
+                  Ajustar saldo
+                </Button>
+                <Button variant="ghost" onClick={() => setSettlementModal(true)}>
+                  Novo fechamento
+                </Button>
+              </div>
+            </>
+          ) : (
+            <div className="py-6">
+              <p className="text-sm text-on-surface-variant mb-4">
+                Selecione uma conta existente ou crie um novo crédito.
+              </p>
+              <Button onClick={() => openCreditModal(false)}>Novo crédito</Button>
             </div>
-            <div className="col-span-2">
-              <Select
-                label="Fornecedor vinculado"
-                value={form.supplier_id}
-                onChange={(value) => update('supplier_id', String(value || ''))}
-                options={linkedSuppliers.map((supplier) => ({
-                  value: supplier.id,
-                  label: supplier.name,
-                }))}
-              />
-            </div>
-            <Input
-              label="Valor"
-              type="number"
-              step="0.01"
-              value={form.amount}
-              onChange={(e) => update('amount', e.target.value)}
-            />
-            <Input
-              label="Litros"
-              type="number"
-              step="0.01"
-              value={form.liters}
-              onChange={(e) => update('liters', e.target.value)}
-            />
-            <div className="col-span-2">
-              <Input
-                label="Preço por litro"
-                optional
-                type="number"
-                step="0.001"
-                value={form.price_per_liter}
-                onChange={(e) => update('price_per_liter', e.target.value)}
-              />
-            </div>
-            <DatePicker
-              label="Data"
-              value={form.movement_date}
-              onChange={(e) => update('movement_date', e.target.value)}
-            />
-            <DatePicker
-              label="Vencimento"
-              value={form.due_date}
-              onChange={(e) => update('due_date', e.target.value)}
-            />
-            <div className="col-span-2">
-              <Input
-                label="Descrição"
-                optional
-                value={form.description}
-                onChange={(e) => update('description', e.target.value)}
-              />
-            </div>
-          </div>
-          <div className="flex gap-2 mt-5">
-            <Button disabled={busy} onClick={() => saveCredit(false)}>
-              Adicionar crédito
-            </Button>
-            <Button disabled={busy} variant="ghost" onClick={() => saveCredit(true)}>
-              Ajustar saldo
-            </Button>
-          </div>
+          )}
         </section>
+        {creditModal && (
+          <Modal
+            title={adjustmentMode ? 'Ajustar saldo' : 'Adicionar crédito'}
+            onClose={() => setCreditModal(false)}
+          >
+            <section className="bg-surface-container rounded-xl p-6 border border-outline-variant/10">
+              <h2 className="text-lg font-bold mb-5">Lançar crédito / ajuste</h2>
+              {!selected && (
+                <div className="grid grid-cols-2 gap-3 mb-4">
+                  <div className="col-span-2">
+                    <Select
+                      label="Cliente"
+                      value={form.customer_id}
+                      onChange={(value) => {
+                        update('customer_id', String(value || ''))
+                        update('supplier_id', '')
+                      }}
+                      options={customers.map((customer) => ({
+                        value: customer.id,
+                        label: customer.name,
+                      }))}
+                    />
+                  </div>
+                  <div className="col-span-2">
+                    <Select
+                      label="Fornecedor vinculado"
+                      value={form.supplier_id}
+                      onChange={(value) => update('supplier_id', String(value || ''))}
+                      options={linkedSuppliers.map((supplier) => ({
+                        value: supplier.id,
+                        label: supplier.name,
+                      }))}
+                    />
+                  </div>
+                </div>
+              )}
+              <div className="grid grid-cols-2 gap-3">
+                <Input
+                  label="Valor"
+                  type="number"
+                  step="0.01"
+                  value={form.amount}
+                  onChange={(e) => update('amount', e.target.value)}
+                />
+                <Input
+                  label="Litros"
+                  type="number"
+                  step="0.01"
+                  value={form.liters}
+                  onChange={(e) => update('liters', e.target.value)}
+                />
+                <div className="col-span-2">
+                  <Input
+                    label="Preço por litro"
+                    optional
+                    type="number"
+                    step="0.001"
+                    value={form.price_per_liter}
+                    onChange={(e) => update('price_per_liter', e.target.value)}
+                  />
+                </div>
+                <DatePicker
+                  label="Data"
+                  value={form.movement_date}
+                  onChange={(e) => update('movement_date', e.target.value)}
+                />
+                <DatePicker
+                  label="Vencimento"
+                  value={form.due_date}
+                  onChange={(e) => update('due_date', e.target.value)}
+                />
+                <div className="col-span-2">
+                  <Input
+                    label="Descrição"
+                    optional
+                    value={form.description}
+                    onChange={(e) => update('description', e.target.value)}
+                  />
+                </div>
+              </div>
+              <div className="flex gap-2 mt-5">
+                <Button disabled={busy} onClick={() => saveCredit(adjustmentMode)}>
+                  {adjustmentMode ? 'Salvar ajuste' : 'Adicionar crédito'}
+                </Button>
+              </div>
+            </section>
+          </Modal>
+        )}
       </div>
       <section className="mt-6 bg-surface-container rounded-xl p-6 border border-outline-variant/10">
         <div className="flex flex-wrap items-end justify-between gap-4">
@@ -338,26 +403,9 @@ export function OilCreditsPage({ embedded = false }: { embedded?: boolean }) {
               Seleciona todos os abastecimentos de crédito ainda não fechados no período.
             </p>
           </div>
-          <div className="flex gap-2 items-end">
-            <DatePicker
-              label="Início"
-              value={settlementForm.start_date}
-              onChange={(e) => setSettlementForm({ ...settlementForm, start_date: e.target.value })}
-            />
-            <DatePicker
-              label="Fim"
-              value={settlementForm.end_date}
-              onChange={(e) => setSettlementForm({ ...settlementForm, end_date: e.target.value })}
-            />
-            <DatePicker
-              label="Vencimento"
-              value={settlementForm.due_date}
-              onChange={(e) => setSettlementForm({ ...settlementForm, due_date: e.target.value })}
-            />
-            <Button disabled={busy} onClick={createSettlement}>
-              {editingSettlement ? 'Atualizar fechamento' : 'Salvar fechamento'}
-            </Button>
-          </div>
+          <Button disabled={busy || !selected} onClick={() => setSettlementModal(true)}>
+            Novo fechamento
+          </Button>
         </div>
         <div className="mt-5 overflow-x-auto">
           <table className="w-full text-left">
@@ -408,6 +456,44 @@ export function OilCreditsPage({ embedded = false }: { embedded?: boolean }) {
           </table>
         </div>
       </section>
+      {settlementModal && (
+        <Modal
+          title={editingSettlement ? 'Editar fechamento' : 'Novo fechamento'}
+          onClose={() => {
+            setSettlementModal(false)
+            setEditingSettlement(null)
+          }}
+        >
+          <p className="text-sm text-on-surface-variant mb-5">
+            Serão incluídos os abastecimentos de crédito ainda não fechados no período.
+          </p>
+          <div className="grid grid-cols-2 gap-3">
+            <DatePicker
+              label="Início"
+              value={settlementForm.start_date}
+              onChange={(e) => setSettlementForm({ ...settlementForm, start_date: e.target.value })}
+            />
+            <DatePicker
+              label="Fim"
+              value={settlementForm.end_date}
+              onChange={(e) => setSettlementForm({ ...settlementForm, end_date: e.target.value })}
+            />
+            <DatePicker
+              label="Vencimento"
+              value={settlementForm.due_date}
+              onChange={(e) => setSettlementForm({ ...settlementForm, due_date: e.target.value })}
+            />
+          </div>
+          <div className="flex justify-end gap-3 mt-6">
+            <Button variant="ghost" onClick={() => setSettlementModal(false)}>
+              Cancelar
+            </Button>
+            <Button disabled={busy || !selected} onClick={createSettlement}>
+              {editingSettlement ? 'Atualizar fechamento' : 'Salvar fechamento'}
+            </Button>
+          </div>
+        </Modal>
+      )}
     </div>
   )
 }
