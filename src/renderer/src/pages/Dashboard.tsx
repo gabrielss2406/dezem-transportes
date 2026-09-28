@@ -1,9 +1,10 @@
 import { toPng } from 'html-to-image'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { getOilCreditDashboardSummary } from '../../../shared/oilCreditsDashboard'
 import { BankBalanceHistory } from '../components/BankBalanceHistory'
 import { PageHeader } from '../components/PageHeader'
-import { Button, DatePicker, Toast, useToast } from '../components/ui'
+import { Button, DatePicker, Modal, Toast, useToast } from '../components/ui'
 import type { DashboardSummary } from '../lib/types'
 import { currentMonthRange, formatBRL, formatMonthLabel } from '../lib/utils'
 
@@ -91,6 +92,7 @@ export function DashboardPage() {
   const [range, setRange] = useState(currentMonthRange())
   const [showCustom, setShowCustom] = useState(false)
   const [showAllTrucks, setShowAllTrucks] = useState(false)
+  const [showOilCreditsModal, setShowOilCreditsModal] = useState(false)
   const [visibleSeries, setVisibleSeries] = useState<Record<ChartSeriesKey, boolean>>({
     revenue: true,
     cost: true,
@@ -232,21 +234,66 @@ export function DashboardPage() {
   const displayedTrucks = showAllTrucks
     ? summary?.perTruck || []
     : (summary?.perTruck || []).slice(0, 5)
+  const oilCreditSummary = getOilCreditDashboardSummary(summary?.oilCredits)
 
   return (
     <div className="px-4 py-8 lg:px-6 lg:py-12 max-w-[1600px] mx-auto">
       {toast && <Toast message={toast.message} type={toast.type} />}
+      {showOilCreditsModal && (
+        <Modal title="Crédito de Óleo" onClose={() => setShowOilCreditsModal(false)}>
+          <div className="space-y-5">
+            <p className="text-sm text-on-surface-variant">
+              Resumo dos créditos disponíveis para abastecimento.
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="rounded-lg bg-primary/10 px-4 py-4">
+                <p className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant">
+                  Disponíveis
+                </p>
+                <p className="mt-2 font-headline text-2xl font-black text-primary">
+                  {formatBRL(oilCreditSummary.activeAmount)}
+                </p>
+                <p className="mt-1 text-xs text-on-surface-variant">
+                  {oilCreditSummary.activeLots} lote(s) ativo(s)
+                </p>
+              </div>
+              <div className="rounded-lg bg-error/10 px-4 py-4">
+                <p className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant">
+                  Vencidos
+                </p>
+                <p className="mt-2 font-headline text-2xl font-black text-error">
+                  {formatBRL(oilCreditSummary.expiredAmount)}
+                </p>
+                <p className="mt-1 text-xs text-on-surface-variant">
+                  {oilCreditSummary.expiredLots} lote(s) vencido(s)
+                </p>
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 border-t border-outline-variant/10 pt-4">
+              <Button variant="ghost" onClick={() => setShowOilCreditsModal(false)}>
+                Fechar
+              </Button>
+              <Button
+                onClick={() => {
+                  setShowOilCreditsModal(false)
+                  navigate('/costs', { state: { activeTab: 'oil-credits' } })
+                }}
+              >
+                Ver créditos
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
       <PageHeader title="Visão Geral Operacional" subtitle={monthLabel}>
         <div className="flex gap-3 items-center">
           <button
             type="button"
-            onClick={() =>
-              bankBalanceRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-            }
+            onClick={() => setShowOilCreditsModal(true)}
             className="flex items-center gap-2 px-4 py-2 rounded text-sm font-bold bg-primary text-on-primary hover:brightness-110 transition-all"
           >
-            <span className="material-symbols-outlined text-base">account_balance</span>
-            Saldo bancário
+            <span className="material-symbols-outlined text-base">local_gas_station</span>
+            Créditos de óleo
           </button>
           <button
             type="button"
@@ -415,12 +462,54 @@ export function DashboardPage() {
                     : 'Em aberto (não filtrado por período)'
                 }
               />
+            </div>
 
-              <KpiBlock
-                label="Créditos de Óleo"
-                value={formatBRL(summary.oilCredits?.activeAmount ?? 0).replace('R$ ', '')}
-                info={`${summary.oilCredits?.activeLots ?? 0} lote(s) ativo(s) · vencidos: ${formatBRL(summary.oilCredits?.expiredAmount ?? 0)}`}
-              />
+            <div className="hidden flex flex-col gap-4 rounded-2xl border border-outline-variant/10 bg-surface-container px-6 py-5 lg:flex-row lg:items-center">
+              <div className="flex items-center gap-3 lg:min-w-[230px]">
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+                  <span className="material-symbols-outlined text-primary">
+                    account_balance_wallet
+                  </span>
+                </div>
+                <div>
+                  <h2 className="font-headline text-sm font-black tracking-tight text-on-surface">
+                    Crédito de Óleo
+                  </h2>
+                  <p className="text-[10px] text-on-surface-variant">Posição atual da carteira</p>
+                </div>
+              </div>
+              <div className="grid flex-1 grid-cols-2 gap-4 border-outline-variant/10 lg:grid-cols-2 lg:border-l lg:pl-6">
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant">
+                    Ativos
+                  </p>
+                  <p className="mt-1 font-headline text-xl font-black text-primary">
+                    {formatBRL(summary.oilCredits?.activeAmount ?? 0)}
+                  </p>
+                  <p className="text-[10px] text-on-surface-variant">
+                    {summary.oilCredits?.activeLots ?? 0} lote(s)
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant">
+                    Vencidos
+                  </p>
+                  <p className="mt-1 font-headline text-xl font-black text-error">
+                    {formatBRL(summary.oilCredits?.expiredAmount ?? 0)}
+                  </p>
+                  <p className="text-[10px] text-on-surface-variant">
+                    {summary.oilCredits?.expiredLots ?? 0} lote(s)
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => navigate('/costs', { state: { activeTab: 'oil-credits' } })}
+                className="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-xs font-bold text-on-primary transition-colors hover:brightness-110"
+              >
+                Ver créditos
+                <span className="material-symbols-outlined text-base">arrow_forward</span>
+              </button>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">

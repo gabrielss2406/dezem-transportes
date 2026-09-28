@@ -1,5 +1,20 @@
 import assert from 'node:assert/strict'
 import { allocateOilCredit } from '../src/shared/oilCredits'
+import { getOilCreditDashboardSummary } from '../src/shared/oilCreditsDashboard'
+
+const dashboardSummary = getOilCreditDashboardSummary({
+  activeAmount: 1250,
+  activeLots: 2,
+  expiredAmount: 300,
+  expiredLots: 1,
+})
+assert.equal(dashboardSummary.activeAmount, 1250)
+assert.equal(dashboardSummary.activeLots, 2)
+assert.equal(dashboardSummary.expiredAmount, 300)
+assert.equal(dashboardSummary.expiredLots, 1)
+const emptyDashboardSummary = getOilCreditDashboardSummary(undefined)
+assert.equal(emptyDashboardSummary.activeAmount, 0)
+assert.equal(emptyDashboardSummary.expiredLots, 0)
 
 const result = allocateOilCredit(
   [

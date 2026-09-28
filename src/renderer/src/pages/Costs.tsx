@@ -196,8 +196,13 @@ export function CostsPage() {
   const navigate = useNavigate()
 
   useEffect(() => {
+    if (location.state?.activeTab === 'oil-credits') {
+      setActiveTab('oil-credits')
+    }
     if (location.state?.openModal) {
       setCostModal(true)
+    }
+    if (location.state?.activeTab || location.state?.openModal) {
       navigate(location.pathname, { replace: true, state: {} })
     }
   }, [location, navigate])

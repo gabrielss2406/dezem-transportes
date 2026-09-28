@@ -130,6 +130,35 @@ export function registerOilCreditHandlers(): void {
         errors: { expires_at: 'Vencimento deve ser igual ou posterior à emissão.' },
       }
     }
+    const existing = db()
+      .prepare(
+        'SELECT id FROM oil_credit_entries WHERE customer_id = ? AND issued_date = ? AND expires_at = ? LIMIT 1',
+      )
+      .get(data.customer_id, data.issued_date, data.expires_at) as { id: number } | undefined
+    if (existing) {
+      db()
+        .prepare(
+          `UPDATE oil_credit_entries
+           SET amount = amount + ?,
+               description = CASE
+                 WHEN ? IS NULL OR ? = '' THEN description
+                 WHEN description IS NULL OR description = '' THEN ?
+                 WHEN instr(description, ?) > 0 THEN description
+                 ELSE description || ' | ' || ?
+               END
+           WHERE id = ?`,
+        )
+        .run(
+          data.amount,
+          data.description || null,
+          data.description || '',
+          data.description || null,
+          data.description || '',
+          data.description || '',
+          existing.id,
+        )
+      return { id: existing.id, merged: true }
+    }
     const result = db()
       .prepare(
         'INSERT INTO oil_credit_entries (customer_id, amount, issued_date, expires_at, description) VALUES (?, ?, ?, ?, ?)',
