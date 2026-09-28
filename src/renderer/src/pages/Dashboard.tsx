@@ -289,8 +289,18 @@ export function DashboardPage() {
         <div className="flex gap-3 items-center">
           <button
             type="button"
-            onClick={() => setShowOilCreditsModal(true)}
+            onClick={() =>
+              bankBalanceRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+            }
             className="flex items-center gap-2 px-4 py-2 rounded text-sm font-bold bg-primary text-on-primary hover:brightness-110 transition-all"
+          >
+            <span className="material-symbols-outlined text-base">account_balance</span>
+            Saldo bancário
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowOilCreditsModal(true)}
+            className="flex items-center gap-2 px-4 py-2 rounded text-sm font-bold bg-surface-container-highest text-on-surface hover:brightness-90 transition-all"
           >
             <span className="material-symbols-outlined text-base">local_gas_station</span>
             Créditos de óleo
