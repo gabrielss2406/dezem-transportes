@@ -83,6 +83,11 @@ export interface FuelRecord {
   date: string
   liters?: number | null
   value: number
+  gross_value?: number
+  credit_value?: number
+  credit_customer_id?: number | null
+  voucher_number?: string | null
+  credit_usage_id?: number | null
   odometer_at_service: number
   supplier_id?: number | null
   notes?: string | null
@@ -90,6 +95,37 @@ export interface FuelRecord {
   truck_license_plate?: string
   truck_model?: string
   supplier_name?: string
+}
+
+export interface OilCreditEntry {
+  id: number
+  customer_id: number
+  customer_name?: string
+  amount: number
+  issued_date: string
+  expires_at: string
+  description?: string | null
+  available_amount: number
+  status: 'active' | 'expired' | 'exhausted'
+}
+
+export interface OilCreditSummary {
+  active_amount: number
+  expired_amount: number
+  active_lots: number
+  expired_lots: number
+}
+
+export interface OilCreditMovement {
+  date: string
+  type: 'entry' | 'usage'
+  reference_id: number
+  customer_name: string
+  gross_amount: number
+  credit_amount: number
+  balance_amount: number
+  voucher_number?: string | null
+  description?: string | null
 }
 
 export interface Trip {
@@ -277,6 +313,12 @@ export interface DashboardSummary {
   costsOpenTotal: number
   costsOverdueCount: number
   costsOverdueTotal: number
+  oilCredits: {
+    activeAmount: number
+    expiredAmount: number
+    activeLots: number
+    expiredLots: number
+  }
 }
 
 export interface CreditorReportLine {
@@ -285,6 +327,9 @@ export interface CreditorReportLine {
   date: string
   category: string
   value: number
+  gross_value?: number
+  credit_value?: number
+  voucher_number?: string | null
   description: string
   supplier_id: number
   supplier_name: string
@@ -414,6 +459,14 @@ declare global {
         list(filters?: any): Promise<FuelRecord[]>
         create(data: any): Promise<{ id?: number; ok?: boolean; errors?: any }>
         delete(id: number): Promise<{ ok: boolean }>
+      }
+      oilCredits: {
+        list(filters?: any): Promise<OilCreditEntry[]>
+        create(data: any): Promise<{ id?: number; ok?: boolean; errors?: any }>
+        update(id: number, data: any): Promise<{ ok: boolean; errors?: any }>
+        delete(id: number): Promise<{ ok: boolean; errors?: any }>
+        summary(): Promise<OilCreditSummary>
+        movements(filters?: any): Promise<OilCreditMovement[]>
       }
       maintenance: {
         listTypes(includeInactive?: boolean): Promise<MaintenanceType[]>

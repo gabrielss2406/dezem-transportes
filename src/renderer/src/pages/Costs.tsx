@@ -24,8 +24,12 @@ import type {
   CommissionByDriver,
   Cost,
   CreditorReportLine,
+  Customer,
   Driver,
   FuelRecord,
+  OilCreditEntry,
+  OilCreditMovement,
+  OilCreditSummary,
   SalarySummary,
   Supplier,
   Truck,
@@ -59,6 +63,10 @@ interface FuelFormData {
   odometer_at_service: number
   supplier_id: number | null
   notes?: string
+  credit_mode: 'normal' | 'credit'
+  credit_customer_id: number | null
+  voucher_number?: string
+  allow_expired_credit?: boolean
 }
 
 const EMPTY_COST: CostFormData = {
@@ -81,6 +89,10 @@ const EMPTY_FUEL: FuelFormData = {
   odometer_at_service: 0,
   supplier_id: null,
   notes: '',
+  credit_mode: 'normal',
+  credit_customer_id: null,
+  voucher_number: '',
+  allow_expired_credit: false,
 }
 
 const categoryBadge: Record<string, string> = {
@@ -92,8 +104,20 @@ const categoryBadge: Record<string, string> = {
   others: 'bg-surface-container-highest text-on-surface-variant',
 }
 
+function oneMonthFrom(dateValue: string): string {
+  const [year, month, day] = dateValue.split('-').map(Number)
+  const targetMonthIndex = month
+  const targetYear = year + Math.floor(targetMonthIndex / 12)
+  const normalizedMonthIndex = targetMonthIndex % 12
+  const lastDay = new Date(targetYear, normalizedMonthIndex + 1, 0).getDate()
+  const clampedDay = Math.min(day, lastDay)
+  return `${targetYear}-${String(normalizedMonthIndex + 1).padStart(2, '0')}-${String(clampedDay).padStart(2, '0')}`
+}
+
 export function CostsPage() {
-  const [activeTab, setActiveTab] = useState<'costs' | 'fuel' | 'commissions' | 'creditor'>('costs')
+  const [activeTab, setActiveTab] = useState<
+    'costs' | 'fuel' | 'commissions' | 'creditor' | 'oil-credits'
+  >('costs')
 
   // ── Commissions state ──
   const [commissionData, setCommissionData] = useState<CommissionByDriver[]>([])
@@ -143,9 +167,27 @@ export function CostsPage() {
   const [pendingFuel, setPendingFuel] = useState<any>(null)
   const [deleteFuelTarget, setDeleteFuelTarget] = useState<FuelRecord | null>(null)
   const [showFuelDiscardConfirm, setShowFuelDiscardConfirm] = useState(false)
+  const [fuelCreditBalance, setFuelCreditBalance] = useState({ active: 0, expired: 0 })
+
+  // ── Oil credit state ──
+  const [oilCredits, setOilCredits] = useState<OilCreditEntry[]>([])
+  const [oilCreditMovements, setOilCreditMovements] = useState<OilCreditMovement[]>([])
+  const [oilCreditSummary, setOilCreditSummary] = useState<OilCreditSummary | null>(null)
+  const [oilCreditCustomerFilter, setOilCreditCustomerFilter] = useState('')
+  const [oilCreditModal, setOilCreditModal] = useState(false)
+  const [deleteOilCreditTarget, setDeleteOilCreditTarget] = useState<OilCreditEntry | null>(null)
+  const [editingOilCredit, setEditingOilCredit] = useState<OilCreditEntry | null>(null)
+  const [oilCreditForm, setOilCreditForm] = useState({
+    customer_id: '',
+    amount: 0,
+    issued_date: today(),
+    expires_at: oneMonthFrom(today()),
+    description: '',
+  })
 
   // ── Shared state ──
   const [trucks, setTrucks] = useState<Truck[]>([])
+  const [customers, setCustomers] = useState<Customer[]>([])
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [drivers, setDrivers] = useState<Driver[]>([])
   const { toast, show } = useToast()
@@ -208,21 +250,25 @@ export function CostsPage() {
   })
 
   const selectedFuelTruckId = watchFuel('truck_id')
+  const selectedFuelCreditMode = watchFuel('credit_mode')
+  const selectedFuelCreditCustomerId = watchFuel('credit_customer_id')
   const selectedTruck = trucks.find((t) => String(t.id) === String(selectedFuelTruckId))
 
   const gasStations = suppliers.filter((s) => s.type === 'gas_station')
 
   const load = useCallback(async () => {
-    const [cc, tr, s, d] = await Promise.all([
+    const [cc, tr, s, d, c] = await Promise.all([
       window.api['cost-categories'].list(),
       window.api.trucks.list(),
       window.api.suppliers.list(),
       window.api.drivers.list(),
+      window.api.customers.list(),
     ])
     setCostCategories(cc)
     setTrucks(tr)
     setSuppliers(s)
     setDrivers(d)
+    setCustomers(c)
   }, [])
 
   const loadCosts = useCallback(async () => {
@@ -265,6 +311,21 @@ export function CostsPage() {
     setFuelRecords(f)
   }, [fuelMonth, fuelTruckFilter])
 
+  const loadOilCredits = useCallback(async () => {
+    const [entries, summary, movements] = await Promise.all([
+      window.api.oilCredits.list({
+        customer_id: oilCreditCustomerFilter || undefined,
+      }),
+      window.api.oilCredits.summary(),
+      window.api.oilCredits.movements({
+        customer_id: oilCreditCustomerFilter || undefined,
+      }),
+    ])
+    setOilCredits(entries)
+    setOilCreditSummary(summary)
+    setOilCreditMovements(movements)
+  }, [oilCreditCustomerFilter])
+
   useEffect(() => {
     load()
   }, [load])
@@ -276,6 +337,10 @@ export function CostsPage() {
   useEffect(() => {
     loadFuel()
   }, [loadFuel])
+
+  useEffect(() => {
+    loadOilCredits()
+  }, [loadOilCredits])
 
   const loadCommissions = useCallback(async () => {
     const c = await window.api.dashboard.commissionByDriver(
@@ -340,6 +405,23 @@ export function CostsPage() {
       resetFuel(EMPTY_FUEL)
     }
   }, [fuelModal, resetFuel])
+
+  useEffect(() => {
+    if (selectedFuelCreditMode !== 'credit' || !selectedFuelCreditCustomerId) {
+      setFuelCreditBalance({ active: 0, expired: 0 })
+      return
+    }
+    window.api.oilCredits.list({ customer_id: selectedFuelCreditCustomerId }).then((entries) => {
+      setFuelCreditBalance({
+        active: entries
+          .filter((entry) => entry.status === 'active')
+          .reduce((total, entry) => total + Number(entry.available_amount || 0), 0),
+        expired: entries
+          .filter((entry) => entry.status === 'expired')
+          .reduce((total, entry) => total + Number(entry.available_amount || 0), 0),
+      })
+    })
+  }, [selectedFuelCreditCustomerId, selectedFuelCreditMode])
 
   // ── Cost handlers ──
   const saveCost = async (data: CostFormData) => {
@@ -512,7 +594,15 @@ export function CostsPage() {
       ? `contas_a_pagar_por_credor_${safeFileName}`
       : 'contas_a_pagar_por_credor'
 
-    const headers = ['Data', 'Fornecedor', 'Plano de Contas', 'Descrição', 'Valor']
+    const headers = [
+      'Data',
+      'Fornecedor',
+      'Plano de Contas',
+      'Descrição',
+      'Bruto',
+      'Crédito',
+      'Líquido',
+    ]
     const data: (string | number)[][] = []
     for (const group of creditorGroups) {
       const lines = creditorReport.filter((l) => l.supplier_id === group.supplier_id)
@@ -523,12 +613,14 @@ export function CostsPage() {
           line.supplier_name,
           cat?.label ?? line.category,
           line.description,
+          formatBRL(line.gross_value ?? line.value),
+          formatBRL(line.credit_value ?? 0),
           formatBRL(line.value),
         ])
       }
-      data.push(['', '', '', `SUBTOTAL — ${group.supplier_name}`, formatBRL(group.total)])
+      data.push(['', '', '', `SUBTOTAL — ${group.supplier_name}`, '', '', formatBRL(group.total)])
     }
-    const foot = [['', '', '', 'TOTAL GERAL', formatBRL(creditorGrandTotal)]]
+    const foot = [['', '', '', 'TOTAL GERAL', '', '', formatBRL(creditorGrandTotal)]]
 
     const pdfData = generatePdf({
       title: 'Contas a Pagar por Credor',
@@ -556,6 +648,122 @@ export function CostsPage() {
       setShowCostDiscardConfirm(true)
     } else {
       setCostModal(false)
+    }
+  }
+
+  const handleExportOilCreditsPdf = async () => {
+    const data = oilCreditMovements.map((movement) => [
+      formatDate(movement.date),
+      movement.type === 'entry' ? 'Entrada' : 'Consumo',
+      movement.customer_name,
+      movement.type === 'entry'
+        ? formatBRL(movement.gross_amount)
+        : formatBRL(movement.credit_amount),
+      movement.voucher_number || '—',
+      movement.description || '—',
+    ])
+    const pdfData = generatePdf({
+      title: 'Movimentação de Créditos de Óleo',
+      subtitle: oilCreditCustomerFilter ? 'Cliente filtrado' : 'Todos os clientes',
+      headers: ['Data', 'Tipo', 'Cliente', 'Valor', 'Vale', 'Descrição'],
+      data,
+      foot: [['', '', 'TOTAL DE MOVIMENTAÇÕES', String(oilCreditMovements.length), '', '']],
+    })
+    try {
+      const result = await window.api.exportPdf({
+        fileName: 'movimentacao_creditos_oleo',
+        data: pdfData,
+      })
+      if (result.success) {
+        show(`PDF salvo e aberto com sucesso em: ${result.path}`, 'success')
+      } else {
+        show(`Erro ao exportar PDF: ${result.error}`, 'error')
+      }
+    } catch (error) {
+      show('Ocorreu um erro inesperado ao exportar o PDF.', 'error')
+      console.error(error)
+    }
+  }
+
+  const handleExportFuelPdf = async () => {
+    const truck = trucks.find((item) => String(item.id) === String(fuelTruckFilter))
+    const data = fuelRecords.map((row) => [
+      formatDate(row.date),
+      row.truck_license_plate || '—',
+      row.supplier_name || '—',
+      row.liters != null ? `${Number(row.liters).toFixed(2)} L` : '—',
+      formatBRL(row.gross_value ?? row.value),
+      formatBRL(row.credit_value ?? 0),
+      formatBRL(row.value),
+      row.voucher_number || '—',
+    ])
+    const totalGross = fuelRecords.reduce(
+      (sum, row) => sum + Number(row.gross_value ?? row.value),
+      0,
+    )
+    const totalCredit = fuelRecords.reduce((sum, row) => sum + Number(row.credit_value ?? 0), 0)
+    const totalNet = fuelRecords.reduce((sum, row) => sum + Number(row.value), 0)
+    const pdfData = generatePdf({
+      title: 'Relatório de Abastecimentos',
+      subtitle: `Mês: ${fuelMonth} | Caminhão: ${truck?.license_plate || 'Todos'}`,
+      headers: ['Data', 'Caminhão', 'Posto', 'Litros', 'Bruto', 'Crédito', 'Líquido', 'Vale'],
+      data,
+      foot: [
+        [
+          'TOTAL',
+          '',
+          '',
+          '',
+          formatBRL(totalGross),
+          formatBRL(totalCredit),
+          formatBRL(totalNet),
+          '',
+        ],
+      ],
+    })
+    try {
+      const result = await window.api.exportPdf({
+        fileName: `abastecimentos_${fuelMonth}`,
+        data: pdfData,
+      })
+      if (result.success) {
+        show(`PDF salvo e aberto com sucesso em: ${result.path}`, 'success')
+      } else {
+        show(`Erro ao exportar PDF: ${result.error}`, 'error')
+      }
+    } catch (error) {
+      show('Ocorreu um erro inesperado ao exportar o PDF.', 'error')
+      console.error(error)
+    }
+  }
+
+  const handleExportCommissionPdf = async () => {
+    const driver = drivers.find(
+      (item) => String(item.id) === String(commissionDateFilters.driver_id),
+    )
+    const total = commissionData.reduce((sum, row) => sum + Number(row.total_commission), 0)
+    const data = commissionData.map((row) => [
+      row.name,
+      String(row.trip_count),
+      formatBRL(row.total_commission),
+    ])
+    const pdfData = generatePdf({
+      title: 'Relatório de Comissões',
+      subtitle: `Período: ${formatDate(commissionDateFilters.start)} a ${formatDate(commissionDateFilters.end)} | Motorista: ${driver?.name || 'Todos'}`,
+      headers: ['Motorista', 'Viagens', 'Comissão'],
+      data,
+      foot: [['TOTAL', '', formatBRL(total)]],
+    })
+    try {
+      const result = await window.api.exportPdf({ fileName: 'relatorio_comissoes', data: pdfData })
+      if (result.success) {
+        show(`PDF salvo e aberto com sucesso em: ${result.path}`, 'success')
+      } else {
+        show(`Erro ao exportar PDF: ${result.error}`, 'error')
+      }
+    } catch (error) {
+      show('Ocorreu um erro inesperado ao exportar o PDF.', 'error')
+      console.error(error)
     }
   }
 
@@ -604,6 +812,56 @@ export function CostsPage() {
     } else {
       setFuelModal(false)
     }
+  }
+
+  const saveOilCredit = async () => {
+    const payload = {
+      customer_id: oilCreditForm.customer_id,
+      amount: oilCreditForm.amount,
+      issued_date: oilCreditForm.issued_date,
+      expires_at: oilCreditForm.expires_at,
+      description: oilCreditForm.description,
+    }
+    const result = editingOilCredit
+      ? await window.api.oilCredits.update(editingOilCredit.id, payload)
+      : await window.api.oilCredits.create(payload)
+    if (result.ok === false) {
+      show(result.errors?.form || result.errors?.expires_at || 'Erro ao lançar crédito.', 'error')
+      return
+    }
+    show(editingOilCredit ? 'Crédito atualizado!' : 'Crédito lançado!')
+    setOilCreditModal(false)
+    setEditingOilCredit(null)
+    setOilCreditForm({
+      customer_id: '',
+      amount: 0,
+      issued_date: today(),
+      expires_at: oneMonthFrom(today()),
+      description: '',
+    })
+    loadOilCredits()
+  }
+
+  const openEditOilCredit = (entry: OilCreditEntry) => {
+    setEditingOilCredit(entry)
+    setOilCreditForm({
+      customer_id: String(entry.customer_id),
+      amount: entry.amount,
+      issued_date: entry.issued_date,
+      expires_at: entry.expires_at,
+      description: entry.description || '',
+    })
+    setOilCreditModal(true)
+  }
+
+  const deleteOilCredit = async (id: number) => {
+    const result = await window.api.oilCredits.delete(id)
+    if (result.ok === false) {
+      show(result.errors?.form || 'Não foi possível excluir o crédito.', 'error')
+      return
+    }
+    show('Crédito excluído!')
+    loadOilCredits()
   }
 
   function openSalaryModal() {
@@ -684,7 +942,15 @@ export function CostsPage() {
         subtitle="Gerencie despesas operacionais e histórico de abastecimentos."
         secondaryActionLabel="Exportar PDF"
         onSecondaryAction={
-          activeTab === 'creditor' ? handleExportCreditorPdf : handleExportCostsPdf
+          activeTab === 'creditor'
+            ? handleExportCreditorPdf
+            : activeTab === 'oil-credits'
+              ? handleExportOilCreditsPdf
+              : activeTab === 'fuel'
+                ? handleExportFuelPdf
+                : activeTab === 'commissions'
+                  ? handleExportCommissionPdf
+                  : handleExportCostsPdf
         }
       />
 
@@ -737,6 +1003,18 @@ export function CostsPage() {
         >
           <span className="material-symbols-outlined text-lg">handshake</span>
           Por Credor
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('oil-credits')}
+          className={`flex items-center gap-2 px-5 py-3 text-sm font-bold transition-all border-b-2 -mb-px ${
+            activeTab === 'oil-credits'
+              ? 'border-primary text-primary'
+              : 'border-transparent text-on-surface-variant hover:text-on-surface'
+          }`}
+        >
+          <span className="material-symbols-outlined text-lg">account_balance</span>
+          Crédito de Óleo
         </button>
       </div>
 
@@ -1038,7 +1316,17 @@ export function CostsPage() {
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-surface-container-low">
-                  {['Data', 'Caminhão', 'Posto', 'Litros', 'Hodômetro', 'Valor', ''].map((h) => (
+                  {[
+                    'Data',
+                    'Caminhão',
+                    'Posto',
+                    'Litros',
+                    'Hodômetro',
+                    'Bruto',
+                    'Crédito',
+                    'Líquido',
+                    '',
+                  ].map((h) => (
                     <th
                       key={h}
                       className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-on-surface-variant"
@@ -1052,7 +1340,7 @@ export function CostsPage() {
                 {fuelRecords.length === 0 && (
                   <tr>
                     <td
-                      colSpan={7}
+                      colSpan={9}
                       className="px-6 py-12 text-center text-on-surface-variant text-sm"
                     >
                       Nenhum abastecimento registrado
@@ -1080,7 +1368,18 @@ export function CostsPage() {
                       {Number(row.odometer_at_service).toFixed(0)} km
                     </td>
                     <td className="px-6 py-4 font-black font-headline text-on-surface text-sm">
+                      {formatBRL(row.gross_value ?? row.value)}
+                    </td>
+                    <td className="px-6 py-4 font-black font-headline text-secondary text-sm">
+                      {formatBRL(row.credit_value ?? 0)}
+                    </td>
+                    <td className="px-6 py-4 font-black font-headline text-primary text-sm">
                       {formatBRL(row.value)}
+                      {row.voucher_number && (
+                        <p className="text-[10px] text-on-surface-variant font-normal">
+                          Vale {row.voucher_number}
+                        </p>
+                      )}
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex justify-end opacity-0 group-hover:opacity-100 transition-opacity">
@@ -1092,6 +1391,187 @@ export function CostsPage() {
                           <span className="material-symbols-outlined text-xl">delete</span>
                         </button>
                       </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* ── OIL CREDITS TAB ── */}
+      {activeTab === 'oil-credits' && (
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div className="flex gap-4">
+              <div className="bg-surface-container-low px-5 py-3 rounded-xl">
+                <p className="text-xs text-on-surface-variant mb-0.5">Créditos ativos</p>
+                <p className="text-2xl font-black font-headline text-primary">
+                  {formatBRL(oilCreditSummary?.active_amount || 0)}
+                </p>
+                <p className="text-xs text-on-surface-variant">
+                  {oilCreditSummary?.active_lots || 0} lote(s)
+                </p>
+              </div>
+              <div className="bg-surface-container-low px-5 py-3 rounded-xl">
+                <p className="text-xs text-on-surface-variant mb-0.5">Créditos vencidos</p>
+                <p className="text-2xl font-black font-headline text-error">
+                  {formatBRL(oilCreditSummary?.expired_amount || 0)}
+                </p>
+                <p className="text-xs text-on-surface-variant">
+                  {oilCreditSummary?.expired_lots || 0} lote(s)
+                </p>
+              </div>
+            </div>
+            <Button
+              onClick={() => {
+                setEditingOilCredit(null)
+                setOilCreditForm({
+                  customer_id: '',
+                  amount: 0,
+                  issued_date: today(),
+                  expires_at: oneMonthFrom(today()),
+                  description: '',
+                })
+                setOilCreditModal(true)
+              }}
+            >
+              Novo crédito
+            </Button>
+          </div>
+
+          <div className="bg-surface-container-low p-4 rounded-xl border border-outline-variant/10">
+            <Select
+              label="Cliente"
+              value={oilCreditCustomerFilter}
+              onChange={(v) => setOilCreditCustomerFilter(String(v))}
+              optional
+              options={customers.map((customer) => ({
+                value: customer.id,
+                label: customer.name,
+                displayLabel: customer.name,
+                searchableLabel: customer.name,
+              }))}
+            />
+          </div>
+
+          <div className="bg-surface-container rounded-xl overflow-hidden border border-outline-variant/10">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-surface-container-low">
+                  {[
+                    'Cliente',
+                    'Emissão',
+                    'Vencimento',
+                    'Original',
+                    'Disponível',
+                    'Situação',
+                    '',
+                  ].map((header) => (
+                    <th
+                      key={header}
+                      className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-on-surface-variant"
+                    >
+                      {header}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-outline-variant/10">
+                {oilCredits.map((entry) => (
+                  <tr key={entry.id} className="hover:bg-surface-bright/5 transition-colors group">
+                    <td className="px-6 py-4 font-bold text-sm">{entry.customer_name}</td>
+                    <td className="px-6 py-4 text-sm text-on-surface-variant">
+                      {formatDate(entry.issued_date)}
+                    </td>
+                    <td className="px-6 py-4 text-sm text-on-surface-variant">
+                      {formatDate(entry.expires_at)}
+                    </td>
+                    <td className="px-6 py-4 font-black text-sm">{formatBRL(entry.amount)}</td>
+                    <td className="px-6 py-4 font-black text-primary text-sm">
+                      {formatBRL(entry.available_amount)}
+                    </td>
+                    <td className="px-6 py-4 text-xs font-bold uppercase">
+                      <span className={entry.status === 'expired' ? 'text-error' : 'text-primary'}>
+                        {entry.status === 'expired'
+                          ? 'Vencido'
+                          : entry.status === 'exhausted'
+                            ? 'Esgotado'
+                            : 'Ativo'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex gap-1 opacity-0 group-hover:opacity-100">
+                        <button
+                          type="button"
+                          onClick={() => openEditOilCredit(entry)}
+                          className="p-2 text-on-surface-variant hover:text-primary hover:bg-primary/10 rounded-lg transition-all"
+                        >
+                          <span className="material-symbols-outlined text-xl">edit</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setDeleteOilCreditTarget(entry)}
+                          className="p-2 text-on-surface-variant hover:text-error hover:bg-error/10 rounded-lg transition-all"
+                        >
+                          <span className="material-symbols-outlined text-xl">delete</span>
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+                {oilCredits.length === 0 && (
+                  <tr>
+                    <td
+                      colSpan={7}
+                      className="px-6 py-12 text-center text-on-surface-variant text-sm"
+                    >
+                      Nenhum crédito lançado
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="bg-surface-container rounded-xl overflow-hidden border border-outline-variant/10">
+            <div className="px-6 py-4 border-b border-outline-variant/10">
+              <h3 className="font-headline font-bold">Movimentações e vales</h3>
+            </div>
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-surface-container-low">
+                  {['Data', 'Tipo', 'Cliente', 'Valor', 'Vale', 'Descrição'].map((header) => (
+                    <th
+                      key={header}
+                      className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-on-surface-variant"
+                    >
+                      {header}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-outline-variant/10">
+                {oilCreditMovements.map((movement) => (
+                  <tr key={`${movement.type}-${movement.reference_id}`}>
+                    <td className="px-6 py-4 text-sm text-on-surface-variant">
+                      {formatDate(movement.date)}
+                    </td>
+                    <td className="px-6 py-4 text-sm font-bold">
+                      {movement.type === 'entry' ? 'Entrada' : 'Consumo'}
+                    </td>
+                    <td className="px-6 py-4 text-sm">{movement.customer_name}</td>
+                    <td className="px-6 py-4 text-sm font-black">
+                      {formatBRL(
+                        movement.type === 'entry' ? movement.gross_amount : movement.credit_amount,
+                      )}
+                    </td>
+                    <td className="px-6 py-4 text-sm font-mono">
+                      {movement.voucher_number || '—'}
+                    </td>
+                    <td className="px-6 py-4 text-sm text-on-surface-variant">
+                      {movement.description || '—'}
                     </td>
                   </tr>
                 ))}
@@ -1327,7 +1807,15 @@ export function CostsPage() {
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-surface-container-low">
-                  {['Data', 'Fornecedor', 'Plano de Contas', 'Descrição', 'Valor'].map((h) => (
+                  {[
+                    'Data',
+                    'Fornecedor',
+                    'Plano de Contas',
+                    'Descrição',
+                    'Bruto',
+                    'Crédito',
+                    'Líquido',
+                  ].map((h) => (
                     <th
                       key={h}
                       className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-on-surface-variant"
@@ -1341,7 +1829,7 @@ export function CostsPage() {
                 {creditorReport.length === 0 && (
                   <tr>
                     <td
-                      colSpan={5}
+                      colSpan={7}
                       className="px-6 py-12 text-center text-on-surface-variant text-sm"
                     >
                       Nenhum lançamento encontrado
@@ -1370,6 +1858,12 @@ export function CostsPage() {
                         {row.description}
                       </td>
                       <td className="px-6 py-4 font-black font-headline text-on-surface text-sm">
+                        {formatBRL(row.gross_value ?? row.value)}
+                      </td>
+                      <td className="px-6 py-4 font-black font-headline text-secondary text-sm">
+                        {formatBRL(row.credit_value ?? 0)}
+                      </td>
+                      <td className="px-6 py-4 font-black font-headline text-primary text-sm">
                         {formatBRL(row.value)}
                       </td>
                     </tr>
@@ -1780,6 +2274,69 @@ export function CostsPage() {
         </Modal>
       )}
 
+      {oilCreditModal && (
+        <Modal
+          title={editingOilCredit ? 'Editar crédito de óleo' : 'Novo crédito de óleo'}
+          onClose={() => {
+            setOilCreditModal(false)
+            setEditingOilCredit(null)
+          }}
+        >
+          <div className="space-y-4">
+            <Select
+              label="Cliente"
+              value={oilCreditForm.customer_id}
+              onChange={(value) =>
+                setOilCreditForm((form) => ({ ...form, customer_id: String(value) }))
+              }
+              options={customers.map((customer) => ({
+                value: customer.id,
+                label: customer.name,
+                displayLabel: customer.name,
+                searchableLabel: customer.name,
+              }))}
+            />
+            <CurrencyInput
+              label="Valor do crédito"
+              value={oilCreditForm.amount}
+              onChange={(value) => setOilCreditForm((form) => ({ ...form, amount: value }))}
+            />
+            <div className="grid grid-cols-2 gap-4">
+              <DatePicker
+                label="Data de lançamento"
+                value={oilCreditForm.issued_date}
+                onChange={(event) =>
+                  setOilCreditForm((form) => ({ ...form, issued_date: event.target.value }))
+                }
+              />
+              <DatePicker
+                label="Vencimento"
+                value={oilCreditForm.expires_at}
+                onChange={(event) =>
+                  setOilCreditForm((form) => ({ ...form, expires_at: event.target.value }))
+                }
+              />
+            </div>
+            <Input
+              label="Observação"
+              optional
+              value={oilCreditForm.description}
+              onChange={(event) =>
+                setOilCreditForm((form) => ({ ...form, description: event.target.value }))
+              }
+            />
+          </div>
+          <div className="flex justify-end gap-3 mt-6">
+            <Button variant="ghost" onClick={() => setOilCreditModal(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={saveOilCredit}>
+              {editingOilCredit ? 'Salvar alterações' : 'Lançar crédito'}
+            </Button>
+          </div>
+        </Modal>
+      )}
+
       {/* ── FUEL MODAL ── */}
       {fuelModal && (
         <Modal
@@ -1909,6 +2466,89 @@ export function CostsPage() {
             />
             <div className="col-span-2">
               <Controller
+                name="credit_mode"
+                control={fuelControl}
+                render={({ field }) => (
+                  <div className="flex flex-col gap-1.5">
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
+                      Forma de lançamento
+                    </span>
+                    <div className="flex bg-surface-container-lowest border border-outline-variant/30 rounded-lg p-1 gap-1">
+                      {(
+                        [
+                          { value: 'normal', label: 'Normal' },
+                          { value: 'credit', label: 'Com créditos' },
+                        ] as const
+                      ).map((option) => (
+                        <button
+                          key={option.value}
+                          type="button"
+                          onClick={() => field.onChange(option.value)}
+                          className={`flex-1 py-2 rounded text-sm font-bold transition-colors ${
+                            field.value === option.value
+                              ? 'bg-primary text-on-primary'
+                              : 'text-on-surface-variant hover:bg-surface-container-high'
+                          }`}
+                        >
+                          {option.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              />
+            </div>
+            {selectedFuelCreditMode === 'credit' && (
+              <>
+                <div className="col-span-2">
+                  <Controller
+                    name="credit_customer_id"
+                    control={fuelControl}
+                    render={({ field }) => (
+                      <Select
+                        label="Cliente do crédito"
+                        value={field.value}
+                        onChange={field.onChange}
+                        error={fuelErrors.credit_customer_id?.message}
+                        options={customers.map((customer) => ({
+                          value: customer.id,
+                          label: customer.name,
+                          displayLabel: customer.name,
+                          searchableLabel: customer.name,
+                        }))}
+                      />
+                    )}
+                  />
+                </div>
+                <Controller
+                  name="voucher_number"
+                  control={fuelControl}
+                  render={({ field }) => (
+                    <Input
+                      label="Número do vale"
+                      value={field.value ?? ''}
+                      onChange={field.onChange}
+                      error={fuelErrors.voucher_number?.message}
+                    />
+                  )}
+                />
+                <div className="rounded-lg border border-primary/20 bg-primary/5 px-4 py-3 self-end">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
+                    Créditos disponíveis
+                  </p>
+                  <p className="text-lg font-black text-primary">
+                    {formatBRL(fuelCreditBalance.active)}
+                  </p>
+                  {fuelCreditBalance.expired > 0 && (
+                    <p className="text-[11px] text-on-surface-variant">
+                      Vencidos: {formatBRL(fuelCreditBalance.expired)}
+                    </p>
+                  )}
+                </div>
+              </>
+            )}
+            <div className="col-span-2">
+              <Controller
                 name="supplier_id"
                 control={fuelControl}
                 render={({ field }) => (
@@ -2030,6 +2670,16 @@ export function CostsPage() {
           message="Excluir este registro de abastecimento? O hodômetro do caminhão será recalculado."
           onConfirm={handleDeleteFuel}
           onCancel={() => setDeleteFuelTarget(null)}
+        />
+      )}
+      {deleteOilCreditTarget && (
+        <ConfirmModal
+          message="Excluir esta entrada de crédito? Entradas já consumidas não podem ser excluídas."
+          onConfirm={() => {
+            deleteOilCredit(deleteOilCreditTarget.id)
+            setDeleteOilCreditTarget(null)
+          }}
+          onCancel={() => setDeleteOilCreditTarget(null)}
         />
       )}
       {showFuelDiscardConfirm && (

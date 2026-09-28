@@ -2,6 +2,7 @@ import { ipcMain } from 'electron'
 import { fuelRecordSchema } from '../../../shared/schemas'
 import { getDb } from '../../database'
 import { createIdValidatedHandler, createValidatedHandler } from '../../lib/utils'
+import { consumeOilCredits, releaseOilCredits } from '../oil-credits/oil-credits.handlers'
 
 function recalcTruckOdometer(truckId: number): void {
   const database = getDb()
@@ -51,6 +52,14 @@ export function registerFuelHandlers(): void {
   })
 
   createValidatedHandler('fuel:create', fuelRecordSchema, (data) => {
+    if (data.credit_mode === 'credit') {
+      if (!data.credit_customer_id) {
+        return { ok: false, errors: { credit_customer_id: 'Selecione o cliente do crédito.' } }
+      }
+      if (!data.voucher_number) {
+        return { ok: false, errors: { voucher_number: 'Informe o número do vale.' } }
+      }
+    }
     const previous = db()
       .prepare(
         `SELECT odometer_at_service FROM fuel_records
@@ -83,27 +92,50 @@ export function registerFuelHandlers(): void {
       }
     }
 
-    const r = db()
-      .prepare(
-        'INSERT INTO fuel_records (truck_id, date, liters, value, odometer_at_service, supplier_id, notes) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      )
-      .run(
-        data.truck_id,
-        data.date,
-        data.liters || null,
-        data.value,
-        data.odometer_at_service,
-        data.supplier_id || null,
-        data.notes || null,
-      )
+    const result = db().transaction(() => {
+      const r = db()
+        .prepare(
+          `INSERT INTO fuel_records
+            (truck_id, date, liters, value, gross_value, credit_value, credit_customer_id, voucher_number, odometer_at_service, supplier_id, notes)
+           VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?)`,
+        )
+        .run(
+          data.truck_id,
+          data.date,
+          data.liters || null,
+          data.value,
+          data.value,
+          data.credit_mode === 'credit' ? data.credit_customer_id : null,
+          data.credit_mode === 'credit' ? data.voucher_number : null,
+          data.odometer_at_service,
+          data.supplier_id || null,
+          data.notes || null,
+        )
+      const fuelRecordId = Number(r.lastInsertRowid)
+      const credit =
+        data.credit_mode === 'credit'
+          ? consumeOilCredits(db(), {
+              customerId: data.credit_customer_id as number,
+              fuelRecordId,
+              usageDate: data.date,
+              grossAmount: data.value,
+              voucherNumber: data.voucher_number as string,
+              allowExpired: data.allow_expired_credit === true,
+            })
+          : null
+      return { fuelRecordId, credit }
+    })()
 
     recalcTruckOdometer(data.truck_id)
-    return { id: r.lastInsertRowid }
+    return { id: result.fuelRecordId, credit: result.credit }
   })
 
   createIdValidatedHandler('fuel:delete', (id) => {
     const record = db().prepare('SELECT truck_id FROM fuel_records WHERE id = ?').get(id) as any
-    db().prepare('DELETE FROM fuel_records WHERE id = ?').run(id)
+    db().transaction(() => {
+      releaseOilCredits(db(), id)
+      db().prepare('DELETE FROM fuel_records WHERE id = ?').run(id)
+    })()
     if (record?.truck_id) {
       recalcTruckOdometer(record.truck_id)
     }

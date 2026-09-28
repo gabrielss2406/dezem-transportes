@@ -415,6 +415,12 @@ export function DashboardPage() {
                     : 'Em aberto (não filtrado por período)'
                 }
               />
+
+              <KpiBlock
+                label="Créditos de Óleo"
+                value={formatBRL(summary.oilCredits?.activeAmount ?? 0).replace('R$ ', '')}
+                info={`${summary.oilCredits?.activeLots ?? 0} lote(s) ativo(s) · vencidos: ${formatBRL(summary.oilCredits?.expiredAmount ?? 0)}`}
+              />
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
