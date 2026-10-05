@@ -876,6 +876,23 @@ export function registerDashboardHandlers(): void {
       .get(bankBalanceMonth) as { balance: number } | undefined
     const bankBalance = bankBalanceRow ? Number(bankBalanceRow.balance) : null
 
+    const oilCreditSummary = db()
+      .prepare(
+        `SELECT
+          COALESCE(SUM(CASE WHEN expires_at >= date('now') THEN available_amount ELSE 0 END), 0) AS active_amount,
+          COALESCE(SUM(CASE WHEN expires_at < date('now') THEN available_amount ELSE 0 END), 0) AS expired_amount,
+          COUNT(CASE WHEN expires_at >= date('now') AND available_amount > 0 THEN 1 END) AS active_lots,
+          COUNT(CASE WHEN expires_at < date('now') AND available_amount > 0 THEN 1 END) AS expired_lots
+         FROM (
+           SELECT e.id, e.expires_at,
+             ROUND(e.amount - COALESCE(SUM(a.amount), 0), 2) AS available_amount
+           FROM oil_credit_entries e
+           LEFT JOIN oil_credit_usage_allocations a ON a.entry_id = e.id
+           GROUP BY e.id
+         )`,
+      )
+      .get() as any
+
     return {
       revenue,
       netRevenue: revenue - totalTax,
@@ -903,6 +920,12 @@ export function registerDashboardHandlers(): void {
       costsOpenTotal: Number(costsOpenTotal) || 0,
       costsOverdueCount: Number(costsOverdue.c) || 0,
       costsOverdueTotal: Number(costsOverdue.total) || 0,
+      oilCredits: {
+        activeAmount: Number(oilCreditSummary.active_amount) || 0,
+        expiredAmount: Number(oilCreditSummary.expired_amount) || 0,
+        activeLots: Number(oilCreditSummary.active_lots) || 0,
+        expiredLots: Number(oilCreditSummary.expired_lots) || 0,
+      },
     }
   })
 

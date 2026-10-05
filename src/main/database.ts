@@ -187,10 +187,46 @@ export function setupDatabase(): void {
       date                TEXT NOT NULL,
       liters              REAL,
       value               REAL NOT NULL DEFAULT 0,
+      gross_value         REAL NOT NULL DEFAULT 0,
+      credit_value        REAL NOT NULL DEFAULT 0,
+      credit_customer_id  INTEGER REFERENCES customers(id),
+      voucher_number      TEXT,
+      credit_usage_id     INTEGER,
       odometer_at_service REAL NOT NULL,
       supplier_id         INTEGER REFERENCES suppliers(id),
       notes               TEXT,
       created_at          TEXT DEFAULT (datetime('now'))
+    );
+
+    -- Oil credit ledger
+    CREATE TABLE IF NOT EXISTS oil_credit_entries (
+      id           INTEGER PRIMARY KEY AUTOINCREMENT,
+      customer_id  INTEGER NOT NULL REFERENCES customers(id),
+      amount       REAL NOT NULL,
+      issued_date  TEXT NOT NULL,
+      expires_at   TEXT NOT NULL,
+      description  TEXT,
+      created_at   TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS oil_credit_usages (
+      id             INTEGER PRIMARY KEY AUTOINCREMENT,
+      customer_id    INTEGER NOT NULL REFERENCES customers(id),
+      fuel_record_id INTEGER NOT NULL UNIQUE REFERENCES fuel_records(id) ON DELETE CASCADE,
+      voucher_number TEXT NOT NULL UNIQUE,
+      usage_date     TEXT NOT NULL,
+      gross_amount   REAL NOT NULL,
+      credit_amount  REAL NOT NULL,
+      paid_amount    REAL NOT NULL,
+      created_at     TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS oil_credit_usage_allocations (
+      id        INTEGER PRIMARY KEY AUTOINCREMENT,
+      usage_id  INTEGER NOT NULL REFERENCES oil_credit_usages(id) ON DELETE CASCADE,
+      entry_id  INTEGER NOT NULL REFERENCES oil_credit_entries(id),
+      amount    REAL NOT NULL,
+      UNIQUE (usage_id, entry_id)
     );
 
     -- Customer Prices
@@ -262,6 +298,10 @@ export function setupDatabase(): void {
     CREATE INDEX IF NOT EXISTS idx_maintenance_records_type  ON maintenance_records(maintenance_type_id);
     CREATE INDEX IF NOT EXISTS idx_fuel_records_truck ON fuel_records(truck_id);
     CREATE INDEX IF NOT EXISTS idx_fuel_records_date  ON fuel_records(date);
+    CREATE INDEX IF NOT EXISTS idx_oil_credit_entries_customer ON oil_credit_entries(customer_id);
+    CREATE INDEX IF NOT EXISTS idx_oil_credit_entries_expiry ON oil_credit_entries(expires_at);
+    CREATE INDEX IF NOT EXISTS idx_oil_credit_usages_customer ON oil_credit_usages(customer_id);
+    CREATE INDEX IF NOT EXISTS idx_oil_credit_allocations_entry ON oil_credit_usage_allocations(entry_id);
     CREATE INDEX IF NOT EXISTS idx_receivables_customer ON receivables(customer_id);
     CREATE INDEX IF NOT EXISTS idx_receivables_status ON receivables(status);
     CREATE INDEX IF NOT EXISTS idx_third_party_settlements_status ON third_party_settlements(status);
@@ -553,6 +593,65 @@ export function setupDatabase(): void {
   if (!costInfo.some((col) => col.name === 'paid_date')) {
     db.exec('ALTER TABLE costs ADD COLUMN paid_date TEXT DEFAULT NULL')
   }
+
+  // Migration: Add oil credit accounting fields to standalone fuel records.
+  const fuelRecordInfo = db.pragma('table_info(fuel_records)') as { name: string }[]
+  if (!fuelRecordInfo.some((col) => col.name === 'gross_value')) {
+    db.exec('ALTER TABLE fuel_records ADD COLUMN gross_value REAL NOT NULL DEFAULT 0')
+    db.exec('UPDATE fuel_records SET gross_value = value WHERE gross_value = 0')
+  }
+  if (!fuelRecordInfo.some((col) => col.name === 'credit_value')) {
+    db.exec('ALTER TABLE fuel_records ADD COLUMN credit_value REAL NOT NULL DEFAULT 0')
+  }
+  if (!fuelRecordInfo.some((col) => col.name === 'credit_customer_id')) {
+    db.exec(
+      'ALTER TABLE fuel_records ADD COLUMN credit_customer_id INTEGER REFERENCES customers(id)',
+    )
+  }
+  if (!fuelRecordInfo.some((col) => col.name === 'voucher_number')) {
+    db.exec('ALTER TABLE fuel_records ADD COLUMN voucher_number TEXT')
+  }
+  if (!fuelRecordInfo.some((col) => col.name === 'credit_usage_id')) {
+    db.exec('ALTER TABLE fuel_records ADD COLUMN credit_usage_id INTEGER')
+  }
+  db.exec(
+    'CREATE UNIQUE INDEX IF NOT EXISTS idx_fuel_records_voucher ON fuel_records(voucher_number) WHERE voucher_number IS NOT NULL',
+  )
+
+  // Migration: Create oil credit ledger tables for existing installations.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS oil_credit_entries (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      customer_id INTEGER NOT NULL REFERENCES customers(id),
+      amount REAL NOT NULL,
+      issued_date TEXT NOT NULL,
+      expires_at TEXT NOT NULL,
+      description TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE TABLE IF NOT EXISTS oil_credit_usages (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      customer_id INTEGER NOT NULL REFERENCES customers(id),
+      fuel_record_id INTEGER NOT NULL UNIQUE REFERENCES fuel_records(id) ON DELETE CASCADE,
+      voucher_number TEXT NOT NULL UNIQUE,
+      usage_date TEXT NOT NULL,
+      gross_amount REAL NOT NULL,
+      credit_amount REAL NOT NULL,
+      paid_amount REAL NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE TABLE IF NOT EXISTS oil_credit_usage_allocations (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      usage_id INTEGER NOT NULL REFERENCES oil_credit_usages(id) ON DELETE CASCADE,
+      entry_id INTEGER NOT NULL REFERENCES oil_credit_entries(id),
+      amount REAL NOT NULL,
+      UNIQUE (usage_id, entry_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_oil_credit_entries_customer ON oil_credit_entries(customer_id);
+    CREATE INDEX IF NOT EXISTS idx_oil_credit_entries_expiry ON oil_credit_entries(expires_at);
+    CREATE INDEX IF NOT EXISTS idx_oil_credit_usages_customer ON oil_credit_usages(customer_id);
+    CREATE INDEX IF NOT EXISTS idx_oil_credit_allocations_entry ON oil_credit_usage_allocations(entry_id);
+  `)
 
   // Migration: Add tracks_mileage to maintenance_types if missing. Existing types
   // keep the mileage behaviour they had before (default 1).

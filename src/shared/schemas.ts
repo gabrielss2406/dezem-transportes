@@ -166,6 +166,18 @@ export const fuelRecordSchema = z.object({
   odometer_at_service: requiredNumber(9999999, 'KM máximo de 9.999.999'),
   supplier_id: optionalNumber(999999999, 'ID inválido'),
   notes: z.string().max(500).optional(),
+  credit_mode: z.enum(['normal', 'credit']).default('normal'),
+  credit_customer_id: optionalNumber(999999999, 'ID invÃ¡lido'),
+  voucher_number: z.string().trim().max(100).optional(),
+  allow_expired_credit: z.boolean().optional(),
+})
+
+export const oilCreditEntrySchema = z.object({
+  customer_id: requiredNumber(999999999, 'ID invÃ¡lido'),
+  amount: requiredNumber(100000000, 'Valor mÃ¡ximo de R$ 100.000.000'),
+  issued_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data invÃ¡lida'),
+  expires_at: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data invÃ¡lida'),
+  description: z.string().max(255).optional(),
 })
 
 export const tripSchema = z.object({

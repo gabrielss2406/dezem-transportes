@@ -129,6 +129,16 @@ contextBridge.exposeInMainWorld('api', {
     delete: (id: number) => ipcRenderer.invoke('fuel:delete', id),
   },
 
+  // Oil credit ledger
+  oilCredits: {
+    list: (filters?: any) => ipcRenderer.invoke('oilCredits:list', filters),
+    create: (data: any) => ipcRenderer.invoke('oilCredits:create', data),
+    update: (id: number, data: any) => ipcRenderer.invoke('oilCredits:update', id, data),
+    delete: (id: number) => ipcRenderer.invoke('oilCredits:delete', id),
+    summary: () => ipcRenderer.invoke('oilCredits:summary'),
+    movements: (filters?: any) => ipcRenderer.invoke('oilCredits:movements', filters),
+  },
+
   // Dashboard
   dashboard: {
     summary: (startDate: string, endDate: string) =>

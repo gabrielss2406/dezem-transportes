@@ -180,7 +180,8 @@ export function registerCostHandlers(): void {
 
     let costsPart = `
       SELECT co.id as id, 'cost' as source, co.date as date, co.category as category,
-        co.value as value, co.description as description,
+        co.value as value, co.value as gross_value, 0 as credit_value, NULL as voucher_number,
+        co.description as description,
         co.supplier_id as supplier_id, s.name as supplier_name
       FROM costs co
       JOIN suppliers s ON co.supplier_id = s.id
@@ -201,7 +202,8 @@ export function registerCostHandlers(): void {
 
     let fuelRecordsPart = `
       SELECT fr.id as id, 'fuel_record' as source, fr.date as date, 'fuel' as category,
-        fr.value as value, ('Abastecimento — ' || t.license_plate) as description,
+        fr.value as value, fr.gross_value as gross_value, fr.credit_value as credit_value,
+        fr.voucher_number as voucher_number, ('Abastecimento — ' || t.license_plate) as description,
         fr.supplier_id as supplier_id, s.name as supplier_name
       FROM fuel_records fr
       JOIN trucks t ON fr.truck_id = t.id
@@ -223,7 +225,8 @@ export function registerCostHandlers(): void {
 
     let tripFuelStopsPart = `
       SELECT fs.id as id, 'trip_fuel_stop' as source, tr.date as date, 'fuel' as category,
-        fs.value as value, ('Abastecimento em viagem — ' || tr.ticket_number) as description,
+        fs.value as value, fs.value as gross_value, 0 as credit_value, NULL as voucher_number,
+        ('Abastecimento em viagem — ' || tr.ticket_number) as description,
         fs.supplier_id as supplier_id, s.name as supplier_name
       FROM trip_fuel_stops fs
       JOIN trips tr ON fs.trip_id = tr.id
