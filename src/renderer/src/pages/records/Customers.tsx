@@ -3,9 +3,9 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Controller, useForm } from 'react-hook-form'
 import { customerSchema } from '../../../../shared/schemas'
 import { PageHeader } from '../../components/PageHeader'
-import { Button, Input, Modal, Table, Toast, useToast } from '../../components/ui'
+import { Button, Input, Modal, Select, Table, Toast, useToast } from '../../components/ui'
 import { generatePdf } from '../../lib/pdfGenerator'
-import type { Customer } from '../../lib/types'
+import type { Customer, TaxRate } from '../../lib/types'
 
 interface CustomerFormData {
   name: string
@@ -14,6 +14,7 @@ interface CustomerFormData {
   phone?: string
   address?: string
   customId?: number
+  tax_rate_id?: number | string | null
 }
 
 const EMPTY_VALUES: CustomerFormData = {
@@ -23,6 +24,7 @@ const EMPTY_VALUES: CustomerFormData = {
   phone: '',
   address: '',
   customId: undefined,
+  tax_rate_id: null,
 }
 
 // Modal de confirmação próprio — sem confirm() nativo do Electron
@@ -60,6 +62,8 @@ function ConfirmModal({
 
 export function CustomersPage() {
   const [rows, setRows] = useState<Customer[]>([])
+  const [taxRates, setTaxRates] = useState<TaxRate[]>([])
+  const [defaultTaxRate, setDefaultTaxRate] = useState(0)
   const [modal, setModal] = useState(false)
   const [pricesModal, setPricesModal] = useState<Customer | null>(null)
   const [customerPrices, setCustomerPrices] = useState<any[]>([])
@@ -106,6 +110,18 @@ export function CustomersPage() {
   useEffect(() => {
     load()
   }, [load])
+
+  // Recarrega as alíquotas ao montar e ao abrir/fechar o modal (podem ter mudado em Configurações)
+  // biome-ignore lint/correctness/useExhaustiveDependencies: modal é o gatilho do recarregamento
+  useEffect(() => {
+    window.api.taxRates.list().then(setTaxRates)
+    window.api.settings.getApp().then((s: any) => setDefaultTaxRate(s?.taxRate ?? 0))
+  }, [modal])
+
+  const taxRateById = useCallback(
+    (id?: number | null) => taxRates.find((t) => t.id === id),
+    [taxRates],
+  )
 
   const findNextAvailableId = useCallback(() => {
     const usedIds = new Set(rows.map((r) => r.customId).filter((id): id is number => !!id))
@@ -254,6 +270,7 @@ export function CustomersPage() {
       phone: row.phone ?? '',
       address: row.address ?? '',
       customId: row.customId ?? undefined,
+      tax_rate_id: row.tax_rate_id ?? null,
     })
     setModal(true)
   }
@@ -319,7 +336,7 @@ export function CustomersPage() {
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-surface-container-high">
-              {['ID', 'Nome', 'CNPJ', 'Inscrição Estadual', 'Telefone', ''].map((h) => (
+              {['ID', 'Nome', 'CNPJ', 'Inscrição Estadual', 'Telefone', 'Alíquota', ''].map((h) => (
                 <th
                   key={h}
                   className="px-8 py-5 text-[10px] font-black uppercase tracking-widest text-on-surface-variant"
@@ -332,7 +349,7 @@ export function CustomersPage() {
           <tbody className="divide-y divide-outline-variant/10">
             {rows.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-8 py-12 text-center text-on-surface-variant text-sm">
+                <td colSpan={7} className="px-8 py-12 text-center text-on-surface-variant text-sm">
                   Nenhum cliente encontrado
                 </td>
               </tr>
@@ -363,6 +380,15 @@ export function CustomersPage() {
                 </td>
                 <td className="px-8 py-5 text-sm text-on-surface font-medium">
                   {row.phone || '—'}
+                </td>
+                <td className="px-8 py-5 text-sm">
+                  {taxRateById(row.tax_rate_id) ? (
+                    <span className="px-2 py-1 rounded bg-amber-500/10 text-amber-500 text-xs font-bold">
+                      {taxRateById(row.tax_rate_id)?.name} · {taxRateById(row.tax_rate_id)?.rate}%
+                    </span>
+                  ) : (
+                    <span className="text-on-surface-variant">Padrão</span>
+                  )}
                 </td>
                 <td className="px-8 py-5">
                   <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -546,6 +572,39 @@ export function CustomersPage() {
                 />
               )}
             />
+            <div className="col-span-2">
+              <Controller
+                name="tax_rate_id"
+                control={control}
+                render={({ field }) => (
+                  <Select
+                    label="Alíquota de imposto"
+                    optional
+                    placeholder={`Padrão do sistema (${defaultTaxRate}%)`}
+                    value={field.value ?? ''}
+                    onChange={field.onChange}
+                    error={errors.tax_rate_id?.message as string | undefined}
+                    options={[
+                      {
+                        value: '',
+                        label: `Padrão do sistema (${defaultTaxRate}%)`,
+                        displayLabel: `Padrão do sistema (${defaultTaxRate}%)`,
+                        searchableLabel: 'padrão do sistema',
+                      },
+                      ...taxRates.map((t) => ({
+                        value: t.id,
+                        label: `${t.name} — ${t.rate}%`,
+                        displayLabel: `${t.name} — ${t.rate}%`,
+                        searchableLabel: t.name,
+                      })),
+                    ]}
+                  />
+                )}
+              />
+              <p className="text-xs text-on-surface-variant mt-1">
+                Cadastre alíquotas em Configurações. Sem seleção, usa a alíquota padrão.
+              </p>
+            </div>
           </div>
           <div className="flex justify-end gap-3 mt-6">
             <Button variant="ghost" onClick={() => setModal(false)}>

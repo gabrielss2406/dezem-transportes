@@ -20,7 +20,7 @@ import {
 } from '../components/ui'
 import { generatePdf } from '../lib/pdfGenerator'
 import { TRIP_EXPORT_FIELDS, getDefaultTripExportFieldKeys } from '../lib/tripExportFields'
-import type { Contractor, Customer, Driver, Product, Trip, Truck } from '../lib/types'
+import type { Contractor, Customer, Driver, Product, TaxRate, Trip, Truck } from '../lib/types'
 import { currentMonthKey, formatBRL, formatDate, today } from '../lib/utils'
 
 interface TripFormData {
@@ -104,6 +104,7 @@ export function TripsPage() {
   const [drivers, setDrivers] = useState<Driver[]>([])
   const [products, setProducts] = useState<Product[]>([])
   const [customers, setCustomers] = useState<Customer[]>([])
+  const [taxRates, setTaxRates] = useState<TaxRate[]>([])
   const [contractors, setContractors] = useState<Contractor[]>([])
   const [modal, setModal] = useState(false)
   const [editing, setEditing] = useState<Trip | null>(null)
@@ -186,6 +187,10 @@ export function TripsPage() {
   const effectiveCommissionRate =
     selectedDriver?.commission_rate_override ?? appSettings.commissionRate
 
+  const selectedCustomer = customers.find((c) => c.id === Number(selectedCustomerId))
+  const effectiveTaxRate =
+    taxRates.find((t) => t.id === selectedCustomer?.tax_rate_id)?.rate ?? appSettings.taxRate
+
   const priceLookupKeyRef = useRef<string | null>(null)
 
   useEffect(() => {
@@ -256,7 +261,7 @@ export function TripsPage() {
   }, [manualUnitPrice, noPriceRegistered, currentWeight, currentOverweight, setValue])
 
   const load = useCallback(async () => {
-    const [t, tr, d, p, c, ctr, settings, exportFields] = await Promise.all([
+    const [t, tr, d, p, c, ctr, settings, exportFields, rates] = await Promise.all([
       window.api.trips.list(filters),
       window.api.trucks.list(),
       window.api.drivers.list(),
@@ -265,7 +270,9 @@ export function TripsPage() {
       window.api.contractors.list(),
       window.api.settings.getApp(),
       window.api.settings.getTripExportFields(),
+      window.api.taxRates.list(),
     ])
+    setTaxRates(rates)
     setTrips(t)
     setTrucks(tr)
     setDrivers(d)
@@ -1331,9 +1338,9 @@ export function TripsPage() {
                         },
                         {
                           value: 'true',
-                          label: `Com imposto (${appSettings.taxRate}%)`,
-                          displayLabel: `Com imposto (${appSettings.taxRate}%)`,
-                          searchableLabel: `com imposto ${appSettings.taxRate}`,
+                          label: `Com imposto (${effectiveTaxRate}%)`,
+                          displayLabel: `Com imposto (${effectiveTaxRate}%)`,
+                          searchableLabel: `com imposto ${effectiveTaxRate}`,
                         },
                       ]}
                     />

@@ -19,6 +19,21 @@ export function registerTripHandlers(): void {
     return driver?.commission_rate_override ?? getAppSettings().commissionRate
   }
 
+  // Effective tax rate: rate linked to the customer if any, otherwise the global default.
+  const getEffectiveTaxRate = (customerId: number | null | undefined): number => {
+    if (customerId) {
+      const row = db()
+        .prepare(
+          'SELECT t.rate FROM customers c JOIN tax_rates t ON t.id = c.tax_rate_id WHERE c.id = ?',
+        )
+        .get(customerId) as { rate: number } | undefined
+      if (row) {
+        return row.rate
+      }
+    }
+    return getAppSettings().taxRate
+  }
+
   // Ticket numbers must be unique across trips. When editing, the current record is
   // excluded so a trip can keep its own ticket number unchanged.
   const isTicketNumberTaken = (ticketNumber: string, excludeId?: number): boolean => {
@@ -103,7 +118,9 @@ export function registerTripHandlers(): void {
       }
     }
     const hasTax = !!(tripData as any).has_percentage_tax
-    const taxValue = hasTax ? (tripData.price_charged * getAppSettings().taxRate) / 100 : 0
+    const taxValue = hasTax
+      ? (tripData.price_charged * getEffectiveTaxRate(tripData.customer_id)) / 100
+      : 0
     const hasCommission = !!(tripData as any).has_commission
     const commissionValue = hasCommission
       ? (tripData.price_charged * getEffectiveCommissionRate(tripData.driver_id)) / 100
@@ -188,7 +205,9 @@ export function registerTripHandlers(): void {
       }
     }
     const hasTax = !!(tripData as any).has_percentage_tax
-    const taxValue = hasTax ? (tripData.price_charged * getAppSettings().taxRate) / 100 : 0
+    const taxValue = hasTax
+      ? (tripData.price_charged * getEffectiveTaxRate(tripData.customer_id)) / 100
+      : 0
     const hasCommission = !!(tripData as any).has_commission
     const commissionValue = hasCommission
       ? (tripData.price_charged * getEffectiveCommissionRate(tripData.driver_id)) / 100

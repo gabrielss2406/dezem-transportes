@@ -45,6 +45,10 @@ export const customerSchema = z.object({
     .optional()
     .refine((val) => !val || isValidPhone(val), { message: 'Telefone inválido' }),
   address: z.string().max(255).optional(),
+  tax_rate_id: z.preprocess(
+    (val) => (val === '' || val === null || val === undefined ? null : Number(val)),
+    z.number().int().positive().nullable().optional(),
+  ),
 })
 
 export const productSchema = z.object({
@@ -309,6 +313,17 @@ export const appSettingsSchema = z.object({
   commissionRate: z.preprocess(
     (val) => (val === '' || val === null || val === undefined ? 0 : Number(val)),
     z.number().min(0).max(100, 'Máximo de 100%'),
+  ),
+})
+
+export const taxRateSchema = z.object({
+  name: z.string().trim().min(1, 'Nome é obrigatório').max(50),
+  rate: z.preprocess(
+    (val) => (val === '' || val === null || val === undefined ? undefined : Number(val)),
+    z
+      .number({ message: 'Alíquota é obrigatória' })
+      .min(0, 'Mínimo de 0%')
+      .max(100, 'Máximo de 100%'),
   ),
 })
 

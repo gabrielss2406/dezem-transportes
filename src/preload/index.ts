@@ -18,6 +18,14 @@ contextBridge.exposeInMainWorld('api', {
     delete: (id: number) => ipcRenderer.invoke('customers:delete', id),
   },
 
+  // Tax Rates
+  taxRates: {
+    list: () => ipcRenderer.invoke('taxRates:list'),
+    create: (data: any) => ipcRenderer.invoke('taxRates:create', data),
+    update: (id: number, data: any) => ipcRenderer.invoke('taxRates:update', id, data),
+    delete: (id: number) => ipcRenderer.invoke('taxRates:delete', id),
+  },
+
   // Customer Prices
   customerPrices: {
     listByCustomer: (customerId: number) =>
