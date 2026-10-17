@@ -572,9 +572,6 @@ export function setupDatabase(): void {
 
   // Migration: tax_rates table + customers.tax_rate_id
   // NULL means the customer uses the global default tax rate (app settings).
-  const taxRatesExisted = !!db
-    .prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'tax_rates'")
-    .get()
   db.exec(`
     CREATE TABLE IF NOT EXISTS tax_rates (
       id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -583,14 +580,23 @@ export function setupDatabase(): void {
       created_at TEXT DEFAULT CURRENT_TIMESTAMP
     )
   `)
-  // Seed the default rates only when the table is first created, so rates the user
-  // deletes later do not come back on the next start.
-  if (!taxRatesExisted) {
+  // Seed the default rates once (tracked by a settings flag) and only into an empty table,
+  // so rates the user deletes later do not come back on the next start.
+  const taxRatesSeeded = db.prepare("SELECT 1 FROM settings WHERE key = 'tax_rates_seeded'").get()
+  if (!taxRatesSeeded) {
     const insertTaxRate = db.prepare('INSERT INTO tax_rates (name, rate) VALUES (?, ?)')
+    const taxRatesCount = (
+      db.prepare('SELECT COUNT(*) AS count FROM tax_rates').get() as {
+        count: number
+      }
+    ).count
     db.transaction(() => {
-      insertTaxRate.run('Alíquota 4,72%', 4.72)
-      insertTaxRate.run('Alíquota 5,35%', 5.35)
-      insertTaxRate.run('Alíquota 3,99%', 3.99)
+      if (taxRatesCount === 0) {
+        insertTaxRate.run('Alíquota 4,72%', 4.72)
+        insertTaxRate.run('Alíquota 5,35%', 5.35)
+        insertTaxRate.run('Alíquota 3,99%', 3.99)
+      }
+      db.prepare("INSERT INTO settings (key, value) VALUES ('tax_rates_seeded', '1')").run()
     })()
   }
   const customerInfo = db.pragma('table_info(customers)') as { name: string }[]
