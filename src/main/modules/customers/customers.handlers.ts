@@ -19,18 +19,35 @@ export function registerCustomerHandlers(): void {
   createValidatedHandler('customers:create', customerSchema, (data) => {
     const r = db()
       .prepare(
-        'INSERT INTO customers (name, cnpj, ie, phone, address, customId) VALUES (?,?,?,?,?,?)',
+        'INSERT INTO customers (name, cnpj, ie, phone, address, customId, tax_rate_id) VALUES (?,?,?,?,?,?,?)',
       )
-      .run(data.name, data.cnpj, data.ie, data.phone, data.address, data.customId)
+      .run(
+        data.name,
+        data.cnpj,
+        data.ie,
+        data.phone,
+        data.address,
+        data.customId,
+        data.tax_rate_id ?? null,
+      )
     return { id: r.lastInsertRowid }
   })
 
   createValidatedHandlerWithId('customers:update', customerSchema, (id, data) => {
     db()
       .prepare(
-        'UPDATE customers SET name=?, cnpj=?, ie=?, phone=?, address=?, customId=? WHERE id=?',
+        'UPDATE customers SET name=?, cnpj=?, ie=?, phone=?, address=?, customId=?, tax_rate_id=? WHERE id=?',
       )
-      .run(data.name, data.cnpj, data.ie, data.phone, data.address, data.customId, id)
+      .run(
+        data.name,
+        data.cnpj,
+        data.ie,
+        data.phone,
+        data.address,
+        data.customId,
+        data.tax_rate_id ?? null,
+        id,
+      )
     return { ok: true }
   })
 

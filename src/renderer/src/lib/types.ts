@@ -6,6 +6,13 @@ export interface Customer {
   ie?: string
   phone?: string
   address?: string
+  tax_rate_id?: number | null
+}
+
+export interface TaxRate {
+  id: number
+  name: string
+  rate: number
 }
 
 export interface Product {

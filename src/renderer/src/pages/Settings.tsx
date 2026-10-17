@@ -6,6 +6,7 @@ import { appSettingsSchema } from '../../../shared/schemas'
 import type { AppSettings } from '../../../shared/types'
 import { PageHeader } from '../components/PageHeader'
 import { Button, ConfirmModal, Input, Toast, useToast } from '../components/ui'
+import type { TaxRate } from '../lib/types'
 import { BackupSettings } from './BackupSettings'
 
 const formSchema = z.object({
@@ -284,7 +285,7 @@ function TaxSettings() {
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
         <div>
           <label htmlFor={taxRateId} className="block text-sm font-bold text-on-surface mb-2">
-            Alíquota Percentual (%)
+            Alíquota Padrão (%)
           </label>
           <Controller
             name="taxRate"
@@ -303,7 +304,9 @@ function TaxSettings() {
               />
             )}
           />
-          <p className="text-xs text-on-surface-variant mt-1">Percentual sobre cada viagem</p>
+          <p className="text-xs text-on-surface-variant mt-1">
+            Percentual sobre cada viagem, usado por clientes sem alíquota própria
+          </p>
         </div>
 
         <div>
@@ -339,6 +342,157 @@ function TaxSettings() {
           Salvar
         </Button>
       </form>
+    </Section>
+  )
+}
+
+function TaxRatesManager() {
+  const [items, setItems] = useState<TaxRate[]>([])
+  const [name, setName] = useState('')
+  const [rate, setRate] = useState('')
+  const [editingId, setEditingId] = useState<number | null>(null)
+  const [errors, setErrors] = useState<Record<string, string>>({})
+  const [deleteTarget, setDeleteTarget] = useState<number | null>(null)
+  const { toast, show } = useToast()
+
+  const load = useCallback(() => {
+    window.api.taxRates.list().then(setItems)
+  }, [])
+
+  useEffect(() => {
+    load()
+  }, [load])
+
+  const resetForm = () => {
+    setName('')
+    setRate('')
+    setEditingId(null)
+    setErrors({})
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    const payload = { name, rate }
+    const result =
+      editingId === null
+        ? await window.api.taxRates.create(payload)
+        : await window.api.taxRates.update(editingId, payload)
+    if (result?.ok === false) {
+      setErrors(result.errors ?? {})
+      if (result.errors?.form) {
+        show(result.errors.form, 'error')
+      }
+      return
+    }
+    show(editingId === null ? 'Alíquota adicionada!' : 'Alíquota atualizada!')
+    resetForm()
+    load()
+  }
+
+  const handleEdit = (item: TaxRate) => {
+    setEditingId(item.id)
+    setName(item.name)
+    setRate(String(item.rate))
+    setErrors({})
+  }
+
+  const handleConfirmDelete = async () => {
+    if (deleteTarget === null) {
+      return
+    }
+    const result = await window.api.taxRates.delete(deleteTarget)
+    if (result?.ok === false) {
+      show(result.errors?.form || 'Erro ao excluir alíquota.', 'error')
+    } else {
+      show('Alíquota excluída!')
+      if (editingId === deleteTarget) {
+        resetForm()
+      }
+      load()
+    }
+    setDeleteTarget(null)
+  }
+
+  return (
+    <Section
+      title="Alíquotas cadastradas"
+      subtitle="Escolha qual alíquota usar no cadastro de cada cliente. Clientes sem alíquota usam o padrão acima."
+      icon="percent"
+    >
+      {toast && <Toast message={toast.message} type={toast.type} />}
+      <div className="space-y-2">
+        {items.length === 0 ? (
+          <p className="text-xs text-on-surface-variant italic p-2">Nenhuma alíquota cadastrada</p>
+        ) : (
+          items.map((item) => (
+            <div
+              key={item.id}
+              className="flex items-center justify-between bg-surface-container p-2.5 rounded text-sm"
+            >
+              <p className="font-bold text-on-surface truncate flex-1">
+                {item.name}{' '}
+                <span className="font-normal text-on-surface-variant">— {item.rate}%</span>
+              </p>
+              <button
+                type="button"
+                onClick={() => handleEdit(item)}
+                className="ml-2 p-1 text-on-surface-variant rounded hover:text-primary hover:bg-primary/10 flex-shrink-0"
+                title="Editar"
+              >
+                <span className="material-symbols-outlined text-lg">edit</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setDeleteTarget(item.id)}
+                className="ml-1 p-1 text-on-surface-variant rounded hover:text-error hover:bg-error/10 flex-shrink-0"
+                title="Excluir"
+              >
+                <span className="material-symbols-outlined text-lg">delete</span>
+              </button>
+            </div>
+          ))
+        )}
+      </div>
+
+      <form
+        onSubmit={handleSubmit}
+        className="flex gap-2 items-start border-t border-outline-variant/20 pt-3"
+      >
+        <Input
+          placeholder="Nome (ex: Regime A)"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          error={errors.name}
+          className="flex-1"
+        />
+        <Input
+          type="number"
+          step="0.01"
+          min="0"
+          max="100"
+          placeholder="%"
+          value={rate}
+          onChange={(e) => setRate(e.target.value)}
+          error={errors.rate}
+          className="w-28"
+        />
+        <Button type="submit" size="sm" className="h-9">
+          <span className="material-symbols-outlined">{editingId === null ? 'add' : 'check'}</span>
+        </Button>
+        {editingId !== null && (
+          <Button type="button" size="sm" variant="secondary" className="h-9" onClick={resetForm}>
+            <span className="material-symbols-outlined">close</span>
+          </Button>
+        )}
+      </form>
+
+      {deleteTarget !== null && (
+        <ConfirmModal
+          message="Tem certeza que deseja excluir esta alíquota?"
+          onConfirm={handleConfirmDelete}
+          onCancel={() => setDeleteTarget(null)}
+        />
+      )}
     </Section>
   )
 }
@@ -390,6 +544,7 @@ export function SettingsPage({ theme, onToggleTheme }: SettingsPageProps) {
             </Section>
 
             <TaxSettings />
+            <TaxRatesManager />
           </div>
         )}
 

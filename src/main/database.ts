@@ -570,6 +570,21 @@ export function setupDatabase(): void {
     db.exec('ALTER TABLE drivers ADD COLUMN commission_rate_override REAL DEFAULT NULL')
   }
 
+  // Migration: tax_rates table + customers.tax_rate_id
+  // NULL means the customer uses the global default tax rate (app settings).
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS tax_rates (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      name       TEXT NOT NULL,
+      rate       REAL NOT NULL,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP
+    )
+  `)
+  const customerInfo = db.pragma('table_info(customers)') as { name: string }[]
+  if (!customerInfo.some((col) => col.name === 'tax_rate_id')) {
+    db.exec('ALTER TABLE customers ADD COLUMN tax_rate_id INTEGER REFERENCES tax_rates(id)')
+  }
+
   // Migration: Add installment fields to costs if missing
   const costInfo = db.pragma('table_info(costs)') as { name: string }[]
   if (!costInfo.some((col) => col.name === 'installment_group_id')) {
