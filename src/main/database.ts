@@ -572,6 +572,9 @@ export function setupDatabase(): void {
 
   // Migration: tax_rates table + customers.tax_rate_id
   // NULL means the customer uses the global default tax rate (app settings).
+  const taxRatesExisted = !!db
+    .prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'tax_rates'")
+    .get()
   db.exec(`
     CREATE TABLE IF NOT EXISTS tax_rates (
       id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -580,6 +583,16 @@ export function setupDatabase(): void {
       created_at TEXT DEFAULT CURRENT_TIMESTAMP
     )
   `)
+  // Seed the default rates only when the table is first created, so rates the user
+  // deletes later do not come back on the next start.
+  if (!taxRatesExisted) {
+    const insertTaxRate = db.prepare('INSERT INTO tax_rates (name, rate) VALUES (?, ?)')
+    db.transaction(() => {
+      insertTaxRate.run('Alíquota 4,72%', 4.72)
+      insertTaxRate.run('Alíquota 5,35%', 5.35)
+      insertTaxRate.run('Alíquota 3,99%', 3.99)
+    })()
+  }
   const customerInfo = db.pragma('table_info(customers)') as { name: string }[]
   if (!customerInfo.some((col) => col.name === 'tax_rate_id')) {
     db.exec('ALTER TABLE customers ADD COLUMN tax_rate_id INTEGER REFERENCES tax_rates(id)')
