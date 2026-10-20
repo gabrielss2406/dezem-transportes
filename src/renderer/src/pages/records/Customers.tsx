@@ -387,7 +387,7 @@ export function CustomersPage() {
                       {taxRateById(row.tax_rate_id)?.name} · {taxRateById(row.tax_rate_id)?.rate}%
                     </span>
                   ) : (
-                    <span className="text-on-surface-variant">Padrão</span>
+                    <span className="text-on-surface-variant">Padrão · {defaultTaxRate}%</span>
                   )}
                 </td>
                 <td className="px-8 py-5">
