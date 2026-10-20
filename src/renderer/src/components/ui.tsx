@@ -229,6 +229,13 @@ interface SelectProps {
   icon?: string
 }
 
+// Dropdown layout constants (px): list cap matches the old `max-h-52`; search box height
+// includes its padding.
+const SELECT_LIST_MAX_HEIGHT = 208
+const SELECT_LIST_MIN_HEIGHT = 96
+const SELECT_SEARCH_HEIGHT = 56
+const SELECT_VIEWPORT_MARGIN = 12
+
 export const Select = forwardRef<SelectRef, SelectProps>(
   (
     {
@@ -252,7 +259,13 @@ export const Select = forwardRef<SelectRef, SelectProps>(
     const buttonRef = useRef<HTMLButtonElement>(null)
     const searchInputRef = useRef<HTMLInputElement>(null)
     const optionRefs = useRef<(HTMLButtonElement | null)[]>([])
-    const [coords, setCoords] = useState({ top: 0, left: 0, width: 0 })
+    const [coords, setCoords] = useState<{
+      top?: number
+      bottom?: number
+      left: number
+      width: number
+      listMaxHeight: number
+    }>({ left: 0, width: 0, listMaxHeight: SELECT_LIST_MAX_HEIGHT })
     const uniqueId = useRef(Math.random())
     const id = React.useId()
 
@@ -347,11 +360,24 @@ export const Select = forwardRef<SelectRef, SelectProps>(
 
     const updateCoords = React.useCallback(() => {
       if (buttonRef.current) {
+        // The dropdown is position: fixed, so it uses viewport coordinates (no scroll offset).
+        // Open upwards when there is not enough room below, and cap the list height to the
+        // space available so the last options are never cut off by the window edge.
         const rect = buttonRef.current.getBoundingClientRect()
+        const spaceBelow = window.innerHeight - rect.bottom - SELECT_VIEWPORT_MARGIN
+        const spaceAbove = rect.top - SELECT_VIEWPORT_MARGIN
+        const neededHeight = SELECT_SEARCH_HEIGHT + SELECT_LIST_MAX_HEIGHT
+        const openUp = spaceBelow < neededHeight && spaceAbove > spaceBelow
+        const available = openUp ? spaceAbove : spaceBelow
+        const listMaxHeight = Math.max(
+          SELECT_LIST_MIN_HEIGHT,
+          Math.min(SELECT_LIST_MAX_HEIGHT, available - SELECT_SEARCH_HEIGHT),
+        )
         setCoords({
-          top: rect.bottom + window.scrollY,
-          left: rect.left + window.scrollX,
+          ...(openUp ? { bottom: window.innerHeight - rect.top + 4 } : { top: rect.bottom + 4 }),
+          left: rect.left,
           width: rect.width,
+          listMaxHeight,
         })
       }
     }, [])
@@ -456,7 +482,8 @@ export const Select = forwardRef<SelectRef, SelectProps>(
               onMouseDown={(e) => e.stopPropagation()}
               onClick={(e) => e.stopPropagation()}
               style={{
-                top: coords.top + 4,
+                top: coords.top,
+                bottom: coords.bottom,
                 left: coords.left,
                 width: coords.width,
               }}
@@ -491,7 +518,7 @@ export const Select = forwardRef<SelectRef, SelectProps>(
                   className="w-full bg-surface-container border border-outline-variant/30 rounded-md px-3 py-2 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:outline-none focus:ring-1 focus:ring-primary/50"
                 />
               </div>
-              <div className="max-h-52 overflow-y-auto py-1">
+              <div className="overflow-y-auto py-1" style={{ maxHeight: coords.listMaxHeight }}>
                 {optional && searchTerm.length === 0 && (
                   <button
                     type="button"
