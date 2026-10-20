@@ -1,5 +1,5 @@
 import { ipcMain } from 'electron'
-import { calculateFuelEfficiencyKmPerLiter } from '../../../shared/fuel'
+import { calculateFuelEfficiencyKmPerLiter, calculatePeriodDistanceKm } from '../../../shared/fuel'
 import { getDb } from '../../database'
 import { getMaintenanceStatus } from '../maintenance/maintenance.handlers'
 
@@ -346,28 +346,8 @@ export function registerDashboardHandlers(): void {
       const endOdo = t.end_odometer != null ? Number(t.end_odometer) : null
       const prevOdo = t.prev_odometer != null ? Number(t.prev_odometer) : null
 
-      let km = 0
-      if (endOdo != null && startOdo != null && endOdo > startOdo) {
-        // Multiple readings in period: use first to last
-        km = endOdo - startOdo
-      } else if (
-        endOdo != null &&
-        startOdo != null &&
-        endOdo === startOdo &&
-        prevOdo != null &&
-        endOdo > prevOdo
-      ) {
-        // Single reading in period: use previous period's last reading as baseline
-        km = endOdo - prevOdo
-      } else if (endOdo != null && prevOdo != null && endOdo > prevOdo) {
-        // No reading in period but has previous: shouldn't happen with current query, but guard
-        km = endOdo - prevOdo
-      }
-      // Negative distance shouldn't happen (fuel records enforce chronological monotonicity),
-      // but guard it anyway rather than surfacing a nonsensical negative CPK.
-      if (km < 0) {
-        km = 0
-      }
+      // Baseline is the previous period's last reading, so the month-boundary gap is counted.
+      const km = calculatePeriodDistanceKm({ startOdo, endOdo, prevOdo })
       const fuelStopsCost = fuelStopsCostMap.get(t.id) || 0
       const fuelRecordsCost = fuelRecordsCostMap.get(t.id) || 0
       const fuelCost = Number(fuelStopsCost) + Number(fuelRecordsCost)
