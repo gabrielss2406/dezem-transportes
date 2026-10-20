@@ -592,7 +592,6 @@ export function setupDatabase(): void {
     ).count
     db.transaction(() => {
       if (taxRatesCount === 0) {
-        insertTaxRate.run('Alíquota 4,72%', 4.72)
         insertTaxRate.run('Alíquota 5,35%', 5.35)
         insertTaxRate.run('Alíquota 3,99%', 3.99)
       }
