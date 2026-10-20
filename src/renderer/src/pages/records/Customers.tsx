@@ -381,14 +381,10 @@ export function CustomersPage() {
                 <td className="px-8 py-5 text-sm text-on-surface font-medium">
                   {row.phone || '—'}
                 </td>
-                <td className="px-8 py-5 text-sm">
-                  {taxRateById(row.tax_rate_id) ? (
-                    <span className="px-2 py-1 rounded bg-amber-500/10 text-amber-500 text-xs font-bold">
-                      {taxRateById(row.tax_rate_id)?.name} · {taxRateById(row.tax_rate_id)?.rate}%
-                    </span>
-                  ) : (
-                    <span className="text-on-surface-variant">Padrão · {defaultTaxRate}%</span>
-                  )}
+                <td className="px-8 py-5 text-sm text-on-surface-variant">
+                  {taxRateById(row.tax_rate_id)
+                    ? `${taxRateById(row.tax_rate_id)?.name} · ${taxRateById(row.tax_rate_id)?.rate}%`
+                    : `Padrão · ${defaultTaxRate}%`}
                 </td>
                 <td className="px-8 py-5">
                   <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
