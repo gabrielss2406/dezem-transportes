@@ -236,7 +236,8 @@ export function BankBalanceHistory({ onError }: BankBalanceHistoryProps) {
               Histórico de Saldo Bancário
             </h2>
             <p className="text-[10px] text-on-surface-variant mt-0.5">
-              Saldo informado manualmente, um registro por mês — não é calculado pelo fluxo de caixa
+              Saldo inicial informado manualmente, um registro por mês — o saldo do card soma as
+              baixas por cima dele
             </p>
           </div>
         </div>
@@ -500,12 +501,16 @@ export function BankBalanceHistory({ onError }: BankBalanceHistoryProps) {
         >
           <div className="space-y-4">
             <p className="text-sm text-on-surface-variant">
-              Informe o saldo que estava no banco em{' '}
+              Informe o saldo inicial de{' '}
               <span className="font-bold capitalize">{formatMonthLabel(selectedMonth)}</span>. É um
-              registro manual: salvar aqui altera apenas este mês e não recalcula os outros, nem é
-              alterado por receitas, custos ou baixas.
+              registro manual: salvar aqui altera apenas este mês e não recalcula os outros. As
+              baixas do mês são somadas a ele no card do Dashboard, sem alterar este valor.
             </p>
-            <CurrencyInput label="Saldo do mês" value={balanceInput} onChange={setBalanceInput} />
+            <CurrencyInput
+              label="Saldo inicial do mês"
+              value={balanceInput}
+              onChange={setBalanceInput}
+            />
             <div className="flex justify-end gap-3">
               <Button variant="ghost" onClick={() => setEditModal(false)}>
                 Cancelar

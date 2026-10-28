@@ -846,15 +846,85 @@ export function registerDashboardHandlers(): void {
          WHERE status = 'open' AND date < date('now')`,
       )
       .get() as any
-    // Saldo Bancário is a manually entered monthly snapshot, intentionally independent
-    // from DRE and from receivables/costs movements. Only the month the period starts in
-    // is read, and a month the user never informed stays null — no neighbouring month is
-    // substituted in, so the card never implies a figure that was never recorded.
+    // Saldo Bancário (cash basis, independent from DRE): the balance typed for the month the
+    // period starts in is the INITIAL balance, and cash movements from the 1st of that month
+    // up to min(endDate, today) are applied on top of it. A month the user never informed
+    // stays null — no neighbouring month is substituted in, so the card never implies a
+    // figure that was never recorded.
     const bankBalanceMonth = startDate.slice(0, 7)
     const bankBalanceRow = db()
       .prepare('SELECT balance FROM bank_balances WHERE month = ?')
       .get(bankBalanceMonth) as { balance: number } | undefined
-    const bankBalance = bankBalanceRow ? Number(bankBalanceRow.balance) : null
+    const bankInitialBalance = bankBalanceRow ? Number(bankBalanceRow.balance) : null
+
+    const sumOf = (sql: string, ...params: any[]): number =>
+      Number(
+        ((
+          db()
+            .prepare(sql)
+            .get(...params) as any
+        )?.total as number) ?? 0,
+      ) || 0
+    const cashFrom = `${bankBalanceMonth}-01`
+    const todayLocal = (db().prepare("SELECT date('now', 'localtime') AS d").get() as any)
+      .d as string
+    const cashTo = endDate < todayLocal ? endDate : todayLocal
+    // Receivables paid in the window. Third-party trips are intentionally included: the
+    // cash passes through the company account and the repasse is subtracted below.
+    // kind='adjustment' is the legacy initial-balance workaround and would double-count.
+    const cashReceived = sumOf(
+      `SELECT COALESCE(SUM(amount), 0) AS total FROM receivables
+       WHERE status = 'paid' AND kind = 'revenue' AND paid_date BETWEEN ? AND ?`,
+      cashFrom,
+      cashTo,
+    )
+    // category 'fuel' is excluded like in the DRE: fuel is read from fuel_records/stops.
+    const cashPaidCosts = sumOf(
+      `SELECT COALESCE(SUM(value), 0) AS total FROM costs
+       WHERE status = 'paid' AND category != 'fuel' AND paid_date BETWEEN ? AND ?`,
+      cashFrom,
+      cashTo,
+    )
+    // Fuel is auto-settled on its due date (no baixa): any purchase whose due_date already
+    // arrived is out of the account. Same internal-truck scope as the DRE.
+    const cashFuel =
+      sumOf(
+        `SELECT COALESCE(SUM(fr.value), 0) AS total
+         FROM fuel_records fr
+         JOIN trucks t ON fr.truck_id = t.id
+         WHERE COALESCE(fr.due_date, fr.date) BETWEEN ? AND ? AND ${INTERNAL_TRUCK}`,
+        cashFrom,
+        cashTo,
+      ) +
+      sumOf(
+        `SELECT COALESCE(SUM(fs.value), 0) AS total
+         FROM trip_fuel_stops fs
+         JOIN trips tr ON fs.trip_id = tr.id
+         JOIN trucks t ON tr.truck_id = t.id
+         JOIN drivers d ON tr.driver_id = d.id
+         WHERE COALESCE(fs.due_date, tr.date) BETWEEN ? AND ?
+           AND ${INTERNAL_TRUCK} AND ${INTERNAL_DRIVER} AND ${NOT_THIRD_PARTY}`,
+        cashFrom,
+        cashTo,
+      )
+    const cashSettlements = sumOf(
+      `SELECT COALESCE(SUM(amount), 0) AS total FROM third_party_settlements
+       WHERE status = 'settled' AND settled_date BETWEEN ? AND ?`,
+      cashFrom,
+      cashTo,
+    )
+    const bankBalance =
+      bankInitialBalance === null
+        ? null
+        : bankInitialBalance + cashReceived - cashPaidCosts - cashFuel - cashSettlements
+    const bankBalanceBreakdown = {
+      initial: bankInitialBalance,
+      received: cashReceived,
+      paidCosts: cashPaidCosts,
+      fuel: cashFuel,
+      settlements: cashSettlements,
+      asOf: cashTo,
+    }
 
     const oilCreditSummary = db()
       .prepare(
@@ -896,6 +966,7 @@ export function registerDashboardHandlers(): void {
       perProduct,
       bankBalance,
       bankBalanceMonth,
+      bankBalanceBreakdown,
       receivablesOpenTotal: Number(receivablesOpenTotal) || 0,
       costsOpenTotal: Number(costsOpenTotal) || 0,
       costsOverdueCount: Number(costsOverdue.c) || 0,

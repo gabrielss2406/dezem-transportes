@@ -93,3 +93,32 @@ A ação rápida **Saldo Bancário** do Menu continua existindo e grava sempre o
 Receita, custos, despesas, lucro e DRE continuam sem qualquer relação com o saldo bancário. Lançar
 ou dar baixa em recebíveis e custos não altera nenhum saldo mensal, e editar um saldo mensal não
 altera nenhum número do DRE.
+
+## Atualização — saldo calculado a partir do saldo inicial (Out/2026)
+
+Pedido do cliente: baixa de conta a receber soma no saldo, baixa de conta a pagar desconta, e
+abastecimento desconta automaticamente no vencimento, sem mudar o DRE.
+
+O valor digitado em `bank_balances` passa a ser o **saldo inicial do mês**. O card "Saldo
+Bancário" do Dashboard (`dashboard:summary`, `bankBalance`) agora é calculado em tempo de
+consulta, sem gravar nada:
+
+```
+saldo = saldo inicial do mês de startDate
+      + recebíveis baixados (kind='revenue', paid_date)
+      - custos baixados (status='paid', paid_date, exceto category 'fuel')
+      - abastecimentos com due_date <= hoje (fuel_records e trip_fuel_stops, caminhão interno)
+      - repasses a terceiros quitados (settled_date)
+```
+
+Janela: do dia 1 do mês de `startDate` até `min(endDate, hoje)`. Detalhe em
+`bankBalanceBreakdown`.
+
+- Abastecimento não tem baixa manual: `due_date` (novo campo em `fuel_records` e
+  `trip_fuel_stops`) define quando sai do saldo. Vazio = data do abastecimento. Registros
+  antigos foram migrados com `due_date` = data do abastecimento.
+- O DRE segue contando abastecimento na data do abastecimento (queries inalteradas).
+- Recebível `kind='adjustment'` (atalho antigo de saldo inicial) **não** entra no saldo calculado,
+  para não duplicar o saldo inicial digitado.
+- Viagem de terceiro: a baixa do recebível entra e o repasse quitado sai.
+- Mês sem saldo inicial continua "Não informado".

@@ -453,7 +453,7 @@ export function DashboardPage() {
                 info={
                   summary.bankBalance === null
                     ? `Não informado para ${formatMonthLabel(summary.bankBalanceMonth)}`
-                    : `Informado manualmente · ${formatMonthLabel(summary.bankBalanceMonth)}`
+                    : `Inicial ${formatBRL(summary.bankBalanceBreakdown.initial ?? 0)} · +${formatBRL(summary.bankBalanceBreakdown.received)} recebido · −${formatBRL(summary.bankBalanceBreakdown.paidCosts + summary.bankBalanceBreakdown.fuel + summary.bankBalanceBreakdown.settlements)} pago`
                 }
               />
 
