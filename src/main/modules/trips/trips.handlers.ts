@@ -184,10 +184,17 @@ export function registerTripHandlers(): void {
 
       if (fuel_stops && fuel_stops.length > 0) {
         const insertStop = db().prepare(
-          'INSERT INTO trip_fuel_stops (trip_id, supplier_id, value, liters, km_driven) VALUES (?, ?, ?, ?, ?)',
+          'INSERT INTO trip_fuel_stops (trip_id, supplier_id, value, liters, km_driven, due_date) VALUES (?, ?, ?, ?, ?, ?)',
         )
         for (const stop of fuel_stops) {
-          insertStop.run(tripId, stop.supplier_id, stop.value, stop.liters, stop.km_driven)
+          insertStop.run(
+            tripId,
+            stop.supplier_id,
+            stop.value,
+            stop.liters,
+            stop.km_driven,
+            stop.due_date || tripData.date,
+          )
         }
       }
 
@@ -295,10 +302,17 @@ export function registerTripHandlers(): void {
         db().prepare('DELETE FROM trip_fuel_stops WHERE trip_id = ?').run(id)
         if (fuel_stops.length > 0) {
           const insertStop = db().prepare(
-            'INSERT INTO trip_fuel_stops (trip_id, supplier_id, value, liters, km_driven) VALUES (?, ?, ?, ?, ?)',
+            'INSERT INTO trip_fuel_stops (trip_id, supplier_id, value, liters, km_driven, due_date) VALUES (?, ?, ?, ?, ?, ?)',
           )
           for (const stop of fuel_stops) {
-            insertStop.run(id, stop.supplier_id, stop.value, stop.liters, stop.km_driven)
+            insertStop.run(
+              id,
+              stop.supplier_id,
+              stop.value,
+              stop.liters,
+              stop.km_driven,
+              stop.due_date || tripData.date,
+            )
           }
         }
       }

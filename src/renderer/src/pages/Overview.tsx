@@ -244,13 +244,14 @@ export function OverviewPage({ user, onNavigate }: OverviewProps) {
         >
           <div className="space-y-4">
             <p className="text-sm text-on-surface-variant">
-              Informe o valor que está atualmente no banco. Ele fica registrado como o saldo de{' '}
-              <span className="font-bold capitalize">{formatMonthLabel(month)}</span> e não é
-              alterado por receitas, custos ou baixas. Para corrigir meses anteriores, use o
-              histórico de saldo bancário no Dashboard.
+              Informe o saldo inicial de{' '}
+              <span className="font-bold capitalize">{formatMonthLabel(month)}</span>. O saldo
+              exibido no Dashboard soma a ele as baixas de contas a receber e desconta as baixas de
+              contas a pagar, os abastecimentos no vencimento e os repasses a terceiros. Para
+              corrigir meses anteriores, use o histórico de saldo bancário no Dashboard.
             </p>
             <CurrencyInput
-              label="Saldo do mês"
+              label="Saldo inicial do mês"
               value={bankBalanceInput}
               onChange={setBankBalanceInput}
             />

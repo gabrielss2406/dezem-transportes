@@ -312,8 +312,19 @@ export interface DashboardSummary {
     tonnage: number
     trips: number
   }>
-  /** Manual snapshot recorded for bankBalanceMonth, or null when that month has none. */
+  /**
+   * Initial balance typed for bankBalanceMonth plus cash movements up to bankBalanceBreakdown.asOf,
+   * or null when that month has no initial balance.
+   */
   bankBalance: number | null
+  bankBalanceBreakdown: {
+    initial: number | null
+    received: number
+    paidCosts: number
+    fuel: number
+    settlements: number
+    asOf: string
+  }
   /** 'YYYY-MM' the snapshot above refers to — the month the selected period starts in. */
   bankBalanceMonth: string
   receivablesOpenTotal: number

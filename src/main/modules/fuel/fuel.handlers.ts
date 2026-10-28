@@ -96,12 +96,13 @@ export function registerFuelHandlers(): void {
       const r = db()
         .prepare(
           `INSERT INTO fuel_records
-            (truck_id, date, liters, value, gross_value, credit_value, credit_customer_id, voucher_number, odometer_at_service, supplier_id, notes)
-           VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?)`,
+            (truck_id, date, due_date, liters, value, gross_value, credit_value, credit_customer_id, voucher_number, odometer_at_service, supplier_id, notes)
+           VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?)`,
         )
         .run(
           data.truck_id,
           data.date,
+          data.due_date || data.date,
           data.liters || null,
           data.value,
           data.value,

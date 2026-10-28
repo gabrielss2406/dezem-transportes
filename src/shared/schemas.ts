@@ -160,11 +160,23 @@ export const fuelStopSchema = z.object({
   value: requiredNumber(1000000, 'Valor máximo de R$ 1.000.000'),
   liters: optionalNumber(10000, 'Máximo de 10.000 litros'),
   km_driven: optionalNumber(10000, 'KM máximo de 10.000'),
+  due_date: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, 'Data inválida')
+    .optional(),
 })
 
 export const fuelRecordSchema = z.object({
   truck_id: requiredNumber(999999999, 'ID inválido'),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data inválida'),
+  // Cash-basis settlement date; empty/missing falls back to `date` in the handler.
+  due_date: z.preprocess(
+    (val) => (val === '' || val === null ? undefined : val),
+    z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/, 'Data inválida')
+      .optional(),
+  ),
   liters: optionalNumber(10000, 'Máximo de 10.000 litros'),
   value: requiredNumber(1000000, 'Valor máximo de R$ 1.000.000'),
   odometer_at_service: requiredNumber(9999999, 'KM máximo de 9.999.999'),

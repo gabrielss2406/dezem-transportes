@@ -651,6 +651,21 @@ export function setupDatabase(): void {
     'CREATE UNIQUE INDEX IF NOT EXISTS idx_fuel_records_voucher ON fuel_records(voucher_number) WHERE voucher_number IS NOT NULL',
   )
 
+  // Migration: Add due_date to fuel purchases (cash-basis settlement date used by the bank
+  // balance; DRE keeps using the fuel date). Legacy rows default to the fuel date itself,
+  // i.e. "paid on the spot", which is how they were treated before this column existed.
+  if (!fuelRecordInfo.some((col) => col.name === 'due_date')) {
+    db.exec('ALTER TABLE fuel_records ADD COLUMN due_date TEXT')
+    db.exec('UPDATE fuel_records SET due_date = date WHERE due_date IS NULL')
+  }
+  const fuelStopInfo = db.pragma('table_info(trip_fuel_stops)') as { name: string }[]
+  if (!fuelStopInfo.some((col) => col.name === 'due_date')) {
+    db.exec('ALTER TABLE trip_fuel_stops ADD COLUMN due_date TEXT')
+    db.exec(
+      'UPDATE trip_fuel_stops SET due_date = (SELECT date FROM trips WHERE trips.id = trip_fuel_stops.trip_id) WHERE due_date IS NULL',
+    )
+  }
+
   // Migration: Create oil credit ledger tables for existing installations.
   db.exec(`
     CREATE TABLE IF NOT EXISTS oil_credit_entries (

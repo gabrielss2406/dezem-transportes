@@ -58,6 +58,7 @@ interface CostFormData {
 interface FuelFormData {
   truck_id: number
   date: string
+  due_date?: string
   liters: number | null
   value: number
   odometer_at_service: number
@@ -84,6 +85,7 @@ const EMPTY_COST: CostFormData = {
 const EMPTY_FUEL: FuelFormData = {
   truck_id: 0,
   date: today(),
+  due_date: '',
   liters: null,
   value: 0,
   odometer_at_service: 0,
@@ -247,6 +249,7 @@ export function CostsPage() {
     reset: resetFuel,
     control: fuelControl,
     watch: watchFuel,
+    setValue: setFuelValue,
     setError: setFuelError,
   } = useForm<FuelFormData>({
     resolver: zodResolver(fuelRecordSchema) as any,
@@ -2360,7 +2363,17 @@ export function CostsPage() {
                     label="Caminhão"
                     icon="local_shipping"
                     value={field.value}
-                    onChange={field.onChange}
+                    onChange={(truckId) => {
+                      field.onChange(truckId)
+                      // Pre-fill the odometer with the truck's last known reading; still editable.
+                      const truck = trucks.find((t) => String(t.id) === String(truckId))
+                      if (truck) {
+                        setFuelValue('odometer_at_service', Number(truck.current_odometer) || 0, {
+                          shouldDirty: true,
+                          shouldValidate: true,
+                        })
+                      }
+                    }}
                     onEnterSelect={() => fuelDateRef.current?.focus()}
                     error={fuelErrors.truck_id?.message}
                     options={trucks.map((t) => ({
@@ -2469,6 +2482,27 @@ export function CostsPage() {
                 />
               )}
             />
+            <div className="col-span-2">
+              <Controller
+                name="due_date"
+                control={fuelControl}
+                render={({ field }) => (
+                  <div>
+                    <DatePicker
+                      label="Vencimento"
+                      optional
+                      value={field.value ?? ''}
+                      onChange={field.onChange}
+                      error={fuelErrors.due_date?.message}
+                    />
+                    <p className="text-[11px] text-on-surface-variant/60 mt-1 ml-1">
+                      Data em que o valor sai do saldo bancário (automático). Vazio = data do
+                      abastecimento. Não altera o DRE.
+                    </p>
+                  </div>
+                )}
+              />
+            </div>
             <div className="col-span-2">
               <Controller
                 name="credit_mode"
