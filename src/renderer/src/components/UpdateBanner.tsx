@@ -110,7 +110,12 @@ export function UpdateSettings() {
     <div className="bg-surface-container-low p-6 rounded-xl border border-outline-variant/10">
       <div className="flex items-center gap-3 mb-4">
         <span className="material-symbols-outlined text-xl text-primary">system_update</span>
-        <h3 className="text-base font-bold text-on-surface">Atualizações</h3>
+        <div>
+          <h3 className="text-base font-bold text-on-surface">Atualizações</h3>
+          <p className="text-xs text-on-surface-variant">
+            O app verifica novas versões automaticamente ao abrir.
+          </p>
+        </div>
       </div>
       <div className="flex items-center justify-between p-4 bg-surface-container rounded-lg">
         <div>
