@@ -190,6 +190,20 @@ contextBridge.exposeInMainWorld('api', {
     },
   },
 
+  // Atualizações (electron-updater)
+  updater: {
+    getVersion: () => ipcRenderer.invoke('updater:get-version'),
+    getStatus: () => ipcRenderer.invoke('updater:get-status'),
+    check: () => ipcRenderer.invoke('updater:check'),
+    download: () => ipcRenderer.invoke('updater:download'),
+    install: () => ipcRenderer.invoke('updater:install'),
+    onStatus: (callback: (status: any) => void) => {
+      const listener = (_event: any, status: any) => callback(status)
+      ipcRenderer.on('updater:status', listener)
+      return () => ipcRenderer.removeListener('updater:status', listener)
+    },
+  },
+
   // Bank Balances (manual monthly snapshots)
   bankBalances: {
     list: () => ipcRenderer.invoke('bank-balances:list'),

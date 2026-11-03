@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { MemoryRouter, Route, Routes, useNavigate } from 'react-router-dom'
 import { Sidebar } from './components/Sidebar'
+import { UpdateBanner } from './components/UpdateBanner'
 import { CostsPage } from './pages/Costs'
 import { DashboardPage } from './pages/Dashboard'
 import { DesignSystemPage } from './pages/DesignSystem'
@@ -59,6 +60,7 @@ function AppRoutes() {
         element={
           <div className="flex h-screen bg-surface overflow-hidden">
             <Sidebar onLogout={handleLogout} />
+            <UpdateBanner />
             <main className="flex-1 overflow-y-auto">
               <Routes>
                 <Route path="/" element={<DashboardPage />} />

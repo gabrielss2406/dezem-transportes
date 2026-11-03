@@ -5,6 +5,7 @@ import { z } from 'zod'
 import { appSettingsSchema } from '../../../shared/schemas'
 import type { AppSettings } from '../../../shared/types'
 import { PageHeader } from '../components/PageHeader'
+import { UpdateSettings } from '../components/UpdateBanner'
 import { Button, ConfirmModal, Input, Toast, useToast } from '../components/ui'
 import type { TaxRate } from '../lib/types'
 import { BackupSettings } from './BackupSettings'
@@ -545,6 +546,7 @@ export function SettingsPage({ theme, onToggleTheme }: SettingsPageProps) {
 
             <TaxSettings />
             <TaxRatesManager />
+            <UpdateSettings />
           </div>
         )}
 

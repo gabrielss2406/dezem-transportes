@@ -28,6 +28,7 @@ import { registerTaxRateHandlers } from './modules/tax-rates/tax-rates.handlers'
 import { registerThirdPartySettlementsHandlers } from './modules/third-party-settlements/third-party-settlements.handlers'
 import { registerTripHandlers } from './modules/trips/trips.handlers'
 import { registerTruckHandlers } from './modules/trucks/trucks.handlers'
+import { initAutoUpdater, registerUpdaterHandlers } from './modules/updater/updater.handlers'
 import { createWindow } from './window'
 
 process.on('uncaughtException', (error) => {
@@ -73,6 +74,7 @@ app.whenReady().then(async () => {
   registerTripHandlers()
   registerTruckHandlers()
   registerBackupHandlers()
+  registerUpdaterHandlers()
 
   // Renderer-supplied file names are never trusted directly: strip path separators and
   // anything that isn't a safe filename character, then confirm the resolved path still
@@ -122,6 +124,7 @@ app.whenReady().then(async () => {
 
   const win = createWindow()
   startBackupScheduler(win)
+  initAutoUpdater()
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {

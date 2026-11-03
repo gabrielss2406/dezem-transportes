@@ -572,6 +572,16 @@ declare global {
           callback: (status: import('../../../shared/types').BackupStatus) => void,
         ): () => void
       }
+      updater: {
+        getVersion(): Promise<string>
+        getStatus(): Promise<import('../../../shared/types').UpdateStatus>
+        check(): Promise<void>
+        download(): Promise<void>
+        install(): Promise<void>
+        onStatus(
+          callback: (status: import('../../../shared/types').UpdateStatus) => void,
+        ): () => void
+      }
       bankBalances: {
         list(): Promise<import('../../../shared/types').BankBalanceRecord[]>
         get(month: string): Promise<import('../../../shared/types').BankBalanceRecord | null>

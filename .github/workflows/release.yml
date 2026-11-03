@@ -1,0 +1,47 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            platform: --win
+          - os: ubuntu-latest
+            platform: --linux
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Gerar .env.production
+        shell: bash
+        run: |
+          {
+            echo "MAIN_VITE_R2_ENDPOINT=${{ secrets.MAIN_VITE_R2_ENDPOINT }}"
+            echo "MAIN_VITE_R2_BUCKET=${{ secrets.MAIN_VITE_R2_BUCKET }}"
+            echo "MAIN_VITE_R2_ACCESS_KEY_ID=${{ secrets.MAIN_VITE_R2_ACCESS_KEY_ID }}"
+            echo "MAIN_VITE_R2_SECRET_ACCESS_KEY=${{ secrets.MAIN_VITE_R2_SECRET_ACCESS_KEY }}"
+          } > .env.production
+          cp .env.production .env
+
+      - run: npm run build
+
+      - run: npx electron-builder ${{ matrix.platform }} --publish always
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

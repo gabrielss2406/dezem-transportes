@@ -60,3 +60,12 @@ export interface TruckMaintenanceStatus {
   current_odometer: number
   types: TruckMaintenanceTypeStatus[]
 }
+
+export type UpdateStatus =
+  | { state: 'idle' }
+  | { state: 'checking' }
+  | { state: 'available'; version: string }
+  | { state: 'not-available' }
+  | { state: 'downloading'; version: string; percent: number }
+  | { state: 'downloaded'; version: string }
+  | { state: 'error'; message: string }
