@@ -141,6 +141,7 @@ export function MaintenancePage() {
   const typeSelectRef = useRef<SelectRef>(null)
   const dateRef = useRef<HTMLInputElement>(null)
   const odometerRef = useRef<HTMLInputElement>(null)
+  const confirmWarningRef = useRef<HTMLButtonElement>(null)
   const notesRef = useRef<HTMLInputElement>(null)
 
   const {
@@ -412,6 +413,16 @@ export function MaintenancePage() {
   useEffect(() => {
     setOdometerWarning(null)
   }, [watchedRecordTruckId, watchedRecordDate, watchedRecordOdometer])
+
+  // Move focus to "Salvar mesmo assim" when the km warning appears, so the keyboard
+  // flow continues there. The delay lets a closing ConfirmModal release focus first.
+  useEffect(() => {
+    if (!odometerWarning) {
+      return
+    }
+    const timer = setTimeout(() => confirmWarningRef.current?.focus(), 100)
+    return () => clearTimeout(timer)
+  }, [odometerWarning])
   const selectedRecordType = types.find((t) => t.id === Number(watchedRecordTypeId))
   const recordTracksMileage = selectedRecordType ? !!selectedRecordType.tracks_mileage : true
   const selectedRecordTruck = trucks.find((t) => t.id === Number(watchedRecordTruckId))
@@ -931,6 +942,7 @@ export function MaintenancePage() {
                   </p>
                   <div>
                     <Button
+                      ref={confirmWarningRef}
                       type="button"
                       variant="ghost"
                       disabled={isSavingRecord}
