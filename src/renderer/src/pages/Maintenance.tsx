@@ -2,6 +2,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Controller, useForm } from 'react-hook-form'
 import { useLocation, useNavigate } from 'react-router-dom'
+import { type OdometerWarning, getOdometerWarning } from '../../../shared/maintenanceOdometer'
 import { maintenanceRecordSchema, maintenanceTypeSchema } from '../../../shared/schemas'
 import { PageHeader } from '../components/PageHeader'
 import {
@@ -112,6 +113,10 @@ export function MaintenancePage() {
   // Modals
   const [recordModal, setRecordModal] = useState(false)
   const [pendingRecord, setPendingRecord] = useState<any>(null)
+  const [odometerWarning, setOdometerWarning] = useState<{
+    warning: OdometerWarning
+    data: RecordFormData
+  } | null>(null)
   const [showRecordDiscardConfirm, setShowRecordDiscardConfirm] = useState(false)
   const [typesView, setTypesView] = useState<null | 'list' | 'form'>(null)
   const [editingType, setEditingType] = useState<MaintenanceType | null>(null)
@@ -225,7 +230,7 @@ export function MaintenancePage() {
     }
   }, [recordModal, resetRecord])
 
-  async function saveRecord(data: RecordFormData) {
+  async function saveRecord(data: RecordFormData, confirmed = false) {
     const type = types.find((t) => t.id === Number(data.maintenance_type_id))
     const odometer =
       data.odometer_at_service === '' || data.odometer_at_service == null
@@ -240,16 +245,18 @@ export function MaintenancePage() {
       })
       return
     }
-    if (odometer != null) {
-      const truck = trucks.find((t) => t.id === Number(data.truck_id))
-      if (truck && odometer < truck.current_odometer) {
+    // Late entries legitimately carry a km behind the truck's current odometer, so an
+    // inconsistent km only triggers a warning the user can confirm — never a block.
+    if (odometer != null && !confirmed) {
+      const readings = await window.api.maintenance.getOdometerReadings(Number(data.truck_id))
+      const warning = getOdometerWarning(readings, data.date, odometer)
+      if (warning) {
         setPendingRecord(null)
-        setRecordError('odometer_at_service', {
-          message: `Não pode ser menor que o odômetro atual do caminhão (${truck.current_odometer.toLocaleString('pt-BR')} km).`,
-        })
+        setOdometerWarning({ warning, data })
         return
       }
     }
+    setOdometerWarning(null)
 
     const result = await window.api.maintenance.createRecord(data as any)
     if (result?.ok === false) {
@@ -382,6 +389,13 @@ export function MaintenancePage() {
   // Selected type in the record form drives whether operational mileage is required.
   const watchedRecordTypeId = watchRecord('maintenance_type_id')
   const watchedRecordTruckId = watchRecord('truck_id')
+  const watchedRecordDate = watchRecord('date')
+  const watchedRecordOdometer = watchRecord('odometer_at_service')
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: clear the stale warning when the inputs it was computed from change
+  useEffect(() => {
+    setOdometerWarning(null)
+  }, [watchedRecordTruckId, watchedRecordDate, watchedRecordOdometer])
   const selectedRecordType = types.find((t) => t.id === Number(watchedRecordTypeId))
   const recordTracksMileage = selectedRecordType ? !!selectedRecordType.tracks_mileage : true
   const selectedRecordTruck = trucks.find((t) => t.id === Number(watchedRecordTruckId))
@@ -884,6 +898,33 @@ export function MaintenancePage() {
                     ? 'Usada para recalcular e reiniciar o intervalo de manutenção deste tipo.'
                     : 'Tipo informativo — não afeta o controle de quilometragem da frota. Preenchimento opcional.'}
                 </p>
+              )}
+              {odometerWarning && (
+                <div
+                  role="alert"
+                  className="flex flex-col gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-on-surface"
+                >
+                  <p>
+                    {odometerWarning.warning.kind === 'below_previous'
+                      ? 'Km menor que o último registro'
+                      : 'Km maior que o próximo registro'}{' '}
+                    ({odometerWarning.warning.reference.odometer.toLocaleString('pt-BR')} km em{' '}
+                    {odometerWarning.warning.reference.date.split('-').reverse().join('/')},{' '}
+                    {odometerWarning.warning.reference.source === 'fuel'
+                      ? 'abastecimento'
+                      : 'manutenção'}
+                    ). Confira o valor ou confirme para salvar mesmo assim.
+                  </p>
+                  <div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      onClick={() => saveRecord(odometerWarning.data, true)}
+                    >
+                      Salvar mesmo assim
+                    </Button>
+                  </div>
+                </div>
               )}
               {selectedRecordTruck && (
                 <p className="text-xs text-on-surface-variant">
