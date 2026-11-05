@@ -2,6 +2,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Controller, useForm } from 'react-hook-form'
 import { useLocation, useNavigate } from 'react-router-dom'
+import { type OdometerWarning, getOdometerWarning } from '../../../shared/maintenanceOdometer'
 import { maintenanceRecordSchema, maintenanceTypeSchema } from '../../../shared/schemas'
 import { PageHeader } from '../components/PageHeader'
 import {
@@ -112,6 +113,8 @@ export function MaintenancePage() {
   // Modals
   const [recordModal, setRecordModal] = useState(false)
   const [pendingRecord, setPendingRecord] = useState<any>(null)
+  const [isSavingRecord, setIsSavingRecord] = useState(false)
+  const [odometerWarning, setOdometerWarning] = useState<OdometerWarning | null>(null)
   const [showRecordDiscardConfirm, setShowRecordDiscardConfirm] = useState(false)
   const [typesView, setTypesView] = useState<null | 'list' | 'form'>(null)
   const [editingType, setEditingType] = useState<MaintenanceType | null>(null)
@@ -138,6 +141,7 @@ export function MaintenancePage() {
   const typeSelectRef = useRef<SelectRef>(null)
   const dateRef = useRef<HTMLInputElement>(null)
   const odometerRef = useRef<HTMLInputElement>(null)
+  const confirmWarningRef = useRef<HTMLButtonElement>(null)
   const notesRef = useRef<HTMLInputElement>(null)
 
   const {
@@ -225,7 +229,22 @@ export function MaintenancePage() {
     }
   }, [recordModal, resetRecord])
 
-  async function saveRecord(data: RecordFormData) {
+  async function saveRecord(data: RecordFormData, confirmed = false) {
+    if (isSavingRecord) {
+      return
+    }
+    setIsSavingRecord(true)
+    try {
+      await persistRecord(data, confirmed)
+    } finally {
+      setIsSavingRecord(false)
+    }
+  }
+
+  async function persistRecord(data: RecordFormData, confirmed: boolean) {
+    // A warning that is still on screen has already been seen: submitting again with the
+    // same truck/date/km (any change clears it) counts as confirming it.
+    const acknowledged = confirmed || odometerWarning != null
     const type = types.find((t) => t.id === Number(data.maintenance_type_id))
     const odometer =
       data.odometer_at_service === '' || data.odometer_at_service == null
@@ -240,16 +259,18 @@ export function MaintenancePage() {
       })
       return
     }
-    if (odometer != null) {
-      const truck = trucks.find((t) => t.id === Number(data.truck_id))
-      if (truck && odometer < truck.current_odometer) {
+    // Late entries legitimately carry a km behind the truck's current odometer, so an
+    // inconsistent km only triggers a warning the user can confirm — never a block.
+    if (odometer != null && !acknowledged) {
+      const readings = await window.api.maintenance.getOdometerReadings(Number(data.truck_id))
+      const warning = getOdometerWarning(readings, data.date, odometer)
+      if (warning) {
         setPendingRecord(null)
-        setRecordError('odometer_at_service', {
-          message: `Não pode ser menor que o odômetro atual do caminhão (${truck.current_odometer.toLocaleString('pt-BR')} km).`,
-        })
+        setOdometerWarning(warning)
         return
       }
     }
+    setOdometerWarning(null)
 
     const result = await window.api.maintenance.createRecord(data as any)
     if (result?.ok === false) {
@@ -274,7 +295,10 @@ export function MaintenancePage() {
   }
 
   const onRecordSubmit = (data: RecordFormData) => saveRecord(data)
-  const onRecordEnterSubmit = (data: RecordFormData) => setPendingRecord(data)
+  // With the km warning already on screen, Enter confirms it directly instead of
+  // asking "Confirmar o registro?" and then showing the same warning again.
+  const onRecordEnterSubmit = (data: RecordFormData) =>
+    odometerWarning ? saveRecord(data, true) : setPendingRecord(data)
 
   const handleRecordEscape = () => {
     if (isRecordDirty) {
@@ -382,6 +406,23 @@ export function MaintenancePage() {
   // Selected type in the record form drives whether operational mileage is required.
   const watchedRecordTypeId = watchRecord('maintenance_type_id')
   const watchedRecordTruckId = watchRecord('truck_id')
+  const watchedRecordDate = watchRecord('date')
+  const watchedRecordOdometer = watchRecord('odometer_at_service')
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: clear the stale warning when the inputs it was computed from change
+  useEffect(() => {
+    setOdometerWarning(null)
+  }, [watchedRecordTruckId, watchedRecordDate, watchedRecordOdometer])
+
+  // Move focus to "Salvar mesmo assim" when the km warning appears, so the keyboard
+  // flow continues there. The delay lets a closing ConfirmModal release focus first.
+  useEffect(() => {
+    if (!odometerWarning) {
+      return
+    }
+    const timer = setTimeout(() => confirmWarningRef.current?.focus(), 100)
+    return () => clearTimeout(timer)
+  }, [odometerWarning])
   const selectedRecordType = types.find((t) => t.id === Number(watchedRecordTypeId))
   const recordTracksMileage = selectedRecordType ? !!selectedRecordType.tracks_mileage : true
   const selectedRecordTruck = trucks.find((t) => t.id === Number(watchedRecordTruckId))
@@ -885,6 +926,33 @@ export function MaintenancePage() {
                     : 'Tipo informativo — não afeta o controle de quilometragem da frota. Preenchimento opcional.'}
                 </p>
               )}
+              {odometerWarning && (
+                <div
+                  role="alert"
+                  className="flex flex-col gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-on-surface"
+                >
+                  <p>
+                    {odometerWarning.kind === 'below_previous'
+                      ? 'Km menor que o último registro'
+                      : 'Km maior que o próximo registro'}{' '}
+                    ({odometerWarning.reference.odometer.toLocaleString('pt-BR')} km em{' '}
+                    {odometerWarning.reference.date.split('-').reverse().join('/')},{' '}
+                    {odometerWarning.reference.source === 'fuel' ? 'abastecimento' : 'manutenção'}
+                    ). Confira o valor ou confirme para salvar mesmo assim.
+                  </p>
+                  <div>
+                    <Button
+                      ref={confirmWarningRef}
+                      type="button"
+                      variant="ghost"
+                      disabled={isSavingRecord}
+                      onClick={() => handleRecord((current) => saveRecord(current, true))()}
+                    >
+                      Salvar mesmo assim
+                    </Button>
+                  </div>
+                </div>
+              )}
               {selectedRecordTruck && (
                 <p className="text-xs text-on-surface-variant">
                   Odômetro atual do caminhão:{' '}
@@ -922,7 +990,9 @@ export function MaintenancePage() {
             <Button variant="ghost" onClick={() => setRecordModal(false)}>
               Cancelar
             </Button>
-            <Button onClick={handleRecord(onRecordSubmit as any)}>Registrar</Button>
+            <Button disabled={isSavingRecord} onClick={handleRecord(onRecordSubmit as any)}>
+              Registrar
+            </Button>
           </div>
         </Modal>
       )}

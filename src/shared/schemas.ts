@@ -251,8 +251,9 @@ export const maintenanceRecordSchema = z.object({
   truck_id: requiredNumber(999999999, 'ID inválido'),
   maintenance_type_id: requiredNumber(999999999, 'ID inválido'),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data inválida'),
-  // Optional at the schema level: required only for mileage-tracking types, and
-  // validated against the truck's current odometer — both enforced in the handler.
+  // Optional at the schema level: required only for mileage-tracking types, which the
+  // handler enforces. The km is never blocked against the truck's current odometer
+  // (late entries); the UI only warns about inconsistencies.
   odometer_at_service: optionalNumber(9999999, 'KM máximo de 9.999.999'),
   notes: z.string().max(500).optional(),
 })
