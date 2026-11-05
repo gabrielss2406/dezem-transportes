@@ -113,10 +113,7 @@ export function MaintenancePage() {
   // Modals
   const [recordModal, setRecordModal] = useState(false)
   const [pendingRecord, setPendingRecord] = useState<any>(null)
-  const [odometerWarning, setOdometerWarning] = useState<{
-    warning: OdometerWarning
-    data: RecordFormData
-  } | null>(null)
+  const [odometerWarning, setOdometerWarning] = useState<OdometerWarning | null>(null)
   const [showRecordDiscardConfirm, setShowRecordDiscardConfirm] = useState(false)
   const [typesView, setTypesView] = useState<null | 'list' | 'form'>(null)
   const [editingType, setEditingType] = useState<MaintenanceType | null>(null)
@@ -252,7 +249,7 @@ export function MaintenancePage() {
       const warning = getOdometerWarning(readings, data.date, odometer)
       if (warning) {
         setPendingRecord(null)
-        setOdometerWarning({ warning, data })
+        setOdometerWarning(warning)
         return
       }
     }
@@ -905,21 +902,19 @@ export function MaintenancePage() {
                   className="flex flex-col gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-on-surface"
                 >
                   <p>
-                    {odometerWarning.warning.kind === 'below_previous'
+                    {odometerWarning.kind === 'below_previous'
                       ? 'Km menor que o último registro'
                       : 'Km maior que o próximo registro'}{' '}
-                    ({odometerWarning.warning.reference.odometer.toLocaleString('pt-BR')} km em{' '}
-                    {odometerWarning.warning.reference.date.split('-').reverse().join('/')},{' '}
-                    {odometerWarning.warning.reference.source === 'fuel'
-                      ? 'abastecimento'
-                      : 'manutenção'}
+                    ({odometerWarning.reference.odometer.toLocaleString('pt-BR')} km em{' '}
+                    {odometerWarning.reference.date.split('-').reverse().join('/')},{' '}
+                    {odometerWarning.reference.source === 'fuel' ? 'abastecimento' : 'manutenção'}
                     ). Confira o valor ou confirme para salvar mesmo assim.
                   </p>
                   <div>
                     <Button
                       type="button"
                       variant="ghost"
-                      onClick={() => saveRecord(odometerWarning.data, true)}
+                      onClick={() => handleRecord((current) => saveRecord(current, true))()}
                     >
                       Salvar mesmo assim
                     </Button>
