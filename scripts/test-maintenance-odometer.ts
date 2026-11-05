@@ -39,4 +39,25 @@ assert.deepEqual(getOdometerWarning([r21, r18], '2026-11-20', 9000), {
   reference: r18,
 })
 
+// Same-day readings have no time of day, so they never count as previous/next:
+// a morning service at 9.900 and an evening fuel stop at 10.000 must not warn each other.
+const sameDayService: OdometerReading = {
+  date: '2026-11-20',
+  odometer: 9900,
+  source: 'maintenance',
+}
+const sameDayFuel: OdometerReading = { date: '2026-11-20', odometer: 10000, source: 'fuel' }
+const withSameDay = [r18, r21, sameDayService, sameDayFuel]
+
+assert.equal(getOdometerWarning(withSameDay, '2026-11-20', 9900), null)
+assert.equal(getOdometerWarning(withSameDay, '2026-11-20', 10000), null)
+assert.deepEqual(getOdometerWarning(withSameDay, '2026-11-20', 9000), {
+  kind: 'below_previous',
+  reference: r18,
+})
+assert.deepEqual(getOdometerWarning(withSameDay, '2026-11-20', 12000), {
+  kind: 'above_next',
+  reference: r21,
+})
+
 console.log('maintenance odometer tests passed')

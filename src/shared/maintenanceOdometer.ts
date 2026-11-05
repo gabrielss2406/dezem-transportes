@@ -14,8 +14,10 @@ export type OdometerWarning = {
  * Compares a maintenance odometer with the truck's readings around the service date.
  * Never blocks: it only reports the reading the value disagrees with, if any.
  *
- * Previous = latest reading on or before `date` (ties: highest km).
- * Next = earliest reading after `date` (ties: lowest km).
+ * Previous = latest reading strictly before `date` (ties: highest km).
+ * Next = earliest reading strictly after `date` (ties: lowest km).
+ * Readings on the same date are ignored: dates carry no time of day, so their order
+ * is unknown and comparing against them would warn about valid same-day entries.
  */
 export function getOdometerWarning(
   readings: OdometerReading[],
@@ -26,7 +28,10 @@ export function getOdometerWarning(
   let next: OdometerReading | null = null
 
   for (const reading of readings) {
-    if (reading.date <= date) {
+    if (reading.date === date) {
+      continue
+    }
+    if (reading.date < date) {
       if (
         !previous ||
         reading.date > previous.date ||
