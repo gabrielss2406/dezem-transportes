@@ -113,6 +113,7 @@ export function MaintenancePage() {
   // Modals
   const [recordModal, setRecordModal] = useState(false)
   const [pendingRecord, setPendingRecord] = useState<any>(null)
+  const [isSavingRecord, setIsSavingRecord] = useState(false)
   const [odometerWarning, setOdometerWarning] = useState<OdometerWarning | null>(null)
   const [showRecordDiscardConfirm, setShowRecordDiscardConfirm] = useState(false)
   const [typesView, setTypesView] = useState<null | 'list' | 'form'>(null)
@@ -228,6 +229,21 @@ export function MaintenancePage() {
   }, [recordModal, resetRecord])
 
   async function saveRecord(data: RecordFormData, confirmed = false) {
+    if (isSavingRecord) {
+      return
+    }
+    setIsSavingRecord(true)
+    try {
+      await persistRecord(data, confirmed)
+    } finally {
+      setIsSavingRecord(false)
+    }
+  }
+
+  async function persistRecord(data: RecordFormData, confirmed: boolean) {
+    // A warning that is still on screen has already been seen: submitting again with the
+    // same truck/date/km (any change clears it) counts as confirming it.
+    const acknowledged = confirmed || odometerWarning != null
     const type = types.find((t) => t.id === Number(data.maintenance_type_id))
     const odometer =
       data.odometer_at_service === '' || data.odometer_at_service == null
@@ -244,7 +260,7 @@ export function MaintenancePage() {
     }
     // Late entries legitimately carry a km behind the truck's current odometer, so an
     // inconsistent km only triggers a warning the user can confirm — never a block.
-    if (odometer != null && !confirmed) {
+    if (odometer != null && !acknowledged) {
       const readings = await window.api.maintenance.getOdometerReadings(Number(data.truck_id))
       const warning = getOdometerWarning(readings, data.date, odometer)
       if (warning) {
@@ -278,7 +294,10 @@ export function MaintenancePage() {
   }
 
   const onRecordSubmit = (data: RecordFormData) => saveRecord(data)
-  const onRecordEnterSubmit = (data: RecordFormData) => setPendingRecord(data)
+  // With the km warning already on screen, Enter confirms it directly instead of
+  // asking "Confirmar o registro?" and then showing the same warning again.
+  const onRecordEnterSubmit = (data: RecordFormData) =>
+    odometerWarning ? saveRecord(data, true) : setPendingRecord(data)
 
   const handleRecordEscape = () => {
     if (isRecordDirty) {
@@ -914,6 +933,7 @@ export function MaintenancePage() {
                     <Button
                       type="button"
                       variant="ghost"
+                      disabled={isSavingRecord}
                       onClick={() => handleRecord((current) => saveRecord(current, true))()}
                     >
                       Salvar mesmo assim
@@ -958,7 +978,9 @@ export function MaintenancePage() {
             <Button variant="ghost" onClick={() => setRecordModal(false)}>
               Cancelar
             </Button>
-            <Button onClick={handleRecord(onRecordSubmit as any)}>Registrar</Button>
+            <Button disabled={isSavingRecord} onClick={handleRecord(onRecordSubmit as any)}>
+              Registrar
+            </Button>
           </div>
         </Modal>
       )}
