@@ -114,6 +114,8 @@ contextBridge.exposeInMainWorld('api', {
     createRecord: (data: any) => ipcRenderer.invoke('maintenance:createRecord', data),
     deleteRecord: (id: number) => ipcRenderer.invoke('maintenance:deleteRecord', id),
     getStatus: (filters?: any) => ipcRenderer.invoke('maintenance:getStatus', filters),
+    getOdometerReadings: (truckId: number) =>
+      ipcRenderer.invoke('maintenance:getOdometerReadings', truckId),
   },
 
   // Costs

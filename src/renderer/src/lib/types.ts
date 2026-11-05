@@ -1,3 +1,5 @@
+import type { OdometerReading } from '../../../shared/maintenanceOdometer'
+
 export interface Customer {
   id: number
   customId?: number
@@ -495,6 +497,7 @@ declare global {
         createRecord(data: any): Promise<{ id: number; ok?: boolean; errors?: any }>
         deleteRecord(id: number): Promise<{ ok: boolean }>
         getStatus(filters?: any): Promise<TruckMaintenanceStatus[]>
+        getOdometerReadings(truckId: number): Promise<OdometerReading[]>
       }
       costs: {
         list(filters?: any): Promise<Cost[]>

@@ -1,5 +1,6 @@
 import type Database from 'better-sqlite3'
 import { ipcMain } from 'electron'
+import type { OdometerReading } from '../../../shared/maintenanceOdometer'
 import { maintenanceRecordSchema, maintenanceTypeSchema } from '../../../shared/schemas'
 import type { TruckMaintenanceStatus, TruckMaintenanceTypeStatus } from '../../../shared/types'
 import { getDb } from '../../database'
@@ -46,7 +47,9 @@ export function getMaintenanceStatus(
     types: types.map((type) => {
       const lastRecord = getLastRecord.get(truck.id, type.id) as any
       const km_since_last =
-        lastRecord != null ? truck.current_odometer - lastRecord.odometer_at_service : null
+        lastRecord != null
+          ? Math.max(0, truck.current_odometer - lastRecord.odometer_at_service)
+          : null
       const km_remaining = km_since_last != null ? type.interval_km - km_since_last : null
 
       let status: TruckMaintenanceTypeStatus['status']
@@ -196,22 +199,8 @@ export function registerMaintenanceHandlers(): void {
       }
     }
 
-    // When a reading is given (even for an informational type), it can't be behind
-    // the truck's current recorded odometer.
-    if (odometer != null) {
-      const truck = db()
-        .prepare('SELECT current_odometer FROM trucks WHERE id = ?')
-        .get((data as any).truck_id) as { current_odometer: number } | undefined
-      if (truck && odometer < truck.current_odometer) {
-        return {
-          ok: false,
-          errors: {
-            odometer_at_service: `Não pode ser menor que o odômetro atual do caminhão (${truck.current_odometer.toFixed(0)} km).`,
-          },
-        }
-      }
-    }
-
+    // The reading is the truck's odometer on the service date, which may be behind its
+    // current odometer (late entries). Inconsistencies are warned about in the UI only.
     const r = db()
       .prepare(
         'INSERT INTO maintenance_records (truck_id, maintenance_type_id, date, odometer_at_service, notes) VALUES (?,?,?,?,?)',
@@ -229,6 +218,19 @@ export function registerMaintenanceHandlers(): void {
   createIdValidatedHandler('maintenance:deleteRecord', (id) => {
     db().prepare('DELETE FROM maintenance_records WHERE id=?').run(id)
     return { ok: true }
+  })
+
+  // Odometer readings (fuel + maintenance) used by the UI to warn about inconsistent km.
+  ipcMain.handle('maintenance:getOdometerReadings', (_e, truckId: number): OdometerReading[] => {
+    return db()
+      .prepare(
+        `SELECT date, odometer_at_service AS odometer, 'fuel' AS source
+           FROM fuel_records WHERE truck_id = ? AND odometer_at_service IS NOT NULL
+         UNION ALL
+         SELECT date, odometer_at_service AS odometer, 'maintenance' AS source
+           FROM maintenance_records WHERE truck_id = ? AND odometer_at_service IS NOT NULL`,
+      )
+      .all(truckId, truckId) as OdometerReading[]
   })
 
   ipcMain.handle('maintenance:getStatus', (_e, filters: any = {}) => {
